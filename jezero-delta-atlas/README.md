@@ -1,0 +1,66 @@
+# Jezero Delta Atlas
+
+Interactive map of the western Jezero Crater delta and the mouth of the Neretva Vallis channel on Mars (CTX imagery), with a Python model that marks craters as walking hazards. Crater marks sit in their own layers, switched on and off from the Layers menu.
+
+## Map area
+
+North-west corner 18.57188°N, 77.22318°E; south-east corner 18.44176°N, 77.41956°E (about 11.0 km by 7.2 km, 9.7 m per pixel, 1144 x 799 px). The corners are set in one place, `NW` and `SE` at the top of `integration/web_bridge.py`. The first version of the atlas covered 77.10–77.80°E, 18.10–18.75°N; its image, crater list and CSV are kept in `archive/old-area-77.10-77.80E-18.10-18.75N/`.
+
+## Layout
+
+| Folder | File | Purpose |
+|---|---|---|
+| `web/html/` | `index.html` | page structure |
+| `web/css/` | `atlas-styles.css` | styles, light and dark themes, layers menu |
+| `web/js/` | `atlas-map.js` | pan/zoom, overlay layers, checklist menu |
+| `web/data/` | `craters-data.js` | model output the page reads (generated) |
+| `web/images/` | `jezero-ctx-mosaic.jpg`, `mars-mola-context.jpg` | basemap and context inset |
+| `model/` | `crater_detector.py` | crater detection (matched filter + random forest) |
+| `integration/` | `fetch_ctx.py` | downloads the CTX image for a lat/lon box |
+| `integration/` | `web_bridge.py` | runs the model, writes the page data and `craters.csv`, builds a single-file bundle |
+| `fonts/` | not in git | Nasalization and Terminal F4, install locally |
+
+## Requirements
+
+- **To just view the page:** a web browser (Chrome, Safari, Firefox, Edge). Nothing to install. An internet connection is optional and only loads the Orbitron and VT323 fonts from Google Fonts.
+- **To re-run the crater model:** Python 3.9 or newer (developed on 3.15) and the packages in `model/requirements.txt`: numpy, scipy, scikit-learn, opencv-python-headless, pillow.
+- **To download a different area:** an internet connection and `curl` (already on macOS and most Linux).
+- **Optional:** the Nasalization and Terminal F4 fonts (in `fonts/`, not in git). Install them on your computer for the intended look.
+
+## See the webpage
+
+**Fastest, no setup:** double-click `dist/jezero-delta-atlas.html` (or `jezero-delta-atlas.html` in the project root). It is a single self-contained file with the map, images and crater data inside.
+
+**From the source files:** open `web/html/index.html` in your browser. It loads `web/data/craters-data.js`, which is generated and not stored in git. If you cloned the repo and that file is missing, run the commands under Run first.
+
+```bash
+open dist/jezero-delta-atlas.html        # macOS; on Windows use start, on Linux xdg-open
+```
+
+On the page: drag to pan, scroll or pinch to zoom, and use the Layers menu to switch crater marks on and off.
+
+## Run (rebuild the data and the single-file bundle)
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r model/requirements.txt
+python integration/fetch_ctx.py --nw 18.57188 77.22318 --se 18.44176 77.41956 --out web/images/jezero-ctx-mosaic.jpg   # only to change the area
+python integration/web_bridge.py all      # detect craters, write web/data/craters-data.js and craters.csv, build dist/
+open web/html/index.html                  # works from disk, no server needed
+```
+
+## Sources
+
+CTX mosaic: Global CTX Mosaic of Mars V01 (5 m/pixel), Bruce Murray Laboratory for Planetary Visualization, Caltech, https://murray-lab.caltech.edu/CTX/. Context inset: NASA Mars Trek, MOLA colour-shaded relief. Sample data: NASA Mars rock samples page.
+
+## Fonts
+
+Titles use Nasalization and map numbers use Terminal F4 when installed on the viewer's computer; otherwise Orbitron and VT323. The free Nasalization licence does not cover web embedding, so the files are not shipped here.
+
+## Crater table
+
+`craters.csv` lists every detected crater (36 in the current area), one per row: ID, size class, diameter in metres, latitude and longitude, model confidence, and pixel position and radius on the CTX image and on the page. It opens in Excel, Numbers or Google Sheets, and `integration/web_bridge.py detect` rewrites it each time the model runs.
+
+## How far to trust the crater marks
+
+The detector has no human labels. For this area it runs with `--zmin 3.5` instead of the default 4.5: at 4.5 it finds only one crater here, because the area has few. The lower setting finds more real craters but also marks some bright outcrops and rock piles, and misses some obvious craters. Marks with confidence below 0.6 (29 of the 36) sit in the "Low-confidence marks" layer, which is off by default. Check against the image before relying on any one mark.

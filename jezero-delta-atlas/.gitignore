@@ -1,0 +1,9 @@
+# generated
+dist/
+model/output/
+web/data/craters-data.js
+.venv/
+__pycache__/
+.DS_Store
+# fonts: Nasalization's free licence covers desktop use only, so keep the files out of the repo
+fonts/
