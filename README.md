@@ -22,7 +22,7 @@ Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks
 | Folder / file | What it is |
 |---|---|
 | `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
-| `pages/mission-intro.html` | Intro page with the mission story and map (needs two video files that are not in the repo yet). |
+| `pages/mission-intro.html` | Intro page with the mission story and map. Its videos live in `pages/assets/`. |
 | `pages/rover-sandstorm-simulator.html` | Prototype: Mars rover path and sandstorm simulator. |
 | `docs/mission-guide.md` | The mission objectives. |
 | `docs/to-do.md` | What the team still has to do. |
