@@ -1,0 +1,60 @@
+Here is the whole mission in one place, with each stop located inside the area your atlas covers (18.44176–18.57188° N, 77.22318–77.41956° E).
+
+## The mission
+
+**Name:** Jezero Pathfinder (a placeholder; rename it if you like).
+
+**Story:** A crew drives a pressurised rover west from flat ground at the foot of the delta, up and across the old river delta, to the ravine where the river once entered the crater. They get out on foot at five stops, then drive back. One day, about 15 km round trip.
+
+**Objective 1:** Find evidence of ancient microbial life.
+**Objective 2:** Assess whether the site can sustain human life (water, shelter from radiation, safe ground).
+
+## The stops
+
+| # | Stop | Lat (°N) | Lon (°E) | Objective | What the crew does |
+|---|---|---|---|---|---|
+| 0 | Base camp, Three Forks floor | 18.447 | 77.408 | 2 | Start and end. Confirm the ground is flat and rock-free enough to live on. |
+| 1 | Three Forks sample depot | 18.4525 | 77.4015 | 1 | Recover the 10 sample tubes: photograph, check seal, log, stow. |
+| 2 | Delta front mudstone | 18.458 | 77.397 | 1 | Find the finest mud layers, look for colour spots or rings, sample below the surface. |
+| 3 | Delta top boulders | 18.480 | 77.385 | 1 (context) | Photograph and sample boulders the river carried in. |
+| 4 | Western delta clay beds | 18.502 | 77.369 | 1 and 2 | Test how much water the clay holds; sample one intact layer. |
+| 5 | Western Breach and Bright Angel | 18.493 | 77.293 | 1 | Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find. |
+
+Stop 5 is now the headline of objective 1. Cheyava Falls is the rock Perseverance reached in July 2024 in the Bright Angel formation, whose sample NASA says carries potential biosignatures. Those outcrops sit on the valley floor just downstream of where the channel cuts through the western rim, which is the Western Breach.
+
+## How sure each location is
+
+- **Stops 4 and 5** were measured from your Mars Trek screenshots (the "Western Delta Deposit" and "Western Breach" points). Good to roughly ±400 m.
+- **Stops 0 to 3** are my estimates, good to about ±500 m at best. NASA's depot map notes the tubes lie on level ground close to the foot of the delta, which fits, but I found no published coordinates.
+- **Your atlas disagrees with me on two places.** It puts Three Forks at about 18.447° N, 77.428° E (just outside your map's east edge) and Hawksbill Gap at 18.479° N, 77.399° E. Both are marked "approximate" in your code. Settle these by hovering over the spots in Mars Trek before your friend builds on them.
+- **Your atlas likely has Cheyava Falls in the wrong place.** Its "Neretva Vallis" label converts to about 18.56° N, 77.25° E, upstream of the breach, while the papers put it downstream.
+
+## For your friend building the routes
+
+The stops as data, with pixel positions on the atlas page (1990 × 1390):
+
+```js
+const STOPS = [
+  { id: "base",        name: "Base camp",               lat: 18.4470, lon: 77.4080, x: 1873, y: 1334 },
+  { id: "depot",       name: "Three Forks depot",       lat: 18.4525, lon: 77.4015, x: 1807, y: 1275 },
+  { id: "delta-front", name: "Delta front mudstone",    lat: 18.4580, lon: 77.3970, x: 1761, y: 1217 },
+  { id: "delta-top",   name: "Delta top boulders",      lat: 18.4800, lon: 77.3850, x: 1640, y:  982 },
+  { id: "clay-beds",   name: "Western delta clay beds", lat: 18.5020, lon: 77.3690, x: 1478, y:  747 },
+  { id: "breach",      name: "Western Breach",          lat: 18.4930, lon: 77.2930, x:  708, y:  843 }
+];
+// Convert any lat/lon to atlas pixels:
+// x = (lon - 77.22318) / 0.19638 * 1990
+// y = (18.57188 - lat) / 0.13012 * 1390
+```
+
+Two tips for the routing:
+
+- **Use your crater marks as obstacles.** Each crater in `craters.csv` has a position and radius, so a route can treat each circle (plus a safety margin) as no-go.
+- **The route-finding code I wrote earlier can be reused.** The `findPath` function in the `app.js` from this chat does this on a grid; your friend can adapt it by marking grid cells inside crater circles as blocked.
+
+One caution: the deck I made lists these same five stops, so if you move or rename any after checking Mars Trek, tell me and I'll update slide 6 to match.
+
+Sources:
+- [NASA: Mars rover discovered potential biosignature](https://www.nasa.gov/news-release/nasa-says-mars-rover-discovered-potential-biosignature-last-year/)
+- [Jones et al. 2026, Bright Angel formation in Neretva Vallis (JGR Planets)](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2025JE009420)
+- [NASA: Perseverance's Three Forks Sample Depot Map](https://science.nasa.gov/photojournal/perseverances-three-forks-sample-depot-map/)
