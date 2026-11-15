@@ -43,3 +43,10 @@ See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re
 ## Team
 
 The Triumvirate.
+
+## License and credits
+
+Code is released under the [MIT License](LICENSE). Basemap imagery comes from the
+Murray Lab CTX global mosaic and NASA MOLA data; the intro and simulator pages use
+NASA Trek tiles. Those remain under their providers' terms. Credit NASA/JPL/Caltech/Murray Lab
+when reusing them.
