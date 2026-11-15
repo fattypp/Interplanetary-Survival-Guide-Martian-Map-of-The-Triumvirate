@@ -83,3 +83,14 @@ h1{font:700 26px/1.1 var(--font-d);margin:0;letter-spacing:.02em;text-transform:
 .chk:hover{background:color-mix(in srgb,var(--fg) 10%,transparent)}
 @media(prefers-reduced-motion:no-preference){#stage.ease{transition:transform .5s cubic-bezier(.2,.7,.2,1)}}
 .tools .zr{font-size:18px}
+
+/* route planner */
+.rt-row{display:flex;gap:8px;align-items:center;margin:8px 0;font:400 13px var(--font-b)}
+.rt-row select{flex:1;min-width:0;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:5px;font:400 13px var(--font-b)}
+.rt-btns{display:flex;gap:8px;flex-wrap:wrap}
+.rt-btns button{border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;padding:6px 10px;font:400 13px var(--font-b)}
+.rt-btns button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rt-btns button.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+#rt-out{margin-top:10px;font:400 14px/1.45 var(--font-m);color:var(--fg)}
+#rt-out .err{color:#ff5a44}
+.mapbox.routing{cursor:crosshair}

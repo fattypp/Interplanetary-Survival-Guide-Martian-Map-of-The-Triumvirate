@@ -69,10 +69,12 @@ def bundle():
     html = (WEB / "html" / "index.html").read_text()
     css = (WEB / "css" / "atlas-styles.css").read_text()
     js = (WEB / "js" / "atlas-map.js").read_text()
+    planner = (WEB / "js" / "route-planner.js").read_text()
     data = DATA_JS.read_text()
     for tag, repl in [
         ('<link rel="stylesheet" href="../css/atlas-styles.css">', f"<style>\n{css}\n</style>"),
         ('<script src="../data/craters-data.js"></script>', f"<script>\n{data}\n</script>"),
+        ('<script src="../js/route-planner.js"></script>', f"<script>\n{planner}\n</script>"),
         ('<script src="../js/atlas-map.js"></script>', f"<script>\n{js}\n</script>"),
     ]:
         if tag not in html:

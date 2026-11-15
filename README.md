@@ -47,6 +47,10 @@ See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re
 
 ![Jezero Delta Atlas](docs/atlas-screenshot.jpg)
 
+## Route planner
+
+The atlas has a **Route planner** panel. Click *Pick start and destination*, then click two points on the map. It finds the fastest route that avoids the detected craters (A* search on a grid of about 17 m cells) and reports the distance in km or m and the travel time for a rover (0.042 m/s) or an astronaut on foot (1.4 m/s). Craters with detector confidence 0.6 or higher are blocked; weaker marks only slow the route down. The code is in `jezero-delta-atlas/web/js/route-planner.js`. Slope, rocks and dunes are not modelled yet, because the repo has no elevation data fine enough for that.
+
 ## Team
 
 The Triumvirate:

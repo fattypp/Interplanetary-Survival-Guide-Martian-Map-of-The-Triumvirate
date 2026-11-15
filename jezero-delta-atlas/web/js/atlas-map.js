@@ -141,6 +141,39 @@ document.getElementById('zi').onclick=function(){var r=map.getBoundingClientRect
 document.getElementById('zo').onclick=function(){var r=map.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/1.5)};
 document.getElementById('zr').onclick=fit;
 window.addEventListener('resize',fit);
+/* Route planner UI: click a start and a destination, A* (route-planner.js) draws the fastest safe route. */
+(function(){
+var rt={on:false,start:null,goal:null,grid:null},plan=L.plan=el('g');
+var go=document.getElementById('rt-go'),clr=document.getElementById('rt-clear'),out=document.getElementById('rt-out'),help=document.getElementById('rt-help'),spd=document.getElementById('rt-speed');
+function pageXY(e){var r=map.getBoundingClientRect(),k=base*v.s;return [(e.clientX-r.left-v.x)/k,(e.clientY-r.top-v.y)/k]}
+function fmtPos(p){var q=ll(p[0],p[1]);return q[1].toFixed(4)+'°N, '+q[0].toFixed(4)+'°E'}
+function fmtDist(m){return m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' m'}
+function fmtTime(s){var m=Math.round(s/60);if(m<60)return m+' min';var h=Math.floor(m/60);return h+' h '+(m%60)+' min'}
+function marker(p,color,label){var g=el('g',{transform:'translate('+p[0]+' '+p[1]+')'},plan),k=el('g',{class:'k'},g);el('circle',{r:7,fill:color,stroke:'#000','stroke-width':2},k);var t=el('text',{x:11,y:5},k);t.textContent=label}
+function say(text,err){out.textContent='';var d=document.createElement('div');if(err)d.className='err';d.textContent=text;out.appendChild(d)}
+function draw(){while(plan.firstChild)plan.removeChild(plan.firstChild);
+ if(rt.route){var pts=rt.route.points.map(function(p){return p.join(',')}).join(' ');
+  el('polyline',{points:pts,fill:'none',stroke:'#000','stroke-width':7,'stroke-linejoin':'round','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},plan);
+  el('polyline',{points:pts,fill:'none',stroke:'#ff4fd8','stroke-width':4,'stroke-linejoin':'round','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},plan)}
+ if(rt.start)marker(rt.start,'#7CFC00','Start');if(rt.goal)marker(rt.goal,'#ff4fd8','Destination')}
+function reset(keepMode){rt.start=rt.goal=rt.route=null;rt.on=!!keepMode;map.classList.toggle('routing',rt.on);go.classList.toggle('on',rt.on);go.textContent=rt.on?'Cancel':'Pick start and destination';draw()}
+function solve(){var speed=parseFloat(spd.value);
+ if(!rt.grid)rt.grid=window.RoutePlanner.buildGrid(CR.craters,CR.meta);
+ var res=window.RoutePlanner.plan(rt.grid,rt.start,rt.goal,speed);
+ if(res.error){rt.goal=null;draw();say(res.error,true);help.textContent='Click another destination.';rt.on=true;return}
+ rt.route=res;rt.on=false;map.classList.remove('routing');go.classList.remove('on');go.textContent='Pick new points';draw();
+ var extra=Math.round((res.distance_m/res.straight_m-1)*100);
+ out.textContent='';[['Route',fmtDist(res.distance_m)+(extra>0?' (+'+extra+'% over the straight line, '+fmtDist(res.straight_m)+')':'')],['Time',fmtTime(res.time_s)],['From',fmtPos(rt.start)],['To',fmtPos(rt.goal)]].forEach(function(r){var d=document.createElement('div'),b=document.createElement('b');b.textContent=r[0]+': ';d.appendChild(b);d.appendChild(document.createTextNode(r[1]));out.appendChild(d)});
+ help.textContent='Craters with detector confidence 0.6 or higher are avoided. Slope and rocks are not modelled.'}
+go.onclick=function(){if(rt.on){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.';return}reset(true);say('');help.textContent='Click the map to set the start.'};
+clr.onclick=function(){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.'};
+spd.onchange=function(){if(rt.route)solve()};
+var down=null;
+map.addEventListener('pointerdown',function(e){down=[e.clientX,e.clientY]},true);
+map.addEventListener('pointerup',function(e){var d=down;down=null;if(!rt.on||!d||Math.hypot(e.clientX-d[0],e.clientY-d[1])>5||e.target.closest('.tools,.menu,.menubtn,.inset'))return;
+ var p=pageXY(e);if(p[0]<0||p[1]<0||p[0]>W||p[1]>H)return;
+ if(!rt.start){rt.start=p;draw();help.textContent='Now click the destination.';say('Start set: '+fmtPos(p))}else{rt.goal=p;draw();solve()}});
+})();
 /* Keyboard access: arrow keys pan, + / - zoom, 0 resets (map must be focused). */
 map.addEventListener('keydown',function(e){if(e.target!==map)return;var r=map.getBoundingClientRect(),st=60,h=true;
  if(e.key==='ArrowLeft')v.x+=st;else if(e.key==='ArrowRight')v.x-=st;else if(e.key==='ArrowUp')v.y+=st;else if(e.key==='ArrowDown')v.y-=st;
