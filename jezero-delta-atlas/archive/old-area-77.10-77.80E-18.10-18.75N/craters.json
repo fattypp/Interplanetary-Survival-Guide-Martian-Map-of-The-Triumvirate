@@ -1,6 +1,6 @@
 {
  "meta": {
-  "image": "/Users/josecarreno/Documents/jezero-delta-atlas/web/images/jezero-ctx-mosaic.jpg",
+  "image": "ctx.jpg",
   "m_per_px": 19.8,
   "threshold": 0.5,
   "sun_bright_wall_deg": 101,
