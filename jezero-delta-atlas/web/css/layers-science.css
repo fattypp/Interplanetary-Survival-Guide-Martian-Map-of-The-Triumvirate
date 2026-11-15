@@ -1,0 +1,21 @@
+/* Science layers legend (simulated data). Uses the theme variables from atlas-styles.css. */
+.sci-legend{position:fixed;right:156px;bottom:12px;z-index:19;display:flex;flex-direction:column;align-items:flex-end;gap:6px;width:min(280px,calc(100vw - 180px));font-family:var(--font-b);color:var(--fg);pointer-events:none}
+.sci-toggle{pointer-events:auto;cursor:pointer;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 92%,transparent);color:var(--fg);font:700 11px var(--font-d);letter-spacing:.06em;padding:6px 12px;box-shadow:var(--shadow)}
+.sci-toggle:focus-visible,.sci-spe input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sci-body{display:flex;flex-direction:column;gap:8px;width:100%;max-height:calc(100vh - 150px);overflow-y:auto;pointer-events:none}
+.sci-body[hidden]{display:none}
+.sci-spe{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;cursor:pointer}
+.sci-click{color:var(--accent)}
+.sci-legend[hidden]{display:none}
+.sci-card{pointer-events:auto;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:12px;padding:8px 10px;box-shadow:var(--shadow);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.sci-card h4{margin:0 0 2px;font:700 11px var(--font-d);letter-spacing:.08em;text-transform:uppercase}
+.sci-sim{display:inline-block;margin-bottom:6px;padding:1px 6px;border:1px dashed var(--accent);border-radius:999px;font-size:10px;color:var(--accent)}
+.sci-bar{position:relative;height:10px;border-radius:5px;border:1px solid var(--line)}
+.sci-tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;box-shadow:0 0 0 1px #000}
+.sci-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:2px}
+.sci-note{margin-top:4px;font-size:10px;line-height:1.35;color:var(--mute)}
+.sci-val{margin-top:6px;padding-top:5px;border-top:1px solid var(--line);font:13px var(--font-m);min-height:1.3em}
+.sci-list{list-style:none;margin:0;padding:0;font-size:11px}
+.sci-list li{display:flex;align-items:center;gap:6px;margin:2px 0}
+.sci-sw{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--line)}
+@media (max-width:640px){.sci-legend{right:12px;bottom:64px;width:min(250px,calc(100vw - 24px))}.sci-body{max-height:calc(100vh - 330px)}}

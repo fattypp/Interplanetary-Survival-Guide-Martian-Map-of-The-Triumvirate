@@ -1,0 +1,90 @@
+/* Mission feature styles (pins on the map + Mission tab). Colours come from the shared theme variables. */
+
+/* ---- pins (inside #ov) ---- */
+#ov .ms-s{transform:scale(var(--inv));transform-box:view-box;transform-origin:0 0}   /* the tip stays on the point at any zoom */
+#ov .ms-pin{outline:none}
+#ov .ms-body{stroke:#000;stroke-width:1.5;fill:var(--accent)}
+#ov .ms-o1 .ms-body{fill:var(--delta)}
+#ov .ms-o2 .ms-body{fill:var(--fan)}
+#ov .ms-o3 .ms-body{fill:var(--margin)}
+#ov .ms-o4 .ms-body{fill:var(--igneous)}
+#ov .ms-multi .ms-body{fill:var(--accent)}
+#ov .ms-none .ms-body{fill:#8a8a8a}
+#ov .ms-custom .ms-body{fill:#2fb36b}
+#ov .ms-approx .ms-body{stroke-dasharray:3 2}
+#ov .ms-edgec{fill:var(--accent);stroke:#000;stroke-width:1.5}
+#ov .ms-arrow{fill:#fff;stroke:#000;stroke-width:1.5;stroke-linejoin:round}
+#ov .ms-edge:focus-visible .ms-edgec{stroke:#fff;stroke-width:3}
+#ov .ms-edge{outline:none}
+#ov .ms-edge:hover,#ov .ms-edge:focus{filter:drop-shadow(0 0 3px #fff)}
+#ov .ms-edge:hover .ms-lab,#ov .ms-edge:focus .ms-lab{display:inline}
+#ov .ms-ghost{pointer-events:none;opacity:.75}
+#ov .ms-ghost .ms-body{stroke-dasharray:3 2}
+#ov .ms-num{font:700 11px var(--font-m);stroke-width:2.5px;pointer-events:none}
+#ov .ms-lab{display:none;font:400 17px var(--font-m);pointer-events:none}
+#ov .ms-pin:hover .ms-lab,#ov .ms-pin:focus .ms-lab{display:inline}
+#ov .ms-pin:hover,#ov .ms-pin:focus{filter:drop-shadow(0 0 3px #fff)}
+#ov .ms-pin:focus-visible .ms-body{stroke:#fff;stroke-width:3}
+#ov .ms-done .ms-body{fill-opacity:.7}
+#ov .ms-tick{fill:#1c8a3c;stroke:#000;stroke-width:1}
+#ov .ms-tickt{font:700 9px var(--font-m);stroke:none;fill:#fff}
+
+/* ---- tab ---- */
+.ms-tab{font-family:var(--font-b);font-size:13px;color:var(--fg)}
+.ms-tab button,.ms-tab input,.ms-tab select,.ms-tab textarea{font-family:inherit;font-size:13px;color:var(--fg)}
+.ms-tab :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ms-intro{margin:0 0 8px;color:var(--mute);line-height:1.4}
+.ms-prog{margin:0 0 4px;font-weight:700}
+.ms-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:4px 0 6px}
+.ms-bar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.ms-bar.big{height:8px}
+.ms-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 10px;color:var(--mute);font-size:12px}
+.ms-legend span{display:inline-flex;align-items:center;gap:5px}
+.ms-sw{display:inline-block;width:11px;height:11px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:1px solid #000;background:var(--accent)}
+.ms-sw.ms-dash{border-style:dashed}
+.ms-sw.ms-arrow-sw{border-radius:50%;transform:none;width:13px;height:13px}
+.ms-sw.ms-o1,.ms-badge.ms-o1{background:var(--delta)}
+.ms-sw.ms-o2,.ms-badge.ms-o2{background:var(--fan)}
+.ms-sw.ms-o3,.ms-badge.ms-o3{background:var(--margin)}
+.ms-sw.ms-o4,.ms-badge.ms-o4{background:var(--igneous)}
+.ms-sw.ms-multi,.ms-badge.ms-multi{background:var(--accent)}
+.ms-sw.ms-custom,.ms-badge.ms-custom{background:#2fb36b}
+.ms-badge.ms-none{background:#8a8a8a}
+.ms-tools{display:flex;gap:6px;margin-bottom:10px}
+.ms-search{flex:1;min-width:0}
+.ms-tab input[type=text],.ms-tab input[type=search],.ms-tab select,.ms-tab textarea{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-s);padding:7px 9px;width:100%;box-sizing:border-box}
+.ms-filter{width:auto!important}
+.ms-sec{border-top:1px solid var(--line);padding:10px 0 4px}
+.ms-sec h3{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:0 0 4px;font:700 13px var(--font-d);letter-spacing:.06em}
+.ms-n{font:400 12px var(--font-m);color:var(--mute);letter-spacing:0;white-space:nowrap}
+.ms-text{margin:0 0 6px;color:var(--mute);line-height:1.4}
+.ms-det summary{cursor:pointer;padding:4px 0;color:var(--mute);font-size:12px}
+.ms-row{display:flex;align-items:center;gap:4px;border-radius:var(--radius-s)}
+.ms-row:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.ms-row.is-done .ms-t b{text-decoration:line-through;opacity:.7}
+.ms-chk{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;cursor:pointer}
+.ms-chk input{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.ms-go{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:5px 4px;border:0;background:none;cursor:pointer;text-align:left}
+.ms-badge{flex:none;min-width:22px;height:22px;padding:0 3px;box-sizing:border-box;border-radius:11px;border:1px solid #000;display:inline-flex;align-items:center;justify-content:center;font:700 11px var(--font-m);color:#fff;text-shadow:0 0 2px #000,0 0 2px #000}
+.ms-badge.ms-off{border-style:dashed;opacity:.65}
+.ms-t{display:flex;flex-direction:column;min-width:0}
+.ms-t b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-t small{color:var(--mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-del{flex:none;min-width:32px;height:30px;border:1px solid var(--line);border-radius:var(--radius-s);background:none;cursor:pointer}
+.ms-del.armed{background:var(--igneous);color:#fff;border-color:var(--igneous)}
+.ms-empty{margin:4px 0 8px;color:var(--mute)}
+.ms-form{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;display:grid;gap:6px}
+.ms-form h3{margin:0;font:700 13px var(--font-d);letter-spacing:.06em}
+.ms-form label,.ms-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+.ms-count{font:400 12px var(--font-m)}
+.ms-count.bad{color:var(--igneous);font-weight:700}
+.ms-latlon{display:flex;gap:6px}
+.ms-locbtn{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ms-btn,.ms-add{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius-s);padding:7px 10px;cursor:pointer}
+.ms-btn[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ms-add{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.ms-hint{margin:0;color:var(--mute);min-height:0}
+.ms-hint:empty{display:none}
+.ms-err{color:var(--igneous);font-weight:600}
+.ms-err:empty{display:none}
+.ms-form input[aria-invalid=true]{border-color:var(--igneous)}
