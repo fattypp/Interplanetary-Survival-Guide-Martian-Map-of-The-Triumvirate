@@ -69,10 +69,43 @@
     speed: 1
   };
 
+  /* ---------- icon set: monochrome line icons (inline SVG, inherit text colour) ---------- */
+  var ICONS = {
+    map: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14',
+    mission: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 11.2a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z',
+    planner: 'M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M4 10h16 M9 3v4 M15 3v4',
+    team: 'M9 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M3 20c0-3 2.7-5 6-5s6 2 6 5 M17 6.5a2.5 2.5 0 1 1 0 5 M17.5 15c2.2.4 4 2 4 5',
+    suit: 'M5 13a7 7 0 0 1 14 0v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z M8.5 11.5h7v4h-7z',
+    personal: 'M3 12h4l2-6 4 12 2-6h6',
+    close: 'M6 6l12 12 M18 6L6 18',
+    layers: 'M12 3l9 5-9 5-9-5z M3 13l9 5 9-5',
+    chat: 'M4 5h16v11H9l-5 4z',
+    check: 'M5 12.5l5 5 9-10',
+    sleep: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+    meal: 'M7 3v8 M4.5 3v5a2.5 2.5 0 0 0 5 0V3 M7 11v10 M17 3c-2.2 2-2.2 6.5 0 8.5V21',
+    recreation: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2',
+    task: 'M7 4h10a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M9.5 9h5 M9.5 13h5 M9.5 17h3',
+    health: 'M3 12h4l2-6 4 12 2-6h6',
+    flag: 'M5 21V4 M5 4h12l-2.5 4L17 12H5',
+    warn: 'M12 3l10 18H2z M12 10v5 M12 18v.5',
+    critical: 'M8 3h8l5 5v8l-5 5H8l-5-5V8z M12 8v5 M12 16v.5',
+    star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z'
+  };
+  function icon(name, size) {
+    var d = ICONS[name]; if (!d) return null;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', size || 18); svg.setAttribute('height', size || 18);
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false'); svg.setAttribute('class', 'icon icon-' + name);
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path);
+    return svg;
+  }
+
   /* ---------- Atlas object ---------- */
   var Atlas = window.Atlas = {
     W: core.W, H: core.H,
-    ll: core.ll, xy: core.xy, el: core.el, h: h,
+    ll: core.ll, xy: core.xy, el: core.el, h: h, icon: icon,
     setInfo: core.setInfo,   // also opens the Map tab through core.onInfo (set below)
     focus: core.focus,
     mapData: core.mapData, store: store, bus: bus, clock: clock, now: clock.now
@@ -202,13 +235,13 @@
     var panel = h('section', { class: 'tabpanel', hidden: true, attrs: { 'aria-labelledby': 'tp-h-' + def.id, 'data-tab': def.id } }, [
       h('div', { class: 'tp-head' }, [
         h('h2', { id: 'tp-h-' + def.id, text: def.title }),
-        h('button', { type: 'button', class: 'tp-x', text: '✕', attrs: { 'aria-label': 'Hide ' + def.title + ' tab' }, onclick: function () { setOpen(def.id, false); btn.focus(); } })
+        h('button', { type: 'button', class: 'tp-x', attrs: { 'aria-label': 'Hide ' + def.title + ' tab' }, onclick: function () { setOpen(def.id, false); btn.focus(); } }, [icon('close', 14)])
       ]),
       body
     ]);
     panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented) { setOpen(def.id, false); btn.focus(); } });
     var btn = h('button', { type: 'button', class: 'dock-tab', attrs: { 'aria-pressed': 'false', 'aria-label': def.title + ' tab' }, onclick: function () { openTab(def.id); } }, [
-      h('span', { class: 'ic', text: def.icon || '•', attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ic', attrs: { 'aria-hidden': 'true' } }, [icon(def.icon, 18) || (def.icon || '')]),
       h('span', { class: 'tt', text: def.title })
     ]);
     tabs[def.id] = { def: def, btn: btn, panel: panel, body: body, rendered: false };
@@ -301,7 +334,7 @@
     var btn = h('button', { type: 'button', class: 'ls-btn', attrs: { 'aria-expanded': 'false', 'aria-controls': 'ls-menu' }, onclick: function () {
       var open = btn.getAttribute('aria-expanded') !== 'true';
       btn.setAttribute('aria-expanded', open ? 'true' : 'false'); lsMenu.hidden = !open; store.set('layers.open', open);
-    } }, [h('span', { text: '☰', attrs: { 'aria-hidden': 'true' } }), 'Layers']);
+    } }, [h('span', { attrs: { 'aria-hidden': 'true' } }, [icon('layers', 16)]), 'Layers']);
     lsMenu = h('div', { id: 'ls-menu', class: 'ls-menu', hidden: true, attrs: { role: 'group', 'aria-label': 'Map layers' } }, lsBody);
     lsMenu.addEventListener('keydown', function (e) { if (e.key === 'Escape') { lsMenu.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.focus(); } });
     var wrap = h('div', { id: 'layersel', class: 'ui' }, [lsMenu, btn]);
@@ -384,7 +417,7 @@
 
   // Map tab: route planner, selected card, sample list. atlas-map.js bound to their ids at load time, so we move the nodes.
   Atlas.registerTab({
-    id: 'map', title: 'Map', icon: '🗺', order: 5,
+    id: 'map', title: 'Map', icon: 'map', order: 5,
     render: function (container) {
       var src = document.getElementById('map-tab-src');
       while (src.firstChild) container.appendChild(src.firstChild);

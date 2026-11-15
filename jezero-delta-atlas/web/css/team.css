@@ -55,3 +55,4 @@
 .team-mk:focus-visible .team-shape{stroke:#fff;stroke-width:4;stroke-dasharray:4 2}
 .team-mk:focus-visible .team-lab{fill:#ffe9a0}
 @media (max-width:640px){.tm-log{height:150px}.tm-input{font-size:16px}}
+.tm-cx{display:inline-flex;align-items:center;justify-content:center}

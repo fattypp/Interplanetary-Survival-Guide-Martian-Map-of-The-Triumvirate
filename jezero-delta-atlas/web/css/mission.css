@@ -88,3 +88,4 @@
 .ms-err{color:var(--igneous);font-weight:600}
 .ms-err:empty{display:none}
 .ms-form input[aria-invalid=true]{border-color:var(--igneous)}
+#ov .ms-tickp{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

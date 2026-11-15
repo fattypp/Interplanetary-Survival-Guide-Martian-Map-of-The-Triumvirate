@@ -489,7 +489,7 @@
   Atlas.bus.on('pick:changed', function (e) { setMoveMode(!!(e && e.owner === 'suit')); });
 
   /* ================= UI: Suit tab ================= */
-  var ICON = { nominal: '✔', caution: '⚠', critical: '⛔', danger: '⛔' };
+  var ICON = { nominal: '●', caution: '▲', critical: '■', danger: '■' };   // plain status shapes (shape + word, never colour alone)
   var WORD = { nominal: 'Nominal', caution: 'Caution', critical: 'Critical', danger: 'Critical' };
 
   function setMoveMode(on) {
@@ -614,7 +614,7 @@
     } else ui.walkInfo.textContent = '';
   }
 
-  Atlas.registerTab({ id: 'suit', title: 'Suit', icon: '🧑‍🚀', order: 40, render: renderSuit });
+  Atlas.registerTab({ id: 'suit', title: 'Suit', icon: 'suit', order: 40, render: renderSuit });
 
   /* ================= UI: Personal tab ================= */
   function renderPersonal(box) {
@@ -666,7 +666,7 @@
     if (!pui) return;
     var ctx = context(nowMs), v = vitals(nowMs, ctx, 0), f = flags(v);
     function put(k, text, bad, why) {
-      var o = pui.vals[k]; o.v.textContent = text; o.f.textContent = bad ? '⚠ ' + why : '✔ normal';
+      var o = pui.vals[k]; o.v.textContent = text; o.f.textContent = bad ? '▲ ' + why : '● normal';
       o.c.classList.toggle('abn', !!bad);
     }
     put('hr', v.heartRate + ' bpm', v.heartRate > 100 || v.heartRate < 50, v.heartRate > 100 ? 'high' : 'low');
@@ -688,7 +688,7 @@
         h('li', { text: 'Hydration ' + last.hydration + ' %' }), h('li', { text: 'Sleep ' + last.sleepHours + ' h' })
       ]));
       var ab = last.abnormal || [];
-      b.appendChild(h('p', { class: ab.length ? 'pe-note abn' : 'pe-note', text: (ab.length ? '⚠ ' : '✔ ') + last.notes }));
+      b.appendChild(h('p', { class: ab.length ? 'pe-note abn' : 'pe-note', text: (ab.length ? '▲ ' : '● ') + last.notes }));
     }
     var key = history.length + ':' + (last ? last.time : '');
     if (pui.key !== key) {
@@ -696,12 +696,12 @@
       drawSpark(pui.spark, history);
       while (pui.hist.firstChild) pui.hist.removeChild(pui.hist.firstChild);
       history.slice().reverse().forEach(function (r) {
-        pui.hist.appendChild(h('li', { text: fmtTime(r.time) + ': ' + r.heartRate + ' bpm, SpO2 ' + r.spo2 + '%, ' + r.temperatureC + ' °C' + ((r.abnormal || []).length ? ' ⚠' : '') }));
+        pui.hist.appendChild(h('li', { text: fmtTime(r.time) + ': ' + r.heartRate + ' bpm, SpO2 ' + r.spo2 + '%, ' + r.temperatureC + ' °C' + ((r.abnormal || []).length ? ' (flagged)' : '') }));
       });
     }
   }
 
-  Atlas.registerTab({ id: 'personal', title: 'Personal', icon: '❤️', order: 50, render: renderPersonal });
+  Atlas.registerTab({ id: 'personal', title: 'Personal', icon: 'personal', order: 50, render: renderPersonal });
 
   /* ---- start ---- */
   setInterval(tick, 1000);

@@ -177,6 +177,8 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
   #toasts{bottom:20px}
 }
 @media(prefers-reduced-motion:reduce){.sos-btn,.tabpanel,.ls-menu,.toast,.sos-dlg{animation:none}.dock-tab,.tools button{transition:none}}
+.icon{display:block;flex:none}
+.dock-tab .ic,.tp-x,.ls-btn>span{display:inline-flex;align-items:center;justify-content:center}
 
 </style>
 <style>
@@ -270,6 +272,7 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .ms-err{color:var(--igneous);font-weight:600}
 .ms-err:empty{display:none}
 .ms-form input[aria-invalid=true]{border-color:var(--igneous)}
+#ov .ms-tickp{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 </style>
 <style>
@@ -362,6 +365,7 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .pl-howto{border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:8px;font-size:12px}
 .pl-howto summary{cursor:pointer;font-weight:700}
 .pl-howto ul{margin:4px 0 0;padding-left:18px}.pl-howto p{margin:6px 0 0}
+.pl-tag .icon,.pl-ico .icon{display:inline-block;vertical-align:-2px}
 
 </style>
 <style>
@@ -496,6 +500,7 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .team-mk:focus-visible .team-shape{stroke:#fff;stroke-width:4;stroke-dasharray:4 2}
 .team-mk:focus-visible .team-lab{fill:#ffe9a0}
 @media (max-width:640px){.tm-log{height:150px}.tm-input{font-size:16px}}
+.tm-cx{display:inline-flex;align-items:center;justify-content:center}
 
 </style>
 </head>
@@ -1562,10 +1567,43 @@ window.AtlasMapCore=core;
     speed: 1
   };
 
+  /* ---------- icon set: monochrome line icons (inline SVG, inherit text colour) ---------- */
+  var ICONS = {
+    map: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14',
+    mission: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 11.2a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z',
+    planner: 'M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M4 10h16 M9 3v4 M15 3v4',
+    team: 'M9 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M3 20c0-3 2.7-5 6-5s6 2 6 5 M17 6.5a2.5 2.5 0 1 1 0 5 M17.5 15c2.2.4 4 2 4 5',
+    suit: 'M5 13a7 7 0 0 1 14 0v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z M8.5 11.5h7v4h-7z',
+    personal: 'M3 12h4l2-6 4 12 2-6h6',
+    close: 'M6 6l12 12 M18 6L6 18',
+    layers: 'M12 3l9 5-9 5-9-5z M3 13l9 5 9-5',
+    chat: 'M4 5h16v11H9l-5 4z',
+    check: 'M5 12.5l5 5 9-10',
+    sleep: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+    meal: 'M7 3v8 M4.5 3v5a2.5 2.5 0 0 0 5 0V3 M7 11v10 M17 3c-2.2 2-2.2 6.5 0 8.5V21',
+    recreation: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2',
+    task: 'M7 4h10a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M9.5 9h5 M9.5 13h5 M9.5 17h3',
+    health: 'M3 12h4l2-6 4 12 2-6h6',
+    flag: 'M5 21V4 M5 4h12l-2.5 4L17 12H5',
+    warn: 'M12 3l10 18H2z M12 10v5 M12 18v.5',
+    critical: 'M8 3h8l5 5v8l-5 5H8l-5-5V8z M12 8v5 M12 16v.5',
+    star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z'
+  };
+  function icon(name, size) {
+    var d = ICONS[name]; if (!d) return null;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', size || 18); svg.setAttribute('height', size || 18);
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false'); svg.setAttribute('class', 'icon icon-' + name);
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path);
+    return svg;
+  }
+
   /* ---------- Atlas object ---------- */
   var Atlas = window.Atlas = {
     W: core.W, H: core.H,
-    ll: core.ll, xy: core.xy, el: core.el, h: h,
+    ll: core.ll, xy: core.xy, el: core.el, h: h, icon: icon,
     setInfo: core.setInfo,   // also opens the Map tab through core.onInfo (set below)
     focus: core.focus,
     mapData: core.mapData, store: store, bus: bus, clock: clock, now: clock.now
@@ -1695,13 +1733,13 @@ window.AtlasMapCore=core;
     var panel = h('section', { class: 'tabpanel', hidden: true, attrs: { 'aria-labelledby': 'tp-h-' + def.id, 'data-tab': def.id } }, [
       h('div', { class: 'tp-head' }, [
         h('h2', { id: 'tp-h-' + def.id, text: def.title }),
-        h('button', { type: 'button', class: 'tp-x', text: '✕', attrs: { 'aria-label': 'Hide ' + def.title + ' tab' }, onclick: function () { setOpen(def.id, false); btn.focus(); } })
+        h('button', { type: 'button', class: 'tp-x', attrs: { 'aria-label': 'Hide ' + def.title + ' tab' }, onclick: function () { setOpen(def.id, false); btn.focus(); } }, [icon('close', 14)])
       ]),
       body
     ]);
     panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented) { setOpen(def.id, false); btn.focus(); } });
     var btn = h('button', { type: 'button', class: 'dock-tab', attrs: { 'aria-pressed': 'false', 'aria-label': def.title + ' tab' }, onclick: function () { openTab(def.id); } }, [
-      h('span', { class: 'ic', text: def.icon || '•', attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ic', attrs: { 'aria-hidden': 'true' } }, [icon(def.icon, 18) || (def.icon || '')]),
       h('span', { class: 'tt', text: def.title })
     ]);
     tabs[def.id] = { def: def, btn: btn, panel: panel, body: body, rendered: false };
@@ -1794,7 +1832,7 @@ window.AtlasMapCore=core;
     var btn = h('button', { type: 'button', class: 'ls-btn', attrs: { 'aria-expanded': 'false', 'aria-controls': 'ls-menu' }, onclick: function () {
       var open = btn.getAttribute('aria-expanded') !== 'true';
       btn.setAttribute('aria-expanded', open ? 'true' : 'false'); lsMenu.hidden = !open; store.set('layers.open', open);
-    } }, [h('span', { text: '☰', attrs: { 'aria-hidden': 'true' } }), 'Layers']);
+    } }, [h('span', { attrs: { 'aria-hidden': 'true' } }, [icon('layers', 16)]), 'Layers']);
     lsMenu = h('div', { id: 'ls-menu', class: 'ls-menu', hidden: true, attrs: { role: 'group', 'aria-label': 'Map layers' } }, lsBody);
     lsMenu.addEventListener('keydown', function (e) { if (e.key === 'Escape') { lsMenu.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.focus(); } });
     var wrap = h('div', { id: 'layersel', class: 'ui' }, [lsMenu, btn]);
@@ -1877,7 +1915,7 @@ window.AtlasMapCore=core;
 
   // Map tab: route planner, selected card, sample list. atlas-map.js bound to their ids at load time, so we move the nodes.
   Atlas.registerTab({
-    id: 'map', title: 'Map', icon: '🗺', order: 5,
+    id: 'map', title: 'Map', icon: 'map', order: 5,
     render: function (container) {
       var src = document.getElementById('map-tab-src');
       while (src.firstChild) container.appendChild(src.firstChild);
@@ -2398,7 +2436,7 @@ window.AtlasMapCore=core;
     var k = A.el('g', { class: 'ms-s' }, g);
     A.el('path', { class: 'ms-body', d: PIN }, k);
     var t = A.el('text', { class: 'ms-num', x: 0, y: -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
-    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); var c = A.el('text', { class: 'ms-tickt', x: 9, y: -3, 'text-anchor': 'middle' }, k); c.textContent = '✓'; }
+    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
     var lab = A.el('text', { class: 'ms-lab', x: 15, y: -14 }, k); lab.textContent = s.title;
     g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); select(s.id); });
     g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); select(s.id); } });
@@ -2535,11 +2573,11 @@ window.AtlasMapCore=core;
   }
   function delButton(m) {
     var armed = false, timer = null;
-    var b = h('button', { type: 'button', class: 'ms-del', text: '✕', attrs: { 'aria-label': 'Delete mission ' + m.title, 'data-key': 'del:' + m.id } });
+    var b = h('button', { type: 'button', class: 'ms-del', text: '×', attrs: { 'aria-label': 'Delete mission ' + m.title, 'data-key': 'del:' + m.id } });
     b.onclick = function () {
       if (!armed) {
         armed = true; b.textContent = 'Sure?'; b.classList.add('armed'); b.setAttribute('aria-label', 'Confirm deleting ' + m.title);
-        timer = setTimeout(function () { armed = false; b.textContent = '✕'; b.classList.remove('armed'); b.setAttribute('aria-label', 'Delete mission ' + m.title); }, 4000);
+        timer = setTimeout(function () { armed = false; b.textContent = '×'; b.classList.remove('armed'); b.setAttribute('aria-label', 'Delete mission ' + m.title); }, 4000);
         return;
       }
       clearTimeout(timer); API.remove(m.id); A.toast('Deleted mission "' + m.title + '"', 'info');
@@ -2683,7 +2721,7 @@ window.AtlasMapCore=core;
   }
 
   A.registerTab({
-    id: 'mission', title: 'Mission', icon: '🎯', order: 10,
+    id: 'mission', title: 'Mission', icon: 'mission', order: 10,
     render: function (container) {
       ui.root = container; container.classList.add('ms-tab');
       ui.prog = h('p', { class: 'ms-prog' });
@@ -3073,7 +3111,7 @@ window.AtlasMapCore=core;
   /* ---------------- UI ---------------- */
   var ui = { ready: false, refreshLists: function () {}, refreshBadges: function () {} };
   var TYPE_LABEL = { sleep: 'Sleep', meal: 'Meal', recreation: 'Break', mission: 'Mission', task: 'Task', health: 'Health' };
-  var TYPE_ICON = { sleep: '🌙', meal: '🍽', recreation: '☕', mission: '🚀', task: '📌', health: '❤' };
+  var TYPE_ICON = { sleep: 'sleep', meal: 'meal', recreation: 'recreation', mission: 'flag', task: 'task', health: 'health' };   // names of Atlas.icon() line icons
 
   function render(container) {
     container.classList.add('planner');
@@ -3172,7 +3210,7 @@ window.AtlasMapCore=core;
     function deadlineChip(t, n) {
       if (!t.deadline) return h('span', { class: 'pl-chip', text: 'No deadline' });
       var d = ms(t.deadline), over = d <= n && !t.done;
-      if (over) return h('span', { class: 'pl-chip overdue', text: '⚠ OVERDUE by ' + dur((n - d) / MIN) + ' (was due ' + when(d) + ')' });
+      if (over) return h('span', { class: 'pl-chip overdue', text: 'OVERDUE by ' + dur((n - d) / MIN) + ' (was due ' + when(d) + ')' });
       return h('span', { class: 'pl-chip' + (d - n < 6 * 3600000 ? ' soon' : ''), text: 'Due ' + when(d) + ' (in ' + dur((d - n) / MIN) + ')' });
     }
     function todoRow(t, kind) {
@@ -3186,7 +3224,7 @@ window.AtlasMapCore=core;
       var info = kind === 'task' && !t.done ? scheduledInfo(t) : null;
       var li = h('li', { class: 'pl-item ' + kind + (t.done ? ' done' : '') + (over ? ' overdue' : '') }, [
         h('div', { class: 'pl-itop' }, [cb, h('label', { class: 'pl-title', for: idDom, text: t.title }),
-          h('span', { class: 'pl-chip imp', text: '★' + t.importance, attrs: { title: 'Importance ' + t.importance + ' of 5', 'aria-label': 'Importance ' + t.importance + ' of 5' } })]),
+          h('span', { class: 'pl-chip imp', text: 'Priority ' + t.importance, attrs: { title: 'Importance ' + t.importance + ' of 5', 'aria-label': 'Importance ' + t.importance + ' of 5' } })]),
         t.description ? h('p', { class: 'pl-desc', text: t.description }) : null,
         h('div', { class: 'pl-meta' }, [deadlineChip(t, n), h('span', { class: 'pl-chip', text: dur(t.estMin) })]),
         info ? h('p', { class: 'pl-sinfo ' + info.cls, text: info.text }) : null
@@ -3239,7 +3277,7 @@ window.AtlasMapCore=core;
       return h('li', { class: 'pl-block t-' + b.type + (done ? ' done' : '') + (now ? ' now' : '') + (late ? ' late' : ''), attrs: { 'data-type': b.type, 'data-id': b.id, 'aria-current': now ? 'time' : null } }, [
         cb,
         h('span', { class: 'pl-time', text: hhmm(s) + '-' + hhmm(e) }),
-        h('span', { class: 'pl-btitle' }, [h('span', { class: 'pl-ico', text: TYPE_ICON[b.type] || '•', attrs: { 'aria-hidden': 'true' } }), ' ' + b.title]),
+        h('span', { class: 'pl-btitle' }, [h('span', { class: 'pl-ico', attrs: { 'aria-hidden': 'true' } }, [Atlas.icon(TYPE_ICON[b.type], 15)]), ' ' + b.title]),
         h('span', { class: 'pl-tag', text: TYPE_LABEL[b.type] || b.type }),
         now ? h('span', { class: 'pl-tag nowtag', text: 'now' }) : null,
         late ? h('span', { class: 'pl-tag late', text: 'not done' }) : null
@@ -3256,7 +3294,7 @@ window.AtlasMapCore=core;
         h('label', { class: 'pl-speed' }, ['Demo clock: ', speedSel])
       ]));
       schedBox.appendChild(h('p', { class: 'pl-note', text: 'Simulated clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
-      var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k, text: (TYPE_ICON[k] || '') + ' ' + TYPE_LABEL[k] }); }));
+      var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k }, [Atlas.icon(TYPE_ICON[k], 12), ' ' + TYPE_LABEL[k]]); }));
       schedBox.appendChild(legend);
       if (S.unsched.length) {
         schedBox.appendChild(h('div', { class: 'pl-warnbox' }, [h('h4', { text: 'Could not schedule (' + S.unsched.length + ')' }),
@@ -3310,7 +3348,7 @@ window.AtlasMapCore=core;
     buildForm(); show('todo');
   }
 
-  Atlas.registerTab({ id: 'planner', title: 'Planner', icon: '📋', order: 20, render: render });
+  Atlas.registerTab({ id: 'planner', title: 'Planner', icon: 'planner', order: 20, render: render });
 
   /* ---------------- start ---------------- */
   (function init() {
@@ -4072,7 +4110,7 @@ window.AtlasMapCore=core;
   Atlas.bus.on('pick:changed', function (e) { setMoveMode(!!(e && e.owner === 'suit')); });
 
   /* ================= UI: Suit tab ================= */
-  var ICON = { nominal: '✔', caution: '⚠', critical: '⛔', danger: '⛔' };
+  var ICON = { nominal: '●', caution: '▲', critical: '■', danger: '■' };   // plain status shapes (shape + word, never colour alone)
   var WORD = { nominal: 'Nominal', caution: 'Caution', critical: 'Critical', danger: 'Critical' };
 
   function setMoveMode(on) {
@@ -4197,7 +4235,7 @@ window.AtlasMapCore=core;
     } else ui.walkInfo.textContent = '';
   }
 
-  Atlas.registerTab({ id: 'suit', title: 'Suit', icon: '🧑‍🚀', order: 40, render: renderSuit });
+  Atlas.registerTab({ id: 'suit', title: 'Suit', icon: 'suit', order: 40, render: renderSuit });
 
   /* ================= UI: Personal tab ================= */
   function renderPersonal(box) {
@@ -4249,7 +4287,7 @@ window.AtlasMapCore=core;
     if (!pui) return;
     var ctx = context(nowMs), v = vitals(nowMs, ctx, 0), f = flags(v);
     function put(k, text, bad, why) {
-      var o = pui.vals[k]; o.v.textContent = text; o.f.textContent = bad ? '⚠ ' + why : '✔ normal';
+      var o = pui.vals[k]; o.v.textContent = text; o.f.textContent = bad ? '▲ ' + why : '● normal';
       o.c.classList.toggle('abn', !!bad);
     }
     put('hr', v.heartRate + ' bpm', v.heartRate > 100 || v.heartRate < 50, v.heartRate > 100 ? 'high' : 'low');
@@ -4271,7 +4309,7 @@ window.AtlasMapCore=core;
         h('li', { text: 'Hydration ' + last.hydration + ' %' }), h('li', { text: 'Sleep ' + last.sleepHours + ' h' })
       ]));
       var ab = last.abnormal || [];
-      b.appendChild(h('p', { class: ab.length ? 'pe-note abn' : 'pe-note', text: (ab.length ? '⚠ ' : '✔ ') + last.notes }));
+      b.appendChild(h('p', { class: ab.length ? 'pe-note abn' : 'pe-note', text: (ab.length ? '▲ ' : '● ') + last.notes }));
     }
     var key = history.length + ':' + (last ? last.time : '');
     if (pui.key !== key) {
@@ -4279,12 +4317,12 @@ window.AtlasMapCore=core;
       drawSpark(pui.spark, history);
       while (pui.hist.firstChild) pui.hist.removeChild(pui.hist.firstChild);
       history.slice().reverse().forEach(function (r) {
-        pui.hist.appendChild(h('li', { text: fmtTime(r.time) + ': ' + r.heartRate + ' bpm, SpO2 ' + r.spo2 + '%, ' + r.temperatureC + ' °C' + ((r.abnormal || []).length ? ' ⚠' : '') }));
+        pui.hist.appendChild(h('li', { text: fmtTime(r.time) + ': ' + r.heartRate + ' bpm, SpO2 ' + r.spo2 + '%, ' + r.temperatureC + ' °C' + ((r.abnormal || []).length ? ' (flagged)' : '') }));
       });
     }
   }
 
-  Atlas.registerTab({ id: 'personal', title: 'Personal', icon: '❤️', order: 50, render: renderPersonal });
+  Atlas.registerTab({ id: 'personal', title: 'Personal', icon: 'personal', order: 50, render: renderPersonal });
 
   /* ---- start ---- */
   setInterval(tick, 1000);
@@ -4421,11 +4459,11 @@ window.AtlasMapCore=core;
   var LIMITS = { o2Low: 25, o2Crit: 10, batLow: 25, batCrit: 10, hrHigh: 120, hrCrit: 150, hrLow: 50 };
   function flags(v) {
     var out = [];
-    if (v.oxygenPct < LIMITS.o2Crit) out.push({ key: 'oxygen', level: 'critical', icon: '⛔', text: 'Oxygen critical' });
-    else if (v.oxygenPct < LIMITS.o2Low) out.push({ key: 'oxygen', level: 'low', icon: '⚠', text: 'Oxygen low' });
-    if (v.batteryPct < LIMITS.batCrit) out.push({ key: 'battery', level: 'critical', icon: '⛔', text: 'Battery critical' });
-    else if (v.batteryPct < LIMITS.batLow) out.push({ key: 'battery', level: 'low', icon: '⚠', text: 'Battery low' });
-    if (v.heartRate >= LIMITS.hrCrit) out.push({ key: 'heart', level: 'critical', icon: '⛔', text: 'Heart rate very high' });
+    if (v.oxygenPct < LIMITS.o2Crit) out.push({ key: 'oxygen', level: 'critical', icon: '■', text: 'Oxygen critical' });
+    else if (v.oxygenPct < LIMITS.o2Low) out.push({ key: 'oxygen', level: 'low', icon: '▲', text: 'Oxygen low' });
+    if (v.batteryPct < LIMITS.batCrit) out.push({ key: 'battery', level: 'critical', icon: '■', text: 'Battery critical' });
+    else if (v.batteryPct < LIMITS.batLow) out.push({ key: 'battery', level: 'low', icon: '▲', text: 'Battery low' });
+    if (v.heartRate >= LIMITS.hrCrit) out.push({ key: 'heart', level: 'critical', icon: '■', text: 'Heart rate very high' });
     else if (v.heartRate >= LIMITS.hrHigh) out.push({ key: 'heart', level: 'high', icon: '▲', text: 'Heart rate high' });
     else if (v.heartRate < LIMITS.hrLow) out.push({ key: 'heart', level: 'low', icon: '▼', text: 'Heart rate low' });
     return out;
@@ -4622,7 +4660,7 @@ window.AtlasMapCore=core;
     c.focusBtn = h('button', { type: 'button', class: 'tm-focus', attrs: { 'aria-label': 'Show ' + m.name + ' on the map' }, onclick: function () { selectMember(m.id, false); } }, [
       h('span', { class: 'tm-name', text: m.name }), h('span', { class: 'tm-sim', text: 'simulated crew' }), c.status
     ]);
-    c.chatBtn = h('button', { type: 'button', class: 'tm-chatbtn', attrs: { 'aria-label': 'Chat with ' + m.name } }, [h('span', { attrs: { 'aria-hidden': 'true' }, text: '💬 ' }), 'Chat', c.badge]);
+    c.chatBtn = h('button', { type: 'button', class: 'tm-chatbtn', attrs: { 'aria-label': 'Chat with ' + m.name } }, [h('span', { attrs: { 'aria-hidden': 'true' } }, [Atlas.icon('chat', 14)]), ' Chat', c.badge]);
     c.chatBtn.addEventListener('click', function () { openChat(m.id); });
     c.el = h('article', { class: 'tm-card', attrs: { 'data-id': m.id, 'aria-label': m.name + ' (simulated crew-mate)' } },
       [c.focusBtn, c.o2.row, c.bat.row, c.hr.row, c.meta, h('div', { class: 'tm-actions' }, c.chatBtn)]);
@@ -4786,7 +4824,7 @@ window.AtlasMapCore=core;
     form.addEventListener('submit', function (e) { e.preventDefault(); sendMessage(); });
     inputEl.addEventListener('input', updateSend);
     chatBox = h('section', { class: 'tm-chat', hidden: true, attrs: { 'aria-labelledby': 'tm-ctitle' } }, [
-      h('div', { class: 'tm-chead' }, [chatTitle, h('button', { type: 'button', class: 'tm-cx', text: '✕', attrs: { 'aria-label': 'Close chat' }, onclick: closeChat })]),
+      h('div', { class: 'tm-chead' }, [chatTitle, h('button', { type: 'button', class: 'tm-cx', attrs: { 'aria-label': 'Close chat' }, onclick: closeChat }, [Atlas.icon('close', 12)])]),
       h('p', { class: 'tm-note', text: 'Simulated crew: replies are canned and made up by this app, not sent by a person.' }),
       logEl, form
     ]);
@@ -4797,7 +4835,7 @@ window.AtlasMapCore=core;
     renderAll();
   }
 
-  Atlas.registerTab({ id: 'team', title: 'Team', icon: '👥', order: 30, render: render });
+  Atlas.registerTab({ id: 'team', title: 'Team', icon: 'team', order: 30, render: render });
 
   /* ---------- simulation loop (driven by Atlas.clock) ---------- */
   var lastSim = Atlas.now().getTime(), ticks = 0;

@@ -9,7 +9,7 @@ A machine-learning model looks at satellite images of Mars (the Jezero Crater de
 that would be dangerous to walk over. For each one it gives the **exact coordinates** and a **guess of what it is**
 (right now: craters). The results are shown on an interactive map.
 
-> ⚠️ The model learns from example obstacles, so the examples must be checked carefully. Bad examples make it
+> **Note:** The model learns from example obstacles, so the examples must be checked carefully. Bad examples make it
 > invent obstacles that aren't there, or miss real ones.
 
 ## Quick start (nothing to install)

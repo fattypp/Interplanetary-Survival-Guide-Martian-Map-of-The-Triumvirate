@@ -94,3 +94,5 @@
   #toasts{bottom:20px}
 }
 @media(prefers-reduced-motion:reduce){.sos-btn,.tabpanel,.ls-menu,.toast,.sos-dlg{animation:none}.dock-tab,.tools button{transition:none}}
+.icon{display:block;flex:none}
+.dock-tab .ic,.tp-x,.ls-btn>span{display:inline-flex;align-items:center;justify-content:center}

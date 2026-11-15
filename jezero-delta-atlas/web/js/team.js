@@ -126,11 +126,11 @@
   var LIMITS = { o2Low: 25, o2Crit: 10, batLow: 25, batCrit: 10, hrHigh: 120, hrCrit: 150, hrLow: 50 };
   function flags(v) {
     var out = [];
-    if (v.oxygenPct < LIMITS.o2Crit) out.push({ key: 'oxygen', level: 'critical', icon: '⛔', text: 'Oxygen critical' });
-    else if (v.oxygenPct < LIMITS.o2Low) out.push({ key: 'oxygen', level: 'low', icon: '⚠', text: 'Oxygen low' });
-    if (v.batteryPct < LIMITS.batCrit) out.push({ key: 'battery', level: 'critical', icon: '⛔', text: 'Battery critical' });
-    else if (v.batteryPct < LIMITS.batLow) out.push({ key: 'battery', level: 'low', icon: '⚠', text: 'Battery low' });
-    if (v.heartRate >= LIMITS.hrCrit) out.push({ key: 'heart', level: 'critical', icon: '⛔', text: 'Heart rate very high' });
+    if (v.oxygenPct < LIMITS.o2Crit) out.push({ key: 'oxygen', level: 'critical', icon: '■', text: 'Oxygen critical' });
+    else if (v.oxygenPct < LIMITS.o2Low) out.push({ key: 'oxygen', level: 'low', icon: '▲', text: 'Oxygen low' });
+    if (v.batteryPct < LIMITS.batCrit) out.push({ key: 'battery', level: 'critical', icon: '■', text: 'Battery critical' });
+    else if (v.batteryPct < LIMITS.batLow) out.push({ key: 'battery', level: 'low', icon: '▲', text: 'Battery low' });
+    if (v.heartRate >= LIMITS.hrCrit) out.push({ key: 'heart', level: 'critical', icon: '■', text: 'Heart rate very high' });
     else if (v.heartRate >= LIMITS.hrHigh) out.push({ key: 'heart', level: 'high', icon: '▲', text: 'Heart rate high' });
     else if (v.heartRate < LIMITS.hrLow) out.push({ key: 'heart', level: 'low', icon: '▼', text: 'Heart rate low' });
     return out;
@@ -327,7 +327,7 @@
     c.focusBtn = h('button', { type: 'button', class: 'tm-focus', attrs: { 'aria-label': 'Show ' + m.name + ' on the map' }, onclick: function () { selectMember(m.id, false); } }, [
       h('span', { class: 'tm-name', text: m.name }), h('span', { class: 'tm-sim', text: 'simulated crew' }), c.status
     ]);
-    c.chatBtn = h('button', { type: 'button', class: 'tm-chatbtn', attrs: { 'aria-label': 'Chat with ' + m.name } }, [h('span', { attrs: { 'aria-hidden': 'true' }, text: '💬 ' }), 'Chat', c.badge]);
+    c.chatBtn = h('button', { type: 'button', class: 'tm-chatbtn', attrs: { 'aria-label': 'Chat with ' + m.name } }, [h('span', { attrs: { 'aria-hidden': 'true' } }, [Atlas.icon('chat', 14)]), ' Chat', c.badge]);
     c.chatBtn.addEventListener('click', function () { openChat(m.id); });
     c.el = h('article', { class: 'tm-card', attrs: { 'data-id': m.id, 'aria-label': m.name + ' (simulated crew-mate)' } },
       [c.focusBtn, c.o2.row, c.bat.row, c.hr.row, c.meta, h('div', { class: 'tm-actions' }, c.chatBtn)]);
@@ -491,7 +491,7 @@
     form.addEventListener('submit', function (e) { e.preventDefault(); sendMessage(); });
     inputEl.addEventListener('input', updateSend);
     chatBox = h('section', { class: 'tm-chat', hidden: true, attrs: { 'aria-labelledby': 'tm-ctitle' } }, [
-      h('div', { class: 'tm-chead' }, [chatTitle, h('button', { type: 'button', class: 'tm-cx', text: '✕', attrs: { 'aria-label': 'Close chat' }, onclick: closeChat })]),
+      h('div', { class: 'tm-chead' }, [chatTitle, h('button', { type: 'button', class: 'tm-cx', attrs: { 'aria-label': 'Close chat' }, onclick: closeChat }, [Atlas.icon('close', 12)])]),
       h('p', { class: 'tm-note', text: 'Simulated crew: replies are canned and made up by this app, not sent by a person.' }),
       logEl, form
     ]);
@@ -502,7 +502,7 @@
     renderAll();
   }
 
-  Atlas.registerTab({ id: 'team', title: 'Team', icon: '👥', order: 30, render: render });
+  Atlas.registerTab({ id: 'team', title: 'Team', icon: 'team', order: 30, render: render });
 
   /* ---------- simulation loop (driven by Atlas.clock) ---------- */
   var lastSim = Atlas.now().getTime(), ticks = 0;

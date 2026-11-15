@@ -357,7 +357,7 @@
   /* ---------------- UI ---------------- */
   var ui = { ready: false, refreshLists: function () {}, refreshBadges: function () {} };
   var TYPE_LABEL = { sleep: 'Sleep', meal: 'Meal', recreation: 'Break', mission: 'Mission', task: 'Task', health: 'Health' };
-  var TYPE_ICON = { sleep: '🌙', meal: '🍽', recreation: '☕', mission: '🚀', task: '📌', health: '❤' };
+  var TYPE_ICON = { sleep: 'sleep', meal: 'meal', recreation: 'recreation', mission: 'flag', task: 'task', health: 'health' };   // names of Atlas.icon() line icons
 
   function render(container) {
     container.classList.add('planner');
@@ -456,7 +456,7 @@
     function deadlineChip(t, n) {
       if (!t.deadline) return h('span', { class: 'pl-chip', text: 'No deadline' });
       var d = ms(t.deadline), over = d <= n && !t.done;
-      if (over) return h('span', { class: 'pl-chip overdue', text: '⚠ OVERDUE by ' + dur((n - d) / MIN) + ' (was due ' + when(d) + ')' });
+      if (over) return h('span', { class: 'pl-chip overdue', text: 'OVERDUE by ' + dur((n - d) / MIN) + ' (was due ' + when(d) + ')' });
       return h('span', { class: 'pl-chip' + (d - n < 6 * 3600000 ? ' soon' : ''), text: 'Due ' + when(d) + ' (in ' + dur((d - n) / MIN) + ')' });
     }
     function todoRow(t, kind) {
@@ -470,7 +470,7 @@
       var info = kind === 'task' && !t.done ? scheduledInfo(t) : null;
       var li = h('li', { class: 'pl-item ' + kind + (t.done ? ' done' : '') + (over ? ' overdue' : '') }, [
         h('div', { class: 'pl-itop' }, [cb, h('label', { class: 'pl-title', for: idDom, text: t.title }),
-          h('span', { class: 'pl-chip imp', text: '★' + t.importance, attrs: { title: 'Importance ' + t.importance + ' of 5', 'aria-label': 'Importance ' + t.importance + ' of 5' } })]),
+          h('span', { class: 'pl-chip imp', text: 'Priority ' + t.importance, attrs: { title: 'Importance ' + t.importance + ' of 5', 'aria-label': 'Importance ' + t.importance + ' of 5' } })]),
         t.description ? h('p', { class: 'pl-desc', text: t.description }) : null,
         h('div', { class: 'pl-meta' }, [deadlineChip(t, n), h('span', { class: 'pl-chip', text: dur(t.estMin) })]),
         info ? h('p', { class: 'pl-sinfo ' + info.cls, text: info.text }) : null
@@ -523,7 +523,7 @@
       return h('li', { class: 'pl-block t-' + b.type + (done ? ' done' : '') + (now ? ' now' : '') + (late ? ' late' : ''), attrs: { 'data-type': b.type, 'data-id': b.id, 'aria-current': now ? 'time' : null } }, [
         cb,
         h('span', { class: 'pl-time', text: hhmm(s) + '-' + hhmm(e) }),
-        h('span', { class: 'pl-btitle' }, [h('span', { class: 'pl-ico', text: TYPE_ICON[b.type] || '•', attrs: { 'aria-hidden': 'true' } }), ' ' + b.title]),
+        h('span', { class: 'pl-btitle' }, [h('span', { class: 'pl-ico', attrs: { 'aria-hidden': 'true' } }, [Atlas.icon(TYPE_ICON[b.type], 15)]), ' ' + b.title]),
         h('span', { class: 'pl-tag', text: TYPE_LABEL[b.type] || b.type }),
         now ? h('span', { class: 'pl-tag nowtag', text: 'now' }) : null,
         late ? h('span', { class: 'pl-tag late', text: 'not done' }) : null
@@ -540,7 +540,7 @@
         h('label', { class: 'pl-speed' }, ['Demo clock: ', speedSel])
       ]));
       schedBox.appendChild(h('p', { class: 'pl-note', text: 'Simulated clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
-      var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k, text: (TYPE_ICON[k] || '') + ' ' + TYPE_LABEL[k] }); }));
+      var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k }, [Atlas.icon(TYPE_ICON[k], 12), ' ' + TYPE_LABEL[k]]); }));
       schedBox.appendChild(legend);
       if (S.unsched.length) {
         schedBox.appendChild(h('div', { class: 'pl-warnbox' }, [h('h4', { text: 'Could not schedule (' + S.unsched.length + ')' }),
@@ -594,7 +594,7 @@
     buildForm(); show('todo');
   }
 
-  Atlas.registerTab({ id: 'planner', title: 'Planner', icon: '📋', order: 20, render: render });
+  Atlas.registerTab({ id: 'planner', title: 'Planner', icon: 'planner', order: 20, render: render });
 
   /* ---------------- start ---------------- */
   (function init() {

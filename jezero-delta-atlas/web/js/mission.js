@@ -129,7 +129,7 @@
     var k = A.el('g', { class: 'ms-s' }, g);
     A.el('path', { class: 'ms-body', d: PIN }, k);
     var t = A.el('text', { class: 'ms-num', x: 0, y: -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
-    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); var c = A.el('text', { class: 'ms-tickt', x: 9, y: -3, 'text-anchor': 'middle' }, k); c.textContent = '✓'; }
+    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
     var lab = A.el('text', { class: 'ms-lab', x: 15, y: -14 }, k); lab.textContent = s.title;
     g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); select(s.id); });
     g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); select(s.id); } });
@@ -266,11 +266,11 @@
   }
   function delButton(m) {
     var armed = false, timer = null;
-    var b = h('button', { type: 'button', class: 'ms-del', text: '✕', attrs: { 'aria-label': 'Delete mission ' + m.title, 'data-key': 'del:' + m.id } });
+    var b = h('button', { type: 'button', class: 'ms-del', text: '×', attrs: { 'aria-label': 'Delete mission ' + m.title, 'data-key': 'del:' + m.id } });
     b.onclick = function () {
       if (!armed) {
         armed = true; b.textContent = 'Sure?'; b.classList.add('armed'); b.setAttribute('aria-label', 'Confirm deleting ' + m.title);
-        timer = setTimeout(function () { armed = false; b.textContent = '✕'; b.classList.remove('armed'); b.setAttribute('aria-label', 'Delete mission ' + m.title); }, 4000);
+        timer = setTimeout(function () { armed = false; b.textContent = '×'; b.classList.remove('armed'); b.setAttribute('aria-label', 'Delete mission ' + m.title); }, 4000);
         return;
       }
       clearTimeout(timer); API.remove(m.id); A.toast('Deleted mission "' + m.title + '"', 'info');
@@ -414,7 +414,7 @@
   }
 
   A.registerTab({
-    id: 'mission', title: 'Mission', icon: '🎯', order: 10,
+    id: 'mission', title: 'Mission', icon: 'mission', order: 10,
     render: function (container) {
       ui.root = container; container.classList.add('ms-tab');
       ui.prog = h('p', { class: 'ms-prog' });

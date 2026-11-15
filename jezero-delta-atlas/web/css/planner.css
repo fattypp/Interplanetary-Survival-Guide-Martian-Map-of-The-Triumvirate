@@ -87,3 +87,4 @@
 .pl-howto{border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:8px;font-size:12px}
 .pl-howto summary{cursor:pointer;font-weight:700}
 .pl-howto ul{margin:4px 0 0;padding-left:18px}.pl-howto p{margin:6px 0 0}
+.pl-tag .icon,.pl-ico .icon{display:inline-block;vertical-align:-2px}
