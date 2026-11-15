@@ -49,7 +49,11 @@ See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re
 
 ## Team
 
-The Triumvirate.
+The Triumvirate:
+
+- Jayesh Araja
+- Jose Perez-Carreño
+- Juhyeok Ahn
 
 ## License and credits
 
