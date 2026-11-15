@@ -1,37 +1,36 @@
 # To-do list
 
-- [ ] Make an engaging and interactive interface
-- [ ] Include all Mission Stops with their information
-- [ ] Create a map with the mission stops (pin points)
-- [ ] Make an sos button on a very visible area(beside the mission button)
-- [ ] make the mission tab from the data on the mission guide
-- [ ] radiation map 
-- [ ] spectral map
-- [ ] topografic map
-- [ ] adapt the algorithm for the radiation map
-- [ ] radiation detection on build suit
-- [ ] inform the user when radiation level are above resistance and close to resistance
-- [ ] round the edges
-- [ ] the whole screen should be only the map with tab
-- [ ] make the interface so that the user can hide and view the different tabs
-- [ ] on the bottom left down corner a layers selector to hide and show the layers(topgrafic,spectral,radiation)
-- [ ] the selector can make so that the layers are stackable on top of our main map
-- [ ] remove credits ONLY FROM THE WEBPAGE BUT STILL ON THE REPO
-- [ ] make that so the user have an input to add misions
-- [ ] to do list apart form the mission objectives so that can input there wanted goals aside form the main mission
-- [ ] on the to do list the user can add description and dead lines
-- [ ] automated schedule on the stay on mars based on the rot do list and mission objevtives
-- [ ] by default the user has to have 8 hours of sleep
-- [ ] by default 1 hour of mental break( recreation)
-- [ ] by default add time to eat
-- [ ] all this numbers on schedule need to be edited on the code but need to be easy to access on an inside readme file
-- [ ] add tab in which we can see other user locations named "team"
-- [ ] on that tab of team also see the oxygen and battery level of their suits and heart rate
-- [ ] make a tab so that we can see the stats of suits (oxygen, battery, condition)
-- [ ] make a tab in which there are personal stats
-- [ ] on the personal stats tab that apear on our last health check
-- [ ] the health check should appear on a time in the schedule and to do list
-- [ ] if the user don't follow the schedule give reminders and adapt the schedule and evaluate the task importance so it can reschedule the best and more efficient way possible
-- [ ] send to earth if the user don't follow the schedule
-- [ ] on the team tab be able to click on one on the other users to communicate
-- [ ] 
+- [X] Make an engaging and interactive interface
+- [x] Include all Mission Stops with their information
+- [x] Create a map with the mission stops (pin points)
+- [x] Make an sos button on a very visible area(beside the mission button)
+- [x] make the mission tab from the data on the mission guide
+- [x] radiation map 
+- [x] spectral map
+- [x] topografic map
+- [x] adapt the algorithm for the radiation map
+- [x] radiation detection on build suit
+- [x] inform the user when radiation level are above resistance and close to resistance
+- [x] round the edges
+- [x] the whole screen should be only the map with tab
+- [x] make the interface so that the user can hide and view the different tabs
+- [x] on the bottom left down corner a layers selector to hide and show the layers(topgrafic,spectral,radiation)
+- [x] the selector can make so that the layers are stackable on top of our main map
+- [x] remove credits ONLY FROM THE WEBPAGE BUT STILL ON THE REPO
+- [x] make that so the user have an input to add misions
+- [x] to do list apart form the mission objectives so that can input there wanted goals aside form the main mission
+- [x] on the to do list the user can add description and dead lines
+- [x] automated schedule on the stay on mars based on the rot do list and mission objevtives
+- [x] by default the user has to have 8 hours of sleep
+- [x] by default 1 hour of mental break( recreation)
+- [x] by default add time to eat
+- [x] all this numbers on schedule need to be edited on the code but need to be easy to access on an inside readme file
+- [x] add tab in which we can see other user locations named "team"
+- [x] on that tab of team also see the oxygen and battery level of their suits and heart rate
+- [x] make a tab so that we can see the stats of suits (oxygen, battery, condition)
+- [x] make a tab in which there are personal stats
+- [x] on the personal stats tab that apear on our last health check
+- [x] the health check should appear on a time in the schedule and to do list
+- [x] if the user don't follow the schedule give reminders and adapt the schedule and evaluate the task importance so it can reschedule the best and more efficient way possible
+- [x] send to earth if the user don't follow the schedule
+- [x] on the team tab be able to click on one on the other users to communicate 
