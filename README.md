@@ -40,6 +40,13 @@ Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks
 
 See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re-run the model.
 
+## Live demo
+
+- Intro page: https://fattypp.github.io/Interplanetary-Survival-Guide-Martian-Map-of-The-Triumvirate/pages/mission-intro.html
+- Atlas: https://fattypp.github.io/Interplanetary-Survival-Guide-Martian-Map-of-The-Triumvirate/jezero-delta-atlas/dist/jezero-delta-atlas.html
+
+![Jezero Delta Atlas](docs/atlas-screenshot.jpg)
+
 ## Team
 
 The Triumvirate.
