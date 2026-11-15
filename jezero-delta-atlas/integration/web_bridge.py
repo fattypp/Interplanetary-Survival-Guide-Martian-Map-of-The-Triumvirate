@@ -70,9 +70,14 @@ def bundle():
     css = (WEB / "css" / "atlas-styles.css").read_text()
     js = (WEB / "js" / "atlas-map.js").read_text()
     data = DATA_JS.read_text()
-    html = html.replace('<link rel="stylesheet" href="../css/atlas-styles.css">', f"<style>\n{css}\n</style>")
-    html = html.replace('<script src="../data/craters-data.js"></script>', f"<script>\n{data}\n</script>")
-    html = html.replace('<script src="../js/atlas-map.js"></script>', f"<script>\n{js}\n</script>")
+    for tag, repl in [
+        ('<link rel="stylesheet" href="../css/atlas-styles.css">', f"<style>\n{css}\n</style>"),
+        ('<script src="../data/craters-data.js"></script>', f"<script>\n{data}\n</script>"),
+        ('<script src="../js/atlas-map.js"></script>', f"<script>\n{js}\n</script>"),
+    ]:
+        if tag not in html:
+            raise SystemExit(f"bundle failed: {tag!r} not found in web/html/index.html")
+        html = html.replace(tag, repl)
     html = re.sub(r'src="\.\./images/([^"]+)"', lambda m: f'src="{data_uri(WEB / "images" / m.group(1))}"', html)
     DIST.parent.mkdir(exist_ok=True)
     DIST.write_text(html)

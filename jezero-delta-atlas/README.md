@@ -4,7 +4,7 @@ Interactive map of the western Jezero Crater delta and the mouth of the Neretva 
 
 ## Map area
 
-North-west corner 18.57188°N, 77.22318°E; south-east corner 18.44176°N, 77.41956°E (about 11.0 km by 7.2 km, 9.7 m per pixel, 1144 x 799 px). The corners are set in one place, `NW` and `SE` at the top of `integration/web_bridge.py`. The first version of the atlas covered 77.10–77.80°E, 18.10–18.75°N; its image, crater list and CSV are kept in `archive/old-area-77.10-77.80E-18.10-18.75N/`.
+North-west corner 18.57188°N, 77.22318°E; south-east corner 18.44176°N, 77.41956°E (about 11.0 km by 7.2 km, 9.7 m per pixel, 1144 x 799 px). The corners are set in one place, `NW` and `SE` at the top of `integration/web_bridge.py`. The first version of the atlas covered 77.10–77.80°E, 18.10–18.75°N; its crater list, CSV and images are kept in `archive/old-area-77.10-77.80E-18.10-18.75N/`.
 
 ## Layout
 

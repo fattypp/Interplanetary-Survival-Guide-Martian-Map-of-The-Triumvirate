@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Jezero Delta Atlas</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=VT323&display=swap">
 <link rel="stylesheet" href="../css/atlas-styles.css">
 </head>
@@ -25,11 +24,11 @@
       <div class="tools"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" style="font-size:18px">⌂</button></div>
       <div class="readout"><div id="ll">hover the map</div><div class="scale"><i id="sb"></i><span id="sl"></span></div></div>
     </div>
-    <p class="note">Basemap: Murray Lab global CTX mosaic (5 m/pixel native, shown at about 10 m/pixel), covering 77.22318–77.41956°E, 18.44176–18.57188°N. Crater marks come from detect_craters.py (matched-filter proposals checked by a random-forest classifier; no human labels, so false marks remain: bright outcrops and rock piles are sometimes marked, and some real craters are missed; the detector runs with a looser setting than usual because this area has few craters). Overlay positions for the delta outline, channel, route and samples were traced by eye on the earlier, larger map and re-projected here by latitude and longitude, so they were anchored to the published landing coordinates (18.4446°N, 77.4509°E), which lie just east of this view; places outside it are not drawn. Treat them as approximate; sample positions are placed by named area, not by individual rover fix.</p>
+    <p class="note">Basemap: Murray Lab global CTX mosaic (5 m/pixel native, shown at about 10 m/pixel), covering 77.22318–77.41956°E, 18.44176–18.57188°N. Crater marks come from model/crater_detector.py (matched-filter proposals checked by a random-forest classifier; no human labels, so false marks remain: bright outcrops and rock piles are sometimes marked, and some real craters are missed; the detector runs with a looser setting than usual because this area has few craters). Overlay positions for the delta outline, channel, route and samples were traced by eye on the earlier, larger map and re-projected here by latitude and longitude, so they were anchored to the published landing coordinates (18.4446°N, 77.4509°E), which lie just east of this view; places outside it are not drawn. Treat them as approximate; sample positions are placed by named area, not by individual rover fix.</p>
   </div>
 
   <aside class="panel">
-        <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the Layers menu to show or hide each group.</p><div class="meta">detect_craters.py · <span id="ncr">36</span> marks</div></div>
+        <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the Layers menu to show or hide each group.</p><div class="meta">model/crater_detector.py · <span id="ncr">36</span> marks</div></div>
     <div class="card"><h2>Sample sites <span style="font-weight:400;letter-spacing:0">(28 sealed)</span></h2><div class="list" id="samples"></div></div>
   </aside>
 </div>
@@ -38,7 +37,7 @@
   <div><b>Imagery</b>CTX mosaic by the <a href="https://murray-lab.caltech.edu/CTX/">Bruce Murray Laboratory, Caltech</a> (global mosaic V01, 5 m/pixel), cut to this area with integration/fetch_ctx.py. Inset is MOLA colour-shaded relief from <a href="https://trek.nasa.gov/mars/">NASA Mars Trek</a>.</div>
   <div><b>Samples</b>Names, areas, rock types and sols from NASA's <a href="https://science.nasa.gov/mission/mars-2020-perseverance/mars-rock-samples/">Mars rock samples</a> page.</div>
   <div><b>Route</b>Three Forks and Hawksbill Gap follow NASA's Delta Front campaign posts. Raw camera frames at <a href="https://mars.nasa.gov/mars2020/multimedia/raw-images/">Mars 2020 raw images</a> carry no map coordinates, so they were not used for placement.</div>
-  <div><b>Crater detection</b>Python script <code>detect_craters.py</code> run on the CTX mosaic above. Output is the <code>craters.json</code> data embedded in this page.</div>
+  <div><b>Crater detection</b>Python script <code>model/crater_detector.py</code> run on the CTX mosaic above. Output is the crater data embedded in this page (<code>craters-data.js</code>).</div>
   <div><b>Not used</b>NASA Worldview covers Earth. The Mount Sharp path page describes Curiosity in Gale Crater, a different site.</div>
 </div>
 </div>
