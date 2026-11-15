@@ -97,14 +97,17 @@ CR.craters.forEach(function(c){var k=c.confidence<0.6?'cU':c['class']==='large'?
 var menu=document.getElementById('menu'),mb=document.getElementById('mb');
 var GROUPS=[['Hazards · detected',[['cL','Large craters  >700 m',CC.cL,cnt2.cL,1],['cM','Medium craters  250–700 m',CC.cM,cnt2.cM,1],['cS','Small craters  <250 m',CC.cS,cnt2.cS,1],['cU','Low-confidence marks',CC.cU,cnt2.cU,0]]],
  ['Reference',[['delta','Delta fan','#5ec8d8','',0],['chan','Neretva Vallis channel','#7fd8ff','',0],['route','Rover route','#ffb347','',0],['samples','Sample sites','#5ec8d8',nOn,0],['features','Place names','#ffffff','',0],['grid','Lat / lon grid','#999999','',0]]]];
+function mk(t,x,c){var e=document.createElement(t);if(x!==undefined&&x!=='')e.textContent=x;if(c)e.className=c;return e}
 GROUPS.forEach(function(g){var h=document.createElement('h4');h.textContent=g[0];menu.appendChild(h);
  g[1].forEach(function(l){var lb=document.createElement('label');lb.className='chk';
-  lb.innerHTML='<input type="checkbox" id="ly-'+l[0]+'"><span class="box"></span><span class="dot" style="border-color:'+l[2]+'"></span><span>'+l[1]+'</span><span class="n">'+l[3]+'</span>';
-  var inp=lb.querySelector('input');inp.checked=!!l[4];L[l[0]].style.display=l[4]?'':'none';
+  var inp=document.createElement('input');inp.type='checkbox';inp.id='ly-'+l[0];lb.appendChild(inp);
+  lb.appendChild(mk('span','','box'));var dot=mk('span','','dot');dot.style.borderColor=l[2];lb.appendChild(dot);
+  lb.appendChild(mk('span',l[1]));lb.appendChild(mk('span',l[3],'n'));
+  inp.checked=!!l[4];L[l[0]].style.display=l[4]?'':'none';
   inp.onchange=function(){L[l[0]].style.display=inp.checked?'':'none'};menu.appendChild(lb)})});
 mb.onclick=function(){var open=mb.getAttribute('aria-expanded')!=='true';mb.setAttribute('aria-expanded',open);menu.hidden=!open};
 var list=document.getElementById('samples');
-S.forEach(function(s,i){var r=document.createElement('button');r.className='row';r.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+' <em>· '+s[3].replace(/ \/.*|Crater Rim /,'')+(s.off?' · off this map':'')+'</em></span><em>sol '+s[5]+'</em>';r.onclick=function(){pickSample(i)};list.appendChild(r)});
+S.forEach(function(s,i){var r=document.createElement('button');r.className='row';r.appendChild(mk('b',s[0]));var sp=mk('span',s[1]+' ');sp.appendChild(mk('em','· '+s[3].replace(/ \/.*|Crater Rim /,'')+(s.off?' · off this map':'')));r.appendChild(sp);r.appendChild(mk('em','sol '+s[5]));r.onclick=function(){pickSample(i)};list.appendChild(r)});
 var info=document.getElementById('info');var ncr=document.getElementById('ncr');if(ncr)ncr.textContent=CR.craters.length;
 function setInfo(h,p,m){info.innerHTML='<h2>Selected</h2><h3></h3><p></p><div class="meta"></div>';info.querySelector('h3').textContent=h;info.querySelector('p').textContent=p;info.querySelector('.meta').textContent=m}
 function fmt(x,y){var q=ll(x,y);return q[1].toFixed(4)+'°N  '+q[0].toFixed(4)+'°E'}
@@ -138,5 +141,11 @@ document.getElementById('zi').onclick=function(){var r=map.getBoundingClientRect
 document.getElementById('zo').onclick=function(){var r=map.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/1.5)};
 document.getElementById('zr').onclick=fit;
 window.addEventListener('resize',fit);
+/* Keyboard access: arrow keys pan, + / - zoom, 0 resets (map must be focused). */
+map.addEventListener('keydown',function(e){if(e.target!==map)return;var r=map.getBoundingClientRect(),st=60,h=true;
+ if(e.key==='ArrowLeft')v.x+=st;else if(e.key==='ArrowRight')v.x-=st;else if(e.key==='ArrowUp')v.y+=st;else if(e.key==='ArrowDown')v.y-=st;
+ else if(e.key==='+'||e.key==='=')zoomAt(r.width/2,r.height/2,1.5);else if(e.key==='-'||e.key==='_')zoomAt(r.width/2,r.height/2,1/1.5);
+ else if(e.key==='0')fit();else h=false;
+ if(h){e.preventDefault();apply()}});
 fit();
 })();

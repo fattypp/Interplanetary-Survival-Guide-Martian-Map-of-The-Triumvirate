@@ -16,12 +16,12 @@
 
 <div class="grid">
   <div>
-    <div class="mapbox" id="map" aria-label="Pan and zoom map of the Jezero delta">
+    <div class="mapbox" id="map" role="application" tabindex="0" aria-label="Pan and zoom map of the Jezero delta. Use arrow keys to pan, plus and minus to zoom, 0 to reset.">
       <div id="stage"><img id="base" alt="CTX grayscale mosaic of the western Jezero delta and channel mouth, about 10 metres per pixel" src="../images/jezero-ctx-mosaic.jpg"><svg id="ov" viewBox="0 0 1990 1390"></svg></div>
       <div class="inset" aria-hidden="true"><img alt="" src="../images/mars-mola-context.jpg"><svg viewBox="0 0 500 500"><rect x="237.4" y="246.7" width="8.9" height="5.9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="250" cy="255" r="40" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/></svg><span>MOLA · 72–83°E, 13–24°N</span></div>
       <button class="menubtn" id="mb" aria-expanded="true" aria-controls="menu"><span aria-hidden="true">☰</span>Layers</button>
       <div class="menu" id="menu" role="group" aria-label="Map layers"></div>
-      <div class="tools"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" style="font-size:18px">⌂</button></div>
+      <div class="tools"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" class="zr">⌂</button></div>
       <div class="readout"><div id="ll">hover the map</div><div class="scale"><i id="sb"></i><span id="sl"></span></div></div>
     </div>
     <p class="note">Basemap: Murray Lab global CTX mosaic (5 m/pixel native, shown at about 10 m/pixel), covering 77.22318–77.41956°E, 18.44176–18.57188°N. Crater marks come from model/crater_detector.py (matched-filter proposals checked by a random-forest classifier; no human labels, so false marks remain: bright outcrops and rock piles are sometimes marked, and some real craters are missed; the detector runs with a looser setting than usual because this area has few craters). Overlay positions for the delta outline, channel, route and samples were traced by eye on the earlier, larger map and re-projected here by latitude and longitude, so they were anchored to the published landing coordinates (18.4446°N, 77.4509°E), which lie just east of this view; places outside it are not drawn. Treat them as approximate; sample positions are placed by named area, not by individual rover fix.</p>

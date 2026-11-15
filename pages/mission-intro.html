@@ -6,7 +6,7 @@
   <title>Interplanetary Survival Guide: Martian Map</title>
   
   <!-- Leaflet CSS 불러오기 -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -218,7 +218,7 @@
 <body>
 
   <!-- 1인칭 동영상 인트로 화면 -->
-  <div id="intro-screen" onclick="enterMap()">
+  <div id="intro-screen" role="button" tabindex="0" aria-label="Open the Mars survival map" onclick="enterMap()">
 <video id="intro-video" src="assets/first-person-mars-explorer.mp4" autoplay loop muted playsinline></video>
     <h1>JEZERO CRATER LANDING SITE</h1>
     <p>Click the screen to open the Mars survival map 🚀</p>
@@ -228,7 +228,7 @@
   <button id="mission-btn" onclick="openMission()">📋 Mission Check</button>
 
   <!-- 임무 브리핑 화면 -->
-  <div id="mission-modal" onclick="startMissionOnMap()">
+  <div id="mission-modal" role="button" tabindex="0" aria-label="Show the target location on the map" onclick="startMissionOnMap()">
     <div class="mission-box">
       <h2>MISSION BRIEFING</h2>
       <p>This mission: Collect samples from locations where water once existed to search for signs of ancient microbial life.</p>
@@ -237,7 +237,7 @@
   </div>
 
   <!-- 초록색 영역 클릭 시 바로 뜨는 샘플 채취 동영상 창 -->
-  <div id="video-modal" onclick="closeVideoModal()">
+  <div id="video-modal" role="button" tabindex="0" aria-label="Close the video" onclick="closeVideoModal()">
     <div class="video-card">
 <video id="sampling-video" src="assets/mars-microbial-exploration.mp4" loop muted playsinline></video>
       <div class="video-info">
@@ -253,7 +253,7 @@
   <div id="map"></div>
 
   <!-- Leaflet JS 불러오기 -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <script>
     // 화면 클릭 시 인트로 동영상 정지 및 페이드 아웃
@@ -374,5 +374,8 @@
       }
     }
   </script>
+<script>
+document.addEventListener('keydown',function(e){var t=e.target;if((e.key==='Enter'||e.key===' ')&&t.getAttribute&&t.getAttribute('role')==='button'&&t.tagName==='DIV'){e.preventDefault();t.click()}});
+</script>
 </body>
 </html>
