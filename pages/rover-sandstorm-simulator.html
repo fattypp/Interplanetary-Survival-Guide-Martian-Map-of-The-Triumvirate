@@ -133,15 +133,15 @@
       <div class="stat-label">danger zones avoided</div>
       <div class="stat-value danger" id="avoid-val">0 places</div>
     </div>
-    <button id="storm-btn" onclick="triggerSandstorm()">🌪️ Large Sandstorm Occurrence</button>
+    <button id="storm-btn" onclick="triggerSandstorm()">Large Sandstorm Occurrence</button>
   </div>
 
   <!-- 모래폭풍 긴급 경보 배너 -->
-  <div id="alert-banner">🚨 Large Sandstorm Approaching!</div>
+  <div id="alert-banner">ALERT: Large Sandstorm Approaching</div>
 
   <!-- 왼쪽 하단 모서리 범례 -->
   <div id="legend">
-    <div class="legend-title">📍Mars Exploration Map</div>
+    <div class="legend-title">Mars Exploration Map</div>
     <div class="legend-item">
       <span class="legend-color" style="background: #ff1744; border: 2px solid #ff8a80;"></span>
       <span><b>red:</b> danger zones (craters·steep slopes)</span>
@@ -194,7 +194,7 @@
         fillOpacity: 0.45,
         weight: 2,
         radius: zone.radius
-      }).addTo(map).bindTooltip(`⚠️ 위험: ${zone.name}`);
+      }).addTo(map).bindTooltip(`Hazard: ${zone.name}`);
     });
 
     // 4. 파란색 안전지대 (지하동굴 입구 8곳 - 사방에서 대피 가능하도록 배치)
@@ -216,7 +216,7 @@
         fillOpacity: 0.45,
         weight: 2,
         radius: cave.radius
-      }).addTo(map).bindTooltip(`🛡️ Safe Area: ${cave.name}`);
+      }).addTo(map).bindTooltip(`Safe Area: ${cave.name}`);
     });
 
     // 5. 로봇 초기 위치 (화면 오른쪽 가운데 배치)
@@ -329,7 +329,7 @@
         fillColor: lineColor,
         fillOpacity: 1,
         radius: 7
-      }).addTo(map).bindTooltip(isEmergency ? "🛡️ Emergency evacuation objective (Underground Caves)" : "Target Location");
+      }).addTo(map).bindTooltip(isEmergency ? "Emergency evacuation objective (Underground Caves)" : "Target Location");
 
       pathLine = L.polyline(safePath, {
         color: lineColor,
@@ -356,7 +356,7 @@
     map.on('click', function(e) {
       const dest = e.latlng;
       if (isInsideDanger(dest.lat, dest.lng)) {
-        alert("⚠️ You cannot move into a dangerous area (crater/slope/sandstorm)!");
+        alert("You cannot move into a dangerous area (crater/slope/sandstorm)!");
         return;
       }
       if (!drawPathAndStats(dest, false)) {
@@ -399,7 +399,7 @@
       };
 
       const banner = document.getElementById('alert-banner');
-      banner.innerText = `🚨 [${dirName}] sandstorm approaching! Evacuating to the nearest safe area (underground caves).`;
+      banner.innerText = `ALERT [${dirName}] sandstorm approaching! Evacuating to the nearest safe area (underground caves).`;
       banner.style.display = 'block';
 
       stormCircle = L.circle([stormLat, stormLng], {
@@ -409,7 +409,7 @@
         weight: 3,
         dashArray: '6, 6',
         radius: stormRadius
-      }).addTo(map).bindTooltip(`🌪️ ${dirName} sandstorm approaching!`);
+      }).addTo(map).bindTooltip(`${dirName} sandstorm approaching`);
 
       // 모래폭풍이 로봇 쪽으로 서서히 다가오는 애니메이션 (25단계 이동)
       let stepCount = 0;
@@ -460,7 +460,7 @@
         const caveLatLng = L.latLng(cave.lat, cave.lng);
         const success = drawPathAndStats(caveLatLng, true);
         if (success) {
-          robotMarker.setPopupContent(`<b>🚨 Emergency Evacuation Route Activated!</b><br>Threat: ${dirName} Sandstorm<br>Evacuation Point: ${cave.name}`).openPopup();
+          robotMarker.setPopupContent(`<b>Emergency Evacuation Route Activated!</b><br>Threat: ${dirName} Sandstorm<br>Evacuation Point: ${cave.name}`).openPopup();
           break;
         }
       }

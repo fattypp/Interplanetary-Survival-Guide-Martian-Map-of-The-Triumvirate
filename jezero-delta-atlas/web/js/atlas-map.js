@@ -1,4 +1,4 @@
-/* Jezero Delta Atlas: pan/zoom map, overlay layers, layers checklist menu, sample list.
+/* Jezero Delta Atlas: pan/zoom map, overlay layers (registered by atlas-shell.js), sample list, route planner UI.
    Reads window.JEZERO_CRATERS from ../data/craters-data.js (written by integration/web_bridge.py). */
 (function(){
 var CR=window.JEZERO_CRATERS||{craters:[]};   // set by ../data/craters-data.js; its meta also carries the map extent
@@ -54,6 +54,7 @@ var F=[
  {id:'neretva',n:'Neretva Vallis',x:430,y:470,d:'Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it.'},
  {id:'whh',n:'Witch Hazel Hill',x:455,y:1005,d:'Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate.'},
  {id:'seitah',n:'Séítah',x:890,y:975,d:'Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate.'}];
+var F0=F.slice();
 F=F.map(function(f){var p=o2n([f.x,f.y]);f.x=p[0];f.y=p[1];return f}).filter(function(f){return inMap([f.x,f.y])});
 var delta=[[470,735],[560,640],[700,610],[850,570],[935,600],[958,690],[950,770],[905,838],[830,858],[740,838],[670,776],[580,748]];
 var chan=[[60,400],[200,380],[330,455],[430,470],[405,560],[392,640],[470,728]];
@@ -78,12 +79,12 @@ var rt=L.route=el('g');
 el('polyline',{points:pts(route),fill:'none',stroke:'#ffb347','stroke-width':3,'stroke-dasharray':'2 7','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},rt);
 var sm=L.samples=el('g');
 var smEls=[];
-S.forEach(function(s,i){if(s.off){smEls.push(null);return}var gg=el('g',{transform:'translate('+s.x+' '+s.y+')',class:'hit','data-i':i},sm);var k=el('g',{class:'k'},gg);el('circle',{r:6,fill:col(s),stroke:'#000','stroke-width':1.5},k);el('circle',{r:13,fill:'transparent'},k);var t=el('text',{x:9,y:4,class:'lab',style:'font-size:10px'},k);t.textContent=s[0];smEls.push(gg);gg.addEventListener('click',function(e){e.stopPropagation();pickSample(i)})});
+S.forEach(function(s,i){if(s.off){smEls.push(null);return}var gg=el('g',{transform:'translate('+s.x+' '+s.y+')',class:'hit','data-i':i},sm);var k=el('g',{class:'k'},gg);el('circle',{r:6,fill:col(s),stroke:'#000','stroke-width':1.5},k);el('circle',{r:13,fill:'transparent'},k);var t=el('text',{x:9,y:4,class:'lab',style:'font-size:10px'},k);t.textContent=s[0];smEls.push(gg);gg.addEventListener('click',function(e){e.stopPropagation();if(core.busy())return;pickSample(i)})});
 var ft=L.features=el('g');
 F.forEach(function(f){var gg=el('g',{transform:'translate('+f.x+' '+f.y+')',class:'hit'},ft);var k=el('g',{class:'k'},gg);
  if(f.id==='landing'){el('path',{d:'M0,-12 L3.5,-4 12,-4 5,2 7.5,11 0,5.5 -7.5,11 -5,2 -12,-4 -3.5,-4Z',fill:'#fff',stroke:'#000','stroke-width':1.5},k)}
  else{el('rect',{x:-6,y:-6,width:12,height:12,transform:'rotate(45)',fill:'#fff',stroke:'#000','stroke-width':1.5},k)}
- el('circle',{r:16,fill:'transparent'},k);var t=el('text',{x:15,y:5},k);t.textContent=f.n;gg.addEventListener('click',function(e){e.stopPropagation();pickFeature(f)})});
+ el('circle',{r:16,fill:'transparent'},k);var t=el('text',{x:15,y:5},k);t.textContent=f.n;gg.addEventListener('click',function(e){e.stopPropagation();if(core.busy())return;pickFeature(f)})});
 
 // craters: one layer per size class, plus a layer for low-confidence marks
 var CC={cL:'#ff5a44',cM:'#ffd23c',cS:'#4fd6ff',cU:'#d7d7d7'},cnt2={cL:0,cM:0,cS:0,cU:0};
@@ -92,24 +93,25 @@ CR.craters.forEach(function(c){var k=c.confidence<0.6?'cU':c['class']==='large'?
  var x=c.page[0],y=c.page[1],r=c.page[2];var gg=el('g',{class:'hit'},L[k]);
  el('circle',{cx:x,cy:y,r:r,fill:CC[k],'fill-opacity':.10,stroke:CC[k],'stroke-width':k==='cU'?1.5:2.5,'stroke-dasharray':k==='cU'?'5 4':'none','vector-effect':'non-scaling-stroke'},gg);
  el('circle',{cx:x,cy:y,r:r*0.12+2,fill:CC[k],stroke:'none',opacity:.9},gg);
- gg.addEventListener('click',function(e){e.stopPropagation();setInfo('Crater #'+c.id,'About '+c.diameter_m+' m across ('+(k==='cU'?'low-confidence mark':c['class']+' class')+'). Detector confidence '+c.confidence.toFixed(2)+'. Rim and floor slopes are a trip and fall hazard on foot; a rim crossing may need a detour.',c.lat.toFixed(4)+'°N  '+c.lon.toFixed(4)+'°E');focus(x,y,Math.max(2.2,Math.min(6,60/r)))})});
-// checklist menu
-var menu=document.getElementById('menu'),mb=document.getElementById('mb');
-var GROUPS=[['Hazards · detected',[['cL','Large craters  >700 m',CC.cL,cnt2.cL,1],['cM','Medium craters  250–700 m',CC.cM,cnt2.cM,1],['cS','Small craters  <250 m',CC.cS,cnt2.cS,1],['cU','Low-confidence marks',CC.cU,cnt2.cU,0]]],
- ['Reference',[['delta','Delta fan','#5ec8d8','',0],['chan','Neretva Vallis channel','#7fd8ff','',0],['route','Rover route','#ffb347','',0],['samples','Sample sites','#5ec8d8',nOn,0],['features','Place names','#ffffff','',0],['grid','Lat / lon grid','#999999','',0]]]];
+ gg.addEventListener('click',function(e){e.stopPropagation();if(core.busy())return;setInfo('Crater #'+c.id,'About '+c.diameter_m+' m across ('+(k==='cU'?'low-confidence mark':c['class']+' class')+'). Detector confidence '+c.confidence.toFixed(2)+'. Rim and floor slopes are a trip and fall hazard on foot; a rim crossing may need a detour.',c.lat.toFixed(4)+'°N  '+c.lon.toFixed(4)+'°E');focus(x,y,Math.max(2.2,Math.min(6,60/r)))})});
+// layer definitions: atlas-shell.js registers these through Atlas.registerLayer (it loads right after this file)
+var LAYERDEFS=[
+ {id:'craters-large',label:'Large craters  >700 m',group:'Hazards · detected',color:CC.cL,node:L.cL,on:true,count:cnt2.cL},
+ {id:'craters-medium',label:'Medium craters  250–700 m',group:'Hazards · detected',color:CC.cM,node:L.cM,on:true,count:cnt2.cM},
+ {id:'craters-small',label:'Small craters  <250 m',group:'Hazards · detected',color:CC.cS,node:L.cS,on:true,count:cnt2.cS},
+ {id:'craters-low',label:'Low-confidence marks',group:'Hazards · detected',color:CC.cU,node:L.cU,on:false,count:cnt2.cU},
+ {id:'delta',label:'Delta fan',group:'Reference',color:'#5ec8d8',node:L.delta,on:false},
+ {id:'channel',label:'Neretva Vallis channel',group:'Reference',color:'#7fd8ff',node:L.chan,on:false},
+ {id:'route',label:'Rover route',group:'Reference',color:'#ffb347',node:L.route,on:false},
+ {id:'samples',label:'Sample sites',group:'Reference',color:'#5ec8d8',node:L.samples,on:false,count:nOn},
+ {id:'places',label:'Place names',group:'Reference',color:'#ffffff',node:L.features,on:false},
+ {id:'grid',label:'Lat / lon grid',group:'Reference',color:'#999999',node:L.grid,on:false}];
+LAYERDEFS.forEach(function(l){l.node.style.display=l.on?'':'none'});
 function mk(t,x,c){var e=document.createElement(t);if(x!==undefined&&x!=='')e.textContent=x;if(c)e.className=c;return e}
-GROUPS.forEach(function(g){var h=document.createElement('h4');h.textContent=g[0];menu.appendChild(h);
- g[1].forEach(function(l){var lb=document.createElement('label');lb.className='chk';
-  var inp=document.createElement('input');inp.type='checkbox';inp.id='ly-'+l[0];lb.appendChild(inp);
-  lb.appendChild(mk('span','','box'));var dot=mk('span','','dot');dot.style.borderColor=l[2];lb.appendChild(dot);
-  lb.appendChild(mk('span',l[1]));lb.appendChild(mk('span',l[3],'n'));
-  inp.checked=!!l[4];L[l[0]].style.display=l[4]?'':'none';
-  inp.onchange=function(){L[l[0]].style.display=inp.checked?'':'none'};menu.appendChild(lb)})});
-mb.onclick=function(){var open=mb.getAttribute('aria-expanded')!=='true';mb.setAttribute('aria-expanded',open);menu.hidden=!open};
 var list=document.getElementById('samples');
 S.forEach(function(s,i){var r=document.createElement('button');r.className='row';r.appendChild(mk('b',s[0]));var sp=mk('span',s[1]+' ');sp.appendChild(mk('em','· '+s[3].replace(/ \/.*|Crater Rim /,'')+(s.off?' · off this map':'')));r.appendChild(sp);r.appendChild(mk('em','sol '+s[5]));r.onclick=function(){pickSample(i)};list.appendChild(r)});
 var info=document.getElementById('info');var ncr=document.getElementById('ncr');if(ncr)ncr.textContent=CR.craters.length;
-function setInfo(h,p,m){info.innerHTML='<h2>Selected</h2><h3></h3><p></p><div class="meta"></div>';info.querySelector('h3').textContent=h;info.querySelector('p').textContent=p;info.querySelector('.meta').textContent=m}
+function setInfo(h,p,m){if(core.onInfo)core.onInfo();info.innerHTML='<h2>Selected</h2><h3></h3><p></p><div class="meta"></div>';info.querySelector('h3').textContent=h;info.querySelector('p').textContent=p;info.querySelector('.meta').textContent=m}
 function fmt(x,y){var q=ll(x,y);return q[1].toFixed(4)+'°N  '+q[0].toFixed(4)+'°E'}
 function pickSample(i){var s=S[i];var rows=list.children;for(var j=0;j<rows.length;j++)rows[j].classList.toggle('on',j===i);rows[i].scrollIntoView({block:'nearest'});
  if(s.off){setInfo('Sample '+s[0]+' · '+s[1],s[2]+' ('+s[3]+'). '+s[4]+' rock, sealed '+s[6]+' on sol '+s[5]+'.','outside the current map area');return}
@@ -128,14 +130,17 @@ function apply(clamp){var r=map.getBoundingClientRect(),k=base*v.s;
 function zoomAt(cx,cy,f){var r=map.getBoundingClientRect(),k0=base*v.s,s2=Math.min(12,Math.max(1,v.s*f));if(s2===v.s)return;var k1=base*s2;
  var px=(cx-v.x)/k0,py=(cy-v.y)/k0;v.s=s2;v.x=cx-px*k1;v.y=cy-py*k1;apply()}
 function focus(x,y,s){var r=map.getBoundingClientRect();stage.classList.add('ease');v.s=Math.max(v.s,s);var k=base*v.s;v.x=r.width/2-x*k;v.y=r.height/2-y*k;apply();setTimeout(function(){stage.classList.remove('ease')},520)}
-map.addEventListener('wheel',function(e){if(e.target.closest('.menu'))return;e.preventDefault();var r=map.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.25:0.8)},{passive:false});
-var ptrs={},last=null,pd=0;
-map.addEventListener('pointerdown',function(e){if(e.target.closest('.tools,.menu,.menubtn'))return;map.setPointerCapture(e.pointerId);ptrs[e.pointerId]=[e.clientX,e.clientY];map.classList.add('drag');var a=Object.keys(ptrs);if(a.length===2){var p=ptrs[a[0]],q=ptrs[a[1]];pd=Math.hypot(p[0]-q[0],p[1]-q[1])}});
+map.addEventListener('wheel',function(e){e.preventDefault();var r=map.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.25:0.8)},{passive:false});
+var ptrs={},last=null,pd=0,clickDown=null,core={busy:function(){return false}};
+map.addEventListener('pointerdown',function(e){if(e.target.closest('.tools,.inset,.ui'))return;map.setPointerCapture(e.pointerId);ptrs[e.pointerId]=[e.clientX,e.clientY];map.classList.add('drag');var a=Object.keys(ptrs);if(a.length===2){var p=ptrs[a[0]],q=ptrs[a[1]];pd=Math.hypot(p[0]-q[0],p[1]-q[1])}});
 map.addEventListener('pointermove',function(e){var r=map.getBoundingClientRect(),q=ll((e.clientX-r.left-v.x)/(base*v.s),(e.clientY-r.top-v.y)/(base*v.s));document.getElementById('ll').textContent=q[1].toFixed(4)+'°N  '+q[0].toFixed(4)+'°E';
  if(!ptrs[e.pointerId])return;var a=Object.keys(ptrs),o=ptrs[e.pointerId];
  if(a.length===2){ptrs[e.pointerId]=[e.clientX,e.clientY];var p=ptrs[a[0]],q2=ptrs[a[1]],dd=Math.hypot(p[0]-q2[0],p[1]-q2[1]);if(pd)zoomAt((p[0]+q2[0])/2-r.left,(p[1]+q2[1])/2-r.top,dd/pd);pd=dd}
  else{v.x+=e.clientX-o[0];v.y+=e.clientY-o[1];ptrs[e.pointerId]=[e.clientX,e.clientY];apply()}});
 function up(e){delete ptrs[e.pointerId];pd=0;if(!Object.keys(ptrs).length)map.classList.remove('drag')}
+map.addEventListener('pointerdown',function(e){clickDown=[e.clientX,e.clientY]},true);
+map.addEventListener('pointerup',function(e){var d=clickDown;clickDown=null;if(!d||!core.onClick||Math.hypot(e.clientX-d[0],e.clientY-d[1])>5||e.target.closest('.tools,.inset,.ui'))return;
+ var r=map.getBoundingClientRect(),k=base*v.s,x=(e.clientX-r.left-v.x)/k,y=(e.clientY-r.top-v.y)/k;if(x<0||y<0||x>W||y>H)return;core.onClick({x:x,y:y,event:e})});
 map.addEventListener('pointerup',up);map.addEventListener('pointercancel',up);
 document.getElementById('zi').onclick=function(){var r=map.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1.5)};
 document.getElementById('zo').onclick=function(){var r=map.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/1.5)};
@@ -145,7 +150,6 @@ window.addEventListener('resize',fit);
 (function(){
 var rt={on:false,start:null,goal:null,grid:null},plan=L.plan=el('g');
 var go=document.getElementById('rt-go'),clr=document.getElementById('rt-clear'),out=document.getElementById('rt-out'),help=document.getElementById('rt-help'),spd=document.getElementById('rt-speed');
-function pageXY(e){var r=map.getBoundingClientRect(),k=base*v.s;return [(e.clientX-r.left-v.x)/k,(e.clientY-r.top-v.y)/k]}
 function fmtPos(p){var q=ll(p[0],p[1]);return q[1].toFixed(4)+'°N, '+q[0].toFixed(4)+'°E'}
 function fmtDist(m){return m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' m'}
 function fmtTime(s){var m=Math.round(s/60);if(m<60)return m+' min';var h=Math.floor(m/60);return h+' h '+(m%60)+' min'}
@@ -156,23 +160,21 @@ function draw(){while(plan.firstChild)plan.removeChild(plan.firstChild);
   el('polyline',{points:pts,fill:'none',stroke:'#000','stroke-width':7,'stroke-linejoin':'round','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},plan);
   el('polyline',{points:pts,fill:'none',stroke:'#ff4fd8','stroke-width':4,'stroke-linejoin':'round','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},plan)}
  if(rt.start)marker(rt.start,'#7CFC00','Start');if(rt.goal)marker(rt.goal,'#ff4fd8','Destination')}
-function reset(keepMode){rt.start=rt.goal=rt.route=null;rt.on=!!keepMode;map.classList.toggle('routing',rt.on);go.classList.toggle('on',rt.on);go.textContent=rt.on?'Cancel':'Pick start and destination';draw()}
+var HELP0='Find the fastest safe route between two points, avoiding detected craters.';
+function arm(label){window.Atlas.pick({owner:'route',label:label,onCancel:function(){if(rt.on){reset(false);say('');help.textContent=HELP0}}},onPick)}
+function onPick(ev){var p=[ev.x,ev.y];if(!rt.start){rt.start=p;draw();help.textContent='Now click the destination.';say('Start set: '+fmtPos(p));arm('route destination')}else{rt.goal=p;draw();solve()}}
+function reset(keepMode){if(!keepMode&&rt.on&&window.Atlas&&window.Atlas.picking&&window.Atlas.picking()==='route'){rt.on=false;window.Atlas.pick.cancel('route')}rt.start=rt.goal=rt.route=null;rt.on=!!keepMode;go.classList.toggle('on',rt.on);go.textContent=rt.on?'Cancel':'Pick start and destination';draw()}
 function solve(){var speed=parseFloat(spd.value);
  if(!rt.grid)rt.grid=window.RoutePlanner.buildGrid(CR.craters,CR.meta);
  var res=window.RoutePlanner.plan(rt.grid,rt.start,rt.goal,speed);
- if(res.error){rt.goal=null;draw();say(res.error,true);help.textContent='Click another destination.';rt.on=true;return}
- rt.route=res;rt.on=false;map.classList.remove('routing');go.classList.remove('on');go.textContent='Pick new points';draw();
+ if(res.error){rt.goal=null;draw();say(res.error,true);help.textContent='Click another destination.';rt.on=true;arm('route destination');return}
+ rt.route=res;rt.on=false;go.classList.remove('on');go.textContent='Pick new points';draw();
  var extra=Math.round((res.distance_m/res.straight_m-1)*100);
  out.textContent='';[['Route',fmtDist(res.distance_m)+(extra>0?' (+'+extra+'% over the straight line, '+fmtDist(res.straight_m)+')':'')],['Time',fmtTime(res.time_s)],['From',fmtPos(rt.start)],['To',fmtPos(rt.goal)]].forEach(function(r){var d=document.createElement('div'),b=document.createElement('b');b.textContent=r[0]+': ';d.appendChild(b);d.appendChild(document.createTextNode(r[1]));out.appendChild(d)});
  help.textContent='Craters with detector confidence 0.6 or higher are avoided. Slope and rocks are not modelled.'}
-go.onclick=function(){if(rt.on){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.';return}reset(true);say('');help.textContent='Click the map to set the start.'};
+go.onclick=function(){if(rt.on){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.';return}reset(true);say('');help.textContent='Click the map to set the start.';arm('route start')};
 clr.onclick=function(){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.'};
 spd.onchange=function(){if(rt.route)solve()};
-var down=null;
-map.addEventListener('pointerdown',function(e){down=[e.clientX,e.clientY]},true);
-map.addEventListener('pointerup',function(e){var d=down;down=null;if(!rt.on||!d||Math.hypot(e.clientX-d[0],e.clientY-d[1])>5||e.target.closest('.tools,.menu,.menubtn,.inset'))return;
- var p=pageXY(e);if(p[0]<0||p[1]<0||p[0]>W||p[1]>H)return;
- if(!rt.start){rt.start=p;draw();help.textContent='Now click the destination.';say('Start set: '+fmtPos(p))}else{rt.goal=p;draw();solve()}});
 })();
 /* Keyboard access: arrow keys pan, + / - zoom, 0 resets (map must be focused). */
 map.addEventListener('keydown',function(e){if(e.target!==map)return;var r=map.getBoundingClientRect(),st=60,h=true;
@@ -181,4 +183,11 @@ map.addEventListener('keydown',function(e){if(e.target!==map)return;var r=map.ge
  else if(e.key==='0')fit();else h=false;
  if(h){e.preventDefault();apply()}});
 fit();
+// what atlas-shell.js needs to build window.Atlas (see docs/ARCHITECTURE.md)
+var lp=F0.filter(function(f){return f.id==='landing'})[0];
+core.W=W;core.H=H;core.ll=ll;core.xy=function(lon,lat){return [(lon-LON0)/DLON*W,(LAT1-lat)/DLAT*H]};
+core.el=el;core.setInfo=setInfo;core.focus=focus;core.layers=LAYERDEFS;core.map=map;core.stage=stage;core.fit=fit;
+core.mapData={samples:S.map(function(s){return {n:s[0],name:s[1],area:s[3],x:s.x,y:s.y,onMap:!s.off}}),places:F0.map(function(f){return {id:f.id,name:f.n,x:f.x,y:f.y,onMap:inMap([f.x,f.y])}})};
+core.landing=[lp.x,lp.y];   // (already through o2n; F objects are mutated in place) page px of the landing site; lies east of this map, so it can be outside 0..W
+window.AtlasMapCore=core;
 })();

@@ -4,7 +4,11 @@ Bridge between the Python crater model and the web page.
 
   python integration/web_bridge.py detect   run the model, write web/data/craters-data.js
   python integration/web_bridge.py bundle   inline css, js, images and data into dist/jezero-delta-atlas.html
-  python integration/web_bridge.py all      detect, then bundle
+  python integration/web_bridge.py missiondata   write web/data/mission-data.js from docs/mission-guide.md
+  python integration/web_bridge.py layers   run model/science_layers.py, write web/data/science-layers-data.js (needs opencv and scikit-learn)
+  python integration/web_bridge.py all      detect, missiondata, then bundle (does not run `layers`: its output is committed)
+
+  bundle takes --out PATH to write somewhere other than dist/ (dry runs).
 
 Why a data .js file and not a .json: the page then opens straight from disk (file://)
 with no local server. Why a bundle: a single self-contained HTML file is what the
@@ -65,33 +69,129 @@ def data_uri(path):
     return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
 
-def bundle():
-    html = (WEB / "html" / "index.html").read_text()
-    css = (WEB / "css" / "atlas-styles.css").read_text()
-    js = (WEB / "js" / "atlas-map.js").read_text()
-    planner = (WEB / "js" / "route-planner.js").read_text()
-    data = DATA_JS.read_text()
-    for tag, repl in [
-        ('<link rel="stylesheet" href="../css/atlas-styles.css">', f"<style>\n{css}\n</style>"),
-        ('<script src="../data/craters-data.js"></script>', f"<script>\n{data}\n</script>"),
-        ('<script src="../js/route-planner.js"></script>', f"<script>\n{planner}\n</script>"),
-        ('<script src="../js/atlas-map.js"></script>', f"<script>\n{js}\n</script>"),
-    ]:
-        if tag not in html:
-            raise SystemExit(f"bundle failed: {tag!r} not found in web/html/index.html")
-        html = html.replace(tag, repl)
-    html = re.sub(r'src="\.\./images/([^"]+)"', lambda m: f'src="{data_uri(WEB / "images" / m.group(1))}"', html)
-    DIST.parent.mkdir(exist_ok=True)
-    DIST.write_text(html)
-    print(f"wrote {DIST.relative_to(ROOT)} ({len(html) // 1024} KB)")
+MISSION_GUIDE = ROOT.parent / "docs" / "mission-guide.md"
+MISSION_JS = WEB / "data" / "mission-data.js"
+
+
+def parse_mission_guide(text):
+    """Parse docs/mission-guide.md into {"objectives": [...], "stops": [...]}.
+    Objective lines look like '1. **Objective 1:** Find evidence of ancient microbial life.'
+    Stops are the rows of the table under '## Mission Stops' (see the column list in the guide).
+    A malformed stop row stops the generator with a message instead of writing bad data."""
+    objectives = []
+    for line in text.splitlines():
+        m = re.match(r"\s*(?:\d+[.)]\s*)?\*\*Objective\s+(\d+):\*\*\s*(.+?)\s*$", line)
+        if m:
+            n, body = int(m.group(1)), m.group(2)
+            objectives.append({"id": f"objective-{n}", "title": f"Objective {n}", "text": body})
+    return {"objectives": objectives, "stops": parse_mission_stops(text, {o["id"] for o in objectives})}
+
+
+def parse_mission_stops(text, objective_ids):
+    """Helper of parse_mission_guide: the '## Mission Stops' table -> list of stop dicts."""
+    stops, ids, inside, header_seen = [], set(), False, False
+    for no, line in enumerate(text.splitlines(), 1):
+        if re.match(r"##\s+Mission Stops\s*$", line):
+            inside = True
+            continue
+        if inside and re.match(r"##\s", line):
+            break
+        if not inside or not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not header_seen:                       # first table row is the header
+            header_seen = True
+            continue
+        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells):
+            continue                              # the |---|---| separator row
+        if len(cells) != 9:
+            raise SystemExit(f"mission-guide.md line {no}: expected 9 columns, found {len(cells)}")
+        sid, name, kind, area, desc, sol, date, objs, pos = cells
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", sid) or sid in ids:
+            raise SystemExit(f"mission-guide.md line {no}: bad or duplicate stop id {sid!r}")
+        if kind not in ("sample", "place") or not name:
+            raise SystemExit(f"mission-guide.md line {no}: kind must be sample or place and name is required")
+        if sol != "-" and not sol.isdigit():
+            raise SystemExit(f"mission-guide.md line {no}: sol must be a number or -")
+        oids = []
+        if objs != "-":
+            for n in re.split(r"\s*,\s*", objs):
+                if not n.isdigit() or f"objective-{n}" not in objective_ids:
+                    raise SystemExit(f"mission-guide.md line {no}: unknown objective {n!r}")
+                oids.append(f"objective-{n}")
+        lat = lon = None
+        if pos != "-":
+            m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", pos)
+            if not m:
+                raise SystemExit(f"mission-guide.md line {no}: position must be 'lat, lon' or -")
+            lat, lon = float(m.group(1)), float(m.group(2))
+        ids.add(sid)
+        stops.append({"id": sid, "no": len(stops) + 1, "name": name, "kind": kind, "area": area, "description": desc,
+                      "sol": None if sol == "-" else int(sol), "date": None if date == "-" else date,
+                      "objectives": oids, "lat": lat, "lon": lon})
+    return stops
+
+
+def layers():
+    """Regenerate web/data/science-layers-data.js (simulated radiation / relief / texture-class layers)."""
+    subprocess.run([sys.executable, str(ROOT / "model" / "science_layers.py")], check=True)
+
+
+def missiondata():
+    if not MISSION_GUIDE.exists():
+        raise SystemExit(f"missiondata failed: {MISSION_GUIDE} not found")
+    data = parse_mission_guide(MISSION_GUIDE.read_text(encoding="utf-8"))
+    MISSION_JS.write_text("/* Generated by integration/web_bridge.py from docs/mission-guide.md. Do not edit by hand. */\n"
+                          "window.JEZERO_MISSION = " + json.dumps(data, indent=1, ensure_ascii=False) + ";\n", encoding="utf-8")
+    print(f"wrote {MISSION_JS.relative_to(ROOT)} ({len(data['objectives'])} objectives, {len(data['stops'])} stops)")
+
+
+def local_file(ref, kind):
+    """Resolve a '../css/x.css' style reference from web/html/index.html; fail loudly if it is missing."""
+    p = (WEB / "html" / ref).resolve()
+    if not p.is_file():
+        raise SystemExit(f"bundle failed: {kind} {ref!r} referenced in web/html/index.html does not exist ({p})")
+    return p
+
+
+def bundle(out=None):
+    out = Path(out) if out else DIST
+    html = (WEB / "html" / "index.html").read_text(encoding="utf-8")
+
+    def css_sub(m):
+        return "<style>\n" + local_file(m.group(1), "stylesheet").read_text(encoding="utf-8") + "\n</style>"
+
+    def js_sub(m):
+        body = local_file(m.group(1), "script").read_text(encoding="utf-8").replace("</script", "<\\/script")
+        return "<script>\n" + body + "\n</script>"
+
+    # local stylesheets (../...) only; the Google Fonts link (https://) is kept as is
+    html = re.sub(r'<link\s+rel="stylesheet"\s+href="(\.\./[^"]+)"\s*/?>', css_sub, html)
+    html = re.sub(r'<script\s+src="(\.\./[^"]+)"\s*>\s*</script>', js_sub, html)
+    html = re.sub(r'src="\.\./images/([^"]+)"', lambda m: f'src="{data_uri(local_file("../images/" + m.group(1), "image"))}"', html)
+    left = re.findall(r'(?:href|src)="\.\./[^"]*"', html)
+    if left:
+        raise SystemExit(f"bundle failed: unresolved local references left in the page: {left}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    try:
+        shown = out.relative_to(ROOT)
+    except ValueError:
+        shown = out
+    print(f"wrote {shown} ({len(html) // 1024} KB)")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["detect", "bundle", "all"])
+    ap.add_argument("command", choices=["detect", "missiondata", "layers", "bundle", "all"])
+    ap.add_argument("--out", help="bundle: write here instead of dist/jezero-delta-atlas.html (for dry runs)")
     ap.add_argument("--threshold", type=float, default=0.5, help="model confidence cut-off (default 0.5)")
     a = ap.parse_args()
     if a.command in ("detect", "all"):
         detect(a.threshold)
+    if a.command in ("missiondata", "all"):
+        missiondata()
+    if a.command == "layers":
+        layers()
     if a.command in ("bundle", "all"):
-        bundle()
+        bundle(a.out)

@@ -53,6 +53,22 @@ open web/html/index.html                  # works from disk, no server needed
 
 CTX mosaic: Global CTX Mosaic of Mars V01 (5 m/pixel), Bruce Murray Laboratory for Planetary Visualization, Caltech, https://murray-lab.caltech.edu/CTX/. Context inset: NASA Mars Trek, MOLA colour-shaded relief. Sample data: NASA Mars rock samples page.
 
+## Sources, credits and accuracy
+
+These credits and caveats were removed from the web page itself (the page shows only the map and its tabs) and are kept here.
+
+**Imagery.** CTX mosaic by the [Bruce Murray Laboratory, Caltech](https://murray-lab.caltech.edu/CTX/) (global mosaic V01, 5 m/pixel), cut to this area with integration/fetch_ctx.py. Inset is MOLA colour-shaded relief from [NASA Mars Trek](https://trek.nasa.gov/mars/).
+
+**Samples.** Names, areas, rock types and sols from NASA's [Mars rock samples](https://science.nasa.gov/mission/mars-2020-perseverance/mars-rock-samples/) page.
+
+**Route.** Three Forks and Hawksbill Gap follow NASA's Delta Front campaign posts. Raw camera frames at [Mars 2020 raw images](https://mars.nasa.gov/mars2020/multimedia/raw-images/) carry no map coordinates, so they were not used for placement.
+
+**Crater detection.** Python script `model/crater_detector.py` run on the CTX mosaic above. Output is the crater data embedded in this page (`craters-data.js`).
+
+**Not used.** NASA Worldview covers Earth. The Mount Sharp path page describes Curiosity in Gale Crater, a different site.
+
+**Accuracy note.** Basemap: Murray Lab global CTX mosaic (5 m/pixel native, shown at about 10 m/pixel), covering 77.22318-77.41956°E, 18.44176-18.57188°N. Crater marks come from model/crater_detector.py (matched-filter proposals checked by a random-forest classifier; no human labels, so false marks remain: bright outcrops and rock piles are sometimes marked, and some real craters are missed; the detector runs with a looser setting than usual because this area has few craters). Overlay positions for the delta outline, channel, route and samples were traced by eye on the earlier, larger map and re-projected here by latitude and longitude, so they were anchored to the published landing coordinates (18.4446°N, 77.4509°E), which lie just east of this view; places outside it are not drawn. Treat them as approximate; sample positions are placed by named area, not by individual rover fix.
+
 ## Fonts
 
 Titles use Nasalization and map numbers use Terminal F4 when installed on the viewer's computer; otherwise Orbitron and VT323. The free Nasalization licence does not cover web embedding, so the files are not shipped here.
