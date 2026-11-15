@@ -1,10 +1,45 @@
-# Interplanetary-Survival-Guide-Martian-Map-of-The-Triumvirate
-the project of The Triumvirate
+# Interplanetary Survival Guide: Martian Map — The Triumvirate
 
-READ THIS TO SEE HOW THE CODE WORKS AND ALL THE DATA COLLECTED NO NEED TO REED IT IF YOU DONT WANT TO KNOW WHAT IT DOES AND HOW IT WORKS
+Our project for the **NASA Space Apps Challenge 2026**, challenge
+[Interplanetary Survival Guide: Martian Map](https://www.spaceappschallenge.org/2026/challenges/interplanetary-survival-guide-martian-map/).
 
-this is the project of the triumvirate for the nasa space app challenge with the problem off Interplanetary Survival Guide: Martian Map for more information about the problem check the webpage https://www.spaceappschallenge.org/2026/challenges/interplanetary-survival-guide-martian-map/
+## What it does
 
-What this program does is to tackle the obstacles by making a machine learning model a lot of data of obstacles so it figures out all the obstacles and gives us an output of the exact coordinates of where the obstacule is and what it probably is. 
+A machine-learning model looks at satellite images of Mars (the Jezero Crater delta) and finds obstacles
+that would be dangerous to walk over. For each one it gives the **exact coordinates** and a **guess of what it is**
+(right now: craters). The results are shown on an interactive map.
 
-ITS IMPORTANT TO HAVE AN IN DEPTH REVISION ON WHAT IS THE EXAMPLE OBSTACULES BECAUSE IF NOT THE MODEL CAN MAKE FAKE OBSTACULES OR NOT DETECT ACTUAL OBSTACULES   
+> ⚠️ The model learns from example obstacles, so the examples must be checked carefully. Bad examples make it
+> invent obstacles that aren't there, or miss real ones.
+
+## Quick start (nothing to install)
+
+Double-click **`jezero-delta-atlas/dist/jezero-delta-atlas.html`**. It opens the map in your browser.
+Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks.
+
+## What's in this repo
+
+| Folder / file | What it is |
+|---|---|
+| `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
+| `pages/mission-intro.html` | Intro page with the mission story and map (needs two video files that are not in the repo yet). |
+| `pages/rover-sandstorm-simulator.html` | Prototype: Mars rover path and sandstorm simulator. |
+| `docs/mission-guide.md` | The mission objectives. |
+| `docs/to-do.md` | What the team still has to do. |
+
+## Inside `jezero-delta-atlas/`
+
+| Folder | What it is |
+|---|---|
+| `dist/` | The finished map as one single file. Open this one. |
+| `web/` | The map's source: page (`html/`), styles (`css/`), code (`js/`), data, images. |
+| `model/` | The crater-detection model (Python). |
+| `integration/` | Scripts that download the Mars image and connect the model to the web page. |
+| `archive/` | Old versions kept for reference. Not used by the current map. |
+| `craters.csv` | Table of every crater found (opens in Excel / Sheets). |
+
+See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re-run the model.
+
+## Team
+
+The Triumvirate.
