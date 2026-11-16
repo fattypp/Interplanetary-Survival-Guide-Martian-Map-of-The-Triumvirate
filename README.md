@@ -43,7 +43,6 @@ Our seven-slide presentation: [`docs/slides/jezero-delta-atlas-slides.pdf`](docs
 | Folder / file | What it is |
 |---|---|
 | `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
-| `pages/mission-intro.html` | Intro page with the mission story and map. Its videos live in `pages/assets/`. |
 | `docs/mission-guide.md` | The mission: 2 objectives, base camp, 5 stops and 10 tasks (source of `web/data/mission-data.js`). |
 | `docs/to-do.md` | What the team still has to do. |
 
@@ -61,7 +60,6 @@ See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re
 
 ## Live demo
 
-- Intro page: https://fattypp.github.io/Interplanetary-Survival-Guide-Martian-Map-of-The-Triumvirate/pages/mission-intro.html
 - Atlas: https://fattypp.github.io/Interplanetary-Survival-Guide-Martian-Map-of-The-Triumvirate/jezero-delta-atlas/dist/jezero-delta-atlas.html
 
 ![Jezero Delta Atlas](docs/atlas-screenshot.jpg)
@@ -82,12 +80,10 @@ The Triumvirate:
 
 - **Code, documentation and slides:** parts of the code, the documentation and the presentation slides were written
   with the help of Claude (Anthropic), an AI assistant.
-- **Videos:** the two intro videos in `pages/assets/` were generated with Canva AI. Each carries a visible
-  "AI-generated video (Canva AI)" label and the same note in its file metadata.
+- **Images:** map imagery and photos come from NASA and the other sources listed in `docs/IMAGE-CREDITS.md`.
 
 ## License and credits
 
 Code is released under the [MIT License](LICENSE). Basemap imagery comes from the
-Murray Lab CTX global mosaic and NASA MOLA data; the intro page uses
-NASA Trek tiles. Those remain under their providers' terms. Credit NASA/JPL/Caltech/Murray Lab
+Murray Lab CTX global mosaic and NASA MOLA data. Those remain under their providers' terms. Credit NASA/JPL/Caltech/Murray Lab
 when reusing them.
