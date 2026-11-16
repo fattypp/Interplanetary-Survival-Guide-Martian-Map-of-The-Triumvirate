@@ -44,6 +44,7 @@ Our seven-slide presentation: [`docs/slides/jezero-delta-atlas-slides.pdf`](docs
 |---|---|
 | `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
 | `pages/mission-intro.html` | Intro page with the mission story and map. Its videos live in `pages/assets/`. |
+| `docs/mission-story.md` | The mission story, objectives and stop coordinates with their accuracy notes. |
 | `docs/mission-guide.md` | The mission: 2 objectives, base camp, 5 stops and 10 tasks (source of `web/data/mission-data.js`). |
 | `docs/to-do.md` | What the team still has to do. |
 

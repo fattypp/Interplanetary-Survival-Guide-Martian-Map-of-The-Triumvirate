@@ -13,7 +13,7 @@
     O2_PER_H:   { resting: 4,  walking: 9, working: 12 },   // full tank lasts 25 h resting, ~11 h walking, ~8 h working
     BAT_PER_H:  { resting: 3,  walking: 6, working: 8 },    // battery: 33 h resting, ~17 h walking, 12.5 h working
     JITTER: 0.10,            // consumption varies +-5% per step (seeded, so repeatable)
-    WALK_MPS: (window.JEZERO_SPEEDS && window.JEZERO_SPEEDS.foot && window.JEZERO_SPEEDS.foot.mps) || 1.4,   // walking speed (m/s): data/travel-speeds.js is the source, 1.4 only if that file is not loaded
+    WALK_MPS: (root.JEZERO_SPEEDS && root.JEZERO_SPEEDS.foot && root.JEZERO_SPEEDS.foot.mps) || 1.4,   // walking speed (m/s): data/travel-speeds.js is the source, 1.4 only if that file is not loaded
     CAUTION_PCT: 25,         // oxygen / battery caution below this
     CRITICAL_PCT: 10,        // oxygen / battery critical below this
     PCT_HYST: 3,             // a resource level is left only after recovering this many points above its threshold

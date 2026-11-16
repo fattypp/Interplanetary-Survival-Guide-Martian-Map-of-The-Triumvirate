@@ -2,10 +2,10 @@
 
 Source of truth for the mission shown in the atlas (Mission tab, pins, planner, automated schedule), the tablet and the helmet.
 `jezero-delta-atlas/web/data/mission-data.js` (`window.JEZERO_MISSION`) is generated from the tables below with
-`python3 integration/web_bridge.py missiondata`. The story, the stop positions and their accuracy are in the repo-root file `MissionGuide`.
+`python3 integration/web_bridge.py missiondata`. The story, the stop positions and their accuracy are in `docs/mission-story.md`.
 
-**Status of the wording.** The stop names, coordinates and the "What the crew does" text of the five stops come from `MissionGuide`.
-The task titles and descriptions below are editorial: for each stop the main objective uses the MissionGuide text, and the task for the
+**Status of the wording.** The stop names, coordinates and the "What the crew does" text of the five stops come from `docs/mission-story.md`.
+The task titles and descriptions below are editorial: for each stop the main objective uses the mission-story text, and the task for the
 other objective is a short, plausible complementary task written by the development team. They need the science owner's confirmation
 before they are treated as the official task list. Estimated minutes are rough planning values (20 to 60) and need the same confirmation.
 

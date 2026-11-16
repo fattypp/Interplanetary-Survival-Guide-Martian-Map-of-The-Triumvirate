@@ -59,7 +59,7 @@ These credits and caveats were removed from the web page itself (the page shows 
 
 **Imagery.** CTX mosaic by the [Bruce Murray Laboratory, Caltech](https://murray-lab.caltech.edu/CTX/) (global mosaic V01, 5 m/pixel), cut to this area with integration/fetch_ctx.py. Inset is MOLA colour-shaded relief from [NASA Mars Trek](https://trek.nasa.gov/mars/).
 
-**Mission.** Base camp, the five stops and their coordinates come from the repository's `MissionGuide` file (the stops are placed to about 400 to 500 m; see its accuracy notes). The ten tasks are editorial and need the science owner's confirmation. Perseverance's rock-sample sites are no longer part of this atlas.
+**Mission.** Base camp, the five stops and their coordinates come from `docs/mission-story.md` (the stops are placed to about 400 to 500 m; see its accuracy notes). The ten tasks are editorial and need the science owner's confirmation. Perseverance's rock-sample sites are no longer part of this atlas.
 
 **Route.** The route planner avoids detected craters. The Three Forks area follows NASA's depot map. Raw camera frames at [Mars 2020 raw images](https://mars.nasa.gov/mars2020/multimedia/raw-images/) carry no map coordinates, so they were not used for placement.
 
