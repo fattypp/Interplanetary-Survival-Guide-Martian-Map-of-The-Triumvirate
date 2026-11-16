@@ -232,6 +232,28 @@
     assert.strictEqual(c.days, 7); assert.strictEqual(c.sol, false); assert.strictEqual(c.escalateAfterMisses, 3);
   });
 
+  t('objective choice: the schedule plans only the chosen tasks (5 or 10), in stop order', function () {
+    var OBJ = root.JdaObjective || (typeof require === 'function' && typeof module !== 'undefined' ? require('../jezero-delta-atlas/web/js/objective.js') : null); if (!OBJ) return;
+    var all = []; for (var n = 1; n <= 5; n++) [1, 2].forEach(function (o) { all.push({ id: 'task-' + n + '-' + o, title: 'T' + n + o, objective: o, estMin: 30 }); });
+    [[1, 5], [2, 5], ['both', 10]].forEach(function (c) {
+      var chosen = OBJ.filter(all, c[0]); assert.strictEqual(chosen.length, c[1]);
+      var r = E.buildSchedule(cfg(), [], chosen, NOW), ids = {};
+      of(r.blocks, 'mission').forEach(function (b) { ids[b.refId] = 1; });
+      assert.strictEqual(Object.keys(ids).length, c[1], 'choice ' + c[0] + ' schedules ' + Object.keys(ids).length);
+      Object.keys(ids).forEach(function (id) { assert.ok(c[0] === 'both' || id.slice(-1) === String(c[0]), id); });
+    });
+  });
+  t('Atlas.todos / Atlas.schedule follow the chosen objective (browser)', function () {
+    var A = root.Atlas, OB = root.JdaObjective; if (!A || !A.todos || !OB) return;
+    var was = OB.get(), ids = ['task-1-1', 'task-2-1', 'task-3-1', 'task-4-1', 'task-5-1', 'task-1-2', 'task-2-2', 'task-3-2', 'task-4-2', 'task-5-2'], before = {};
+    ids.forEach(function (i) { before[i] = A.missions.isDone(i); A.missions.setDone(i, false); });
+    function mi() { return A.todos.list().filter(function (x) { return x.kind === 'mission'; }); }
+    OB.set(1); assert.strictEqual(mi().length, 5); assert.ok(mi().every(function (x) { return /^mission:task-\d-1$/.test(x.id); }));
+    assert.ok(A.schedule.get().filter(function (b) { return b.type === 'mission'; }).every(function (b) { return /^task-\d-1$/.test(b.refId); }));
+    OB.set(2); assert.strictEqual(mi().length, 5); assert.ok(mi().every(function (x) { return /-2$/.test(x.id); }));
+    OB.set('both'); assert.strictEqual(mi().length, 10);
+    ids.forEach(function (i) { A.missions.setDone(i, before[i]); }); if (was !== null) OB.set(was);
+  });
   function runPlannerTests() {
     var results = [], failed = 0;
     tests.forEach(function (x) {

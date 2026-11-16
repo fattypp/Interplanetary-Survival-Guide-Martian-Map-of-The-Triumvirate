@@ -46,14 +46,34 @@
     var l = A.missions.list(), k = function (x) { return l.filter(function (m) { return m.kind === x; }); };
     assert.strictEqual(k('objective').length, 2); assert.strictEqual(k('stop').length, 5); assert.strictEqual(k('task').length, 10);
     assert.strictEqual(A.missions.stops().length, 5); assert.strictEqual(A.missions.base().id, 'base');
+    var OB = root.JdaObjective, wasObj = OB ? OB.get() : null; if (OB) OB.set('both');   // stop done = its tasks of the chosen objective(s)
     var was1 = A.missions.isDone('task-1-1'), was2 = A.missions.isDone('task-1-2');
     A.missions.setDone('task-1-1', false); A.missions.setDone('task-1-2', false);   // a live world run may already have ticked them
     A.missions.setDone('task-1-1', true); assert.ok(!A.missions.isDone('stop-1')); A.missions.setDone('task-1-2', true); assert.ok(A.missions.isDone('stop-1'));
     A.missions.setDone('task-1-1', was1); A.missions.setDone('task-1-2', was2);
+    if (OB && wasObj !== null) OB.set(wasObj);
     var c = A.missions.add({ title: 'Test mission' }); assert.ok(c && c.kind === 'custom'); assert.ok(A.missions.remove(c.id));
+  });
+  t('objective choice: scopedTasks 5 or 10 in stop order, done tasks stay done when the choice changes, a stop is done when its chosen tasks are', function () {
+    var A = root.Atlas, OB = root.JdaObjective; if (!A || !A.missions || !OB) return;
+    var was = OB.get(), d = {}; D.tasks.forEach(function (x) { d[x.id] = A.missions.isDone(x.id); A.missions.setDone(x.id, false); });
+    OB.set(1); var s1 = A.missions.scopedTasks(); assert.strictEqual(s1.length, 5); assert.ok(s1.every(function (x) { return x.objective === 1 && x.inScope; }));
+    assert.strictEqual(A.missions.tasks().length, 10);
+    A.missions.setDone('task-1-1', true); assert.ok(A.missions.isDone('stop-1'), 'one task is enough for objective 1');
+    OB.set(2); assert.strictEqual(A.missions.scopedTasks().length, 5); assert.ok(!A.missions.isDone('stop-1')); assert.ok(A.missions.isDone('task-1-1'), 'done stays done');
+    OB.set('both'); assert.strictEqual(A.missions.scopedTasks().length, 10); assert.ok(!A.missions.isDone('stop-1'));
+    D.tasks.forEach(function (x) { A.missions.setDone(x.id, d[x.id]); }); if (was !== null) OB.set(was);
+  });
+  t('world run progress counts the chosen tasks in order', function () {
+    var A = root.Atlas, OB = root.JdaObjective; if (!A || !A.missions || !A.missions._applyRun || !OB) return;
+    var was = OB.get(), ids = D.tasks.map(function (x) { return x.id; }), before = {}; ids.forEach(function (i) { before[i] = A.missions.isDone(i); A.missions.setDone(i, false); });
+    OB.set(2); A.missions._applyRun(0); A.missions._applyRun(2);
+    assert.ok(A.missions.isDone('task-1-2') && A.missions.isDone('task-2-2') && !A.missions.isDone('task-3-2') && !A.missions.isDone('task-1-1'));
+    A.missions._applyRun(0); ids.forEach(function (i) { A.missions.setDone(i, before[i]); }); if (was !== null) OB.set(was);
   });
   t('world run progress is mirrored once, manual un-tick sticks, a restart re-opens run-marked tasks', function () {
     var A = root.Atlas; if (!A || !A.missions || !A.missions._applyRun) return;
+    var OB2 = root.JdaObjective, was2 = OB2 ? OB2.get() : null; if (OB2) OB2.set('both');
     var ids = D.tasks.map(function (x) { return x.id; }), before = {};
     ids.forEach(function (i) { before[i] = A.missions.isDone(i); A.missions.setDone(i, false); });
     A.missions._applyRun(0); A.missions._applyRun(3);
@@ -66,7 +86,37 @@
     A.missions._applyRun(0);                      // run restarted
     assert.ok(!A.missions.isDone(ids[1]) && !A.missions.isDone(ids[2]) && !A.missions.isDone(ids[3]), 'run-marked tasks re-opened');
     assert.ok(A.missions.isDone(ids[9]), 'hand-ticked task kept');
-    ids.forEach(function (i) { A.missions.setDone(i, before[i]); });
+    ids.forEach(function (i) { A.missions.setDone(i, before[i]); }); if (OB2 && was2 !== null) OB2.set(was2);
+  });
+  t('world progress.doneIds is mirrored exactly (finish objective 1, switch to both; mid-run objective switch)', function () {
+    var A = root.Atlas, OB = root.JdaObjective; if (!A || !A.missions || !A.missions._applyRunIds || !OB) return;
+    var was = OB.get(), ids = D.tasks.map(function (x) { return x.id; }), before = {}; ids.forEach(function (i) { before[i] = A.missions.isDone(i); A.missions.setDone(i, false); });
+    function doneSet() { return ids.filter(function (i) { return A.missions.isDone(i); }).join(','); }
+    A.missions._applyRunIds([]); OB.set(1);
+    A.missions._applyRunIds(['task-1-1', 'task-2-1', 'task-3-1', 'task-4-1', 'task-5-1']);
+    OB.set('both'); A.missions._applyRunIds(['task-1-1', 'task-2-1', 'task-3-1', 'task-4-1', 'task-5-1']);
+    assert.strictEqual(doneSet(), 'task-1-1,task-2-1,task-3-1,task-4-1,task-5-1', 'only what the run did');
+    A.missions.setDone('task-1-2', true);                                   // by hand
+    A.missions._applyRunIds([]);                                            // restart: run ticks re-opened, hand tick kept
+    assert.strictEqual(doneSet(), 'task-1-2');
+    A.missions.setDone('task-1-2', false);
+    OB.set(2); A.missions._applyRunIds(['task-1-2', 'task-2-2']);           // mid-run 2 -> 1: the run did the objective 2 tasks
+    OB.set(1); A.missions._applyRunIds(['task-1-2', 'task-2-2']);
+    assert.ok(A.missions.isDone('task-1-2') && A.missions.isDone('task-2-2') && !A.missions.isDone('task-1-1') && !A.missions.isDone('task-2-1'));
+    A.missions.setDone('task-1-2', false); A.missions._applyRunIds(['task-1-2', 'task-2-2']); assert.ok(!A.missions.isDone('task-1-2'), 'manual un-tick sticks');
+    A.missions._applyRunIds([]); ids.forEach(function (i) { A.missions.setDone(i, before[i]); }); if (was !== null) OB.set(was);
+  });
+  t('stop card: picture or placeholder, both tasks, credit and raw images link; strip and pins always present', function () {
+    var A = root.Atlas; if (!A || !A.missions || !A.missions.open || typeof document === 'undefined') return;
+    A.missions.open('stop-2'); var c = document.getElementById('ms-card'); assert.ok(c && !c.hidden);
+    assert.strictEqual(c.querySelectorAll('.ms-ctask').length, 2);
+    var im = c.querySelector('img.ms-pic'), ph = c.querySelector('.ms-nopic'); assert.ok(im || ph, 'picture or placeholder');
+    if (im) { assert.ok(im.alt.length > 5 && im.getAttribute('loading') === 'lazy'); assert.ok(/NASA\/JPL-Caltech, Perseverance sol \d+/.test(c.textContent)); }
+    else assert.ok(/Picture not available yet/.test(c.textContent));
+    var a = c.querySelector('a[href="https://mars.nasa.gov/mars2020/multimedia/raw-images/"]'); if (im) assert.ok(a && a.target === '_blank' && /noopener/.test(a.rel));
+    assert.strictEqual(document.querySelectorAll('#ms-strip .ms-chip').length, 6); assert.strictEqual(document.querySelectorAll('#ov-top .ms-pin.ms-core').length, 6);
+    assert.ok(A.layers.isOn('mission-stops')); A.layers.setOn('mission-stops', false); assert.ok(A.layers.isOn('mission-stops'), 'locked on');
+    A.missions.closeCard(); assert.ok(c.hidden);
   });
   t('Atlas.me starts at base camp, not clamped; Atlas.mapData has base and 5 stops only', function () {
     var A = root.Atlas; if (!A || !A.mapData) return;

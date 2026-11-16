@@ -37,7 +37,8 @@
         <select id="heroCrew"></select>
       </label>
       <button type="button" id="runMission" class="btn big primary">Run mission</button>
-      <p class="hint" id="moveHint">Drives the selected crew member by rover from base camp to each of the five stops in order; at each stop the crew goes out on foot for the stop's tasks, then back in the rover, and finally back to base camp. Raises the clock to x600 if it is slower.</p>
+      <label class="check"><input type="checkbox" id="optOrder"> Optimize stop order</label>
+      <p class="hint" id="moveHint">Drives the selected crew member by rover from base camp to each of the five stops in order; at each stop the crew goes out on foot for the stop's tasks, then back in the rover, and finally back to base camp. The rover follows the safe route (around craters and high radiation; it re-plans when a solar or dust event is switched). With the option on, the stops are visited in the order with the lowest hazard-weighted cost instead of the guide order. Raises the clock to x600 if it is slower.</p>
     </div>
   </section>
 
@@ -105,6 +106,8 @@
 <script src="../data/science-layers-data.js"></script>
 <script src="../data/mission-data.js"></script>
 <script src="../data/travel-speeds.js"></script>
+<script src="../js/route-planner.js"></script>
+<script src="../js/mission-route.js"></script>
 <script src="../js/sim-core.js"></script>
 <script src="../js/control.js"></script>
 </body>

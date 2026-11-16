@@ -18,7 +18,7 @@
 <body>
 <h1 class="sr-only">Jezero Delta Atlas</h1>
 <div class="mapbox" id="map" role="application" tabindex="0" aria-label="Pan and zoom map of the Jezero delta. Use arrow keys to pan, plus and minus to zoom, 0 to reset.">
-  <div id="stage"><img id="base" alt="CTX grayscale mosaic of the western Jezero delta and channel mouth, about 10 metres per pixel" src="../images/jezero-ctx-mosaic.jpg"><svg id="ov" viewBox="0 0 1990 1390"></svg></div>
+  <div id="stage"><img id="base" alt="CTX grayscale mosaic of the western Jezero delta and channel mouth, about 10 metres per pixel" src="../images/jezero-ctx-mosaic.jpg"><svg id="ov" viewBox="0 0 1990 1390"></svg><svg id="ov-top" viewBox="0 0 1990 1390" aria-label="Base camp and mission stops" role="group"></svg></div>
   <div class="inset" aria-hidden="true"><img alt="" src="../images/mars-mola-context.jpg"><svg viewBox="0 0 500 500"><rect x="237.4" y="246.7" width="8.9" height="5.9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="250" cy="255" r="40" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/></svg><span>MOLA · 72–83°E, 13–24°N</span></div>
   <div class="tools"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" class="zr">⌂</button></div>
   <div class="readout"><div id="ll">hover the map</div><div class="scale"><i id="sb"></i><span id="sl"></span></div></div>
@@ -37,12 +37,14 @@
 <script src="../data/craters-data.js"></script>
 <script src="../data/mission-data.js"></script>
 <script src="../data/travel-speeds.js"></script>
+<script src="../data/stop-images.js"></script>
 <script src="../data/schedule-config.js"></script>
 <script src="../data/science-layers-data.js"></script>
 <script src="../js/route-planner.js"></script>
 <script src="../js/atlas-map.js"></script>
 <script src="../data/link-config.js"></script>
 <script src="../js/link.js"></script>
+<script src="../js/objective.js"></script>
 <script src="../js/link-ui.js"></script>
 <script src="../js/sim-core.js"></script>
 <script src="../js/world-client.js"></script>

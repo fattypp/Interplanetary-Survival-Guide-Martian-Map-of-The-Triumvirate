@@ -77,6 +77,12 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--hud);font:600 c
 }
 @media (max-width:640px) and (orientation:portrait){.tl{top:19vmin;width:42vw;left:9vmin}.tc{top:9vmin;font-size:1.8em}.tr{top:19vmin;height:22vh}.bl{font-size:.8em;white-space:normal;max-width:44vw;bottom:10vmin}.br{max-width:42vw;bottom:10vmin}.br strong{font-size:1.1em}.toasts{bottom:30vmin;max-width:80vw;left:9vmin}.alerts{top:72vmin;width:86vw}.reads dt{min-width:6.5em}.reads div{flex-wrap:wrap}}
 @media (prefers-reduced-motion:reduce){.scan,.dot,.bar.danger,.alert.danger,.reads dd.danger{animation:none}.helmet.lowo2 .fog{animation:none;opacity:.35}.scene{transition:none}.toast{animation:none}.fill{transition:none}}
+/* short landscape (phones): alerts sit between the minimap and the bars, the bars start below the room pill */
+@media (max-height:520px){
+ .tr{top:44px;height:min(36vh,300px)}
+ .alerts{left:calc(9vmin + min(22vw,170px) + 14px);right:calc(9vmin + 96px);transform:none;width:auto;top:15vmin}
+ .alert{padding:.4em .7em}
+}
 
 </style>
 <style>
@@ -1081,7 +1087,8 @@ window.JEZERO_SPEEDS = {
    Everything here is scenario data: there is no real suit, radiation or vitals feed.
    Works in a browser (window.JdaSim) and in Node (module.exports) for tests.
    Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid),
-   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s). */
+   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s),
+   window.JdaRoute (safe route, mission-route.js: the mission run follows its waypoints), window.JdaObjective / JdaLink state 'objective:<id>' (chosen objective). */
 (function (root) {
   'use strict';
 
@@ -1184,12 +1191,27 @@ window.JEZERO_SPEEDS = {
     var raw = Array.isArray(M.stops) && M.stops.length ? M.stops : C.FALLBACK_STOPS;
     var stops = raw.filter(pt).map(function (st, i) { return { id: String(st.id || 'stop-' + (i + 1)), n: i + 1, name: String(st.name || 'Stop ' + (i + 1)), lat: Number(st.lat), lon: Number(st.lon) }; });
     var tasks = (Array.isArray(M.tasks) ? M.tasks : []).filter(function (t) { return t && t.id && t.stopId; })
-      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
+      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), objective: num(t.objective, 0), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
     return { base: base, stops: stops, tasks: tasks };
   }
   function speeds() {
     var S = root.JEZERO_SPEEDS || {};
     return { rover: num(S.rover && S.rover.mps, C.FALLBACK_MPS.rover), foot: num(S.foot && S.foot.mps, C.FALLBACK_MPS.foot) };
+  }
+
+  /* chosen objective of a crew member: 1, 2 or 'both'. Order: explicit override, JdaObjective (if present), shared state 'objective:<id>', default both */
+  function normChoice(v) { if (v && typeof v === 'object') v = v.choice; return v === 1 || v === '1' ? 1 : v === 2 || v === '2' ? 2 : v === 'both' ? 'both' : null; }
+  function objectiveOf(id, override) {
+    var v = normChoice(override); if (v) return v;
+    try { var O = root.JdaObjective; if (O && typeof O.get === 'function') { v = normChoice(O.get(id)); if (v) return v; } } catch (e) { /* ignore */ }
+    try { var L = root.JdaLink; if (L && typeof L.getState === 'function') { var st = L.getState('objective:' + id); v = normChoice(st && st.value); if (v) return v; } } catch (e2) { /* ignore */ }
+    return 'both';
+  }
+  function taskChosen(t, ch) { return ch === 'both' || t.objective === ch; }
+  function wantOptimize(cmd) {
+    if (cmd && cmd.optimize !== undefined) return !!cmd.optimize;
+    try { var L = root.JdaLink; if (L && typeof L.getState === 'function') { var st = L.getState('route:options'); if (st && st.value) return !!st.value.optimizeOrder; } } catch (e) { /* ignore */ }
+    return false;
   }
 
   /* ---------------- geometry on the sphere (local flat approximation, fine for kilometres) ---------------- */
@@ -1240,7 +1262,7 @@ window.JEZERO_SPEEDS = {
       return {
         id: c.id, name: c.name, lat: clamp(lat, -90, 90), lon: lon, zM: C.Z0_M, headingDeg: 0,
         o2: 100, bat: 100, hr: C.HR_IDLE, hrNoise: 0, hrOverride: null, suitT: C.SUIT_NOM_C, dose: 0,
-        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, stopId: null, taskId: null, tasksDone: 0, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
+        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, objOverride: null, objChoice: 'both', objAt: 0, stopId: null, taskId: null, doneIds: [], speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
       };
     }
     function reset() {
@@ -1276,44 +1298,93 @@ window.JEZERO_SPEEDS = {
       return { ok: true };
     }
 
-    /* ---- mission run: base -> stop 1 .. stop 5 -> base. Drive legs by rover, on foot (EVA) at each stop for its tasks ---- */
+    /* ---- mission run: base -> stops (guide order, or the optimised order) -> base. Drive legs by rover along the safe route (JdaRoute),
+       on foot (EVA) at each stop for the tasks of the chosen objective ---- */
+    function stopById(id) { return info.stops.filter(function (s) { return s.id === id; })[0]; }
+    function hazards() { return { solar: events.solar, dust: events.dust }; }
+    function choiceOf(c) { if (c.objOverride) return c.objOverride; if (c.objAt !== objEpoch) { c.objChoice = objectiveOf(c.id); c.objAt = objEpoch; } return c.objChoice; }   // re-read once per tick / command
+    var objEpoch = 1;
+    function isDone(c, id) { return c.doneIds.indexOf(id) >= 0; }
+    function chosenTasks(c) { var ch = choiceOf(c); return info.tasks.filter(function (t) { return taskChosen(t, ch); }); }
+    /* head for dest along the safe route from the current position (straight line when JdaRoute is absent) */
+    function setLeg(c, dest, label) {
+      var R = root.JdaRoute, lg = null, list = [];
+      if (R && typeof R.leg === 'function') {
+        try { var a = xy(c.lat, c.lon), b = xy(dest.lat, dest.lon); lg = R.leg({ x: a[0], y: a[1] }, { x: b[0], y: b[1] }, { hazards: hazards(), toName: label }); } catch (e) { lg = null; }
+      }
+      if (lg && lg.points && lg.points.length > 2) list = lg.points.slice(1, -1).map(function (p) { return { lat: p.lat, lon: p.lon, label: label }; });
+      list.push({ lat: dest.lat, lon: dest.lon, label: label });
+      c.target = list.shift(); c.path = list; c.headingWalk = false; c.run.leg = lg;
+    }
+    function refreshPlan(c) {
+      var R = root.JdaRoute, r = c.run;
+      if (R && typeof R.plan === 'function') { try { r.ch = choiceOf(c); r.plan = R.plan({ objective: r.ch, order: r.order, hazards: hazards() }); } catch (e) { r.plan = null; } }
+    }
     function startDrive(c, i) {
-      var st = info.stops[i], r = c.run;
-      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null;
-      c.target = { lat: st.lat, lon: st.lon, label: st.name }; c.path = []; c.headingWalk = false; c.mode = 'walking';
+      var r = c.run, st = stopById(r.order[i]);
+      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null; c.mode = 'walking';
+      refreshPlan(c); setLeg(c, st, st.name);
     }
     function startHome(c) {
-      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null;
-      c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.mode = 'returning';
+      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null; c.mode = 'returning';
+      refreshPlan(c); setLeg(c, BASE, BASE.name);
+    }
+    function replan(c) {   // a solar or dust event toggled: continue from the current position to the same destination
+      var r = c.run; if (!r || (r.phase !== 'drive' && r.phase !== 'home')) return;
+      var dest = r.phase === 'drive' ? stopById(r.order[r.i]) : BASE;
+      refreshPlan(c); setLeg(c, dest, dest.name); r.replans++;
+    }
+    function advance(c) { if (c.run.i + 1 < c.run.order.length) startDrive(c, c.run.i + 1); else startHome(c); }
+    /* the EVA at the current stop = the chosen objective's tasks there that have not been performed yet (re-computed when the choice changes) */
+    function planEva(c) {
+      var r = c.run, st = stopById(r.order[r.i]), all = info.tasks.filter(function (t) { return t.stopId === st.id; });
+      r.ch = choiceOf(c); r.evaT = 0;
+      r.tasks = all.filter(function (t) { return taskChosen(t, r.ch) && !isDone(c, t.id); });
+      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : all.length ? 0 : C.EVA_DEFAULT_MIN * 60;   // nothing left to do here: no EVA; a stop with no tasks in the data: 30 min
+      c.taskId = r.tasks.length ? r.tasks[0].id : null;
     }
     function startEva(c) {
-      var r = c.run, st = info.stops[r.i];
-      r.phase = 'eva'; r.evaT = 0; r.tasks = tasksOf(st.id); r.doneBase = c.tasksDone;
-      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : C.EVA_DEFAULT_MIN * 60;
-      c.travel = 'foot'; c.stopId = st.id; c.taskId = r.tasks.length ? r.tasks[0].id : null; c.target = null; c.path = []; c.mode = 'walking';
+      var r = c.run, st = stopById(r.order[r.i]);
+      r.phase = 'eva'; planEva(c);
+      if (r.evaTotal <= 0) { c.stopId = null; advance(c); return; }
+      c.travel = 'foot'; c.stopId = st.id; c.target = null; c.path = []; c.mode = 'walking';
     }
-    function evaStep(c, ds) {   // time on foot at a stop; tasks complete one after the other
-      var r = c.run, acc = 0, n = 0;
+    function evaStep(c, ds) {   // time on foot at a stop; a task counts as performed (doneIds) only when its EVA time has fully elapsed
+      var r = c.run;
+      if (choiceOf(c) !== r.ch) planEva(c);   // objective switched mid-EVA: remaining tasks re-computed, partial progress on the current task is lost
       r.evaT += ds;
-      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc) n++; }
-      if (r.evaT >= r.evaTotal) {
-        c.tasksDone = r.doneBase + r.tasks.length;
-        if (r.i + 1 < info.stops.length) startDrive(c, r.i + 1); else startHome(c);
-        return false;
-      }
-      c.tasksDone = r.doneBase + n; c.taskId = r.tasks.length ? r.tasks[Math.min(n, r.tasks.length - 1)].id : null;
+      var acc = 0;
+      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc && !isDone(c, r.tasks[i].id)) c.doneIds.push(r.tasks[i].id); }
+      if (r.evaT >= r.evaTotal) { advance(c); return false; }
+      var next = r.tasks.filter(function (t) { return !isDone(c, t.id); })[0];
+      c.taskId = next ? next.id : null;
       return true;
     }
     function arriveRun(c) {
       if (c.run.phase === 'drive') startEva(c);
-      else { c.run = null; c.target = null; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
+      else { c.run = null; c.target = null; c.path = []; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
     }
-    function startRun(c, speed) {
+    function startRun(c, speed, cmd) {
       if (!info.stops.length) return 'no mission stops';
-      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], doneBase: 0, evaTotal: 0 };
-      c.tasksDone = 0; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
+      if (cmd && normChoice(cmd.objective)) c.objOverride = normChoice(cmd.objective);   // an explicit choice in the command sticks for this crew member
+      var ch = objectiveOf(c.id, c.objOverride), opt = wantOptimize(cmd), R = root.JdaRoute, order = info.stops.map(function (s) { return s.id; }), pl = null;
+      if (R && typeof R.plan === 'function') {
+        try { pl = R.plan({ objective: ch, optimizeOrder: opt, hazards: hazards() }); if (pl && pl.order && pl.order.length === order.length) order = pl.order; } catch (e) { pl = null; }
+      }
+      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], evaTotal: 0, order: order, plan: pl, leg: null, ch: ch, optimize: opt, replans: 0 };
+      c.doneIds = []; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
       startDrive(c, 0);
       return null;
+    }
+    /* route part of the world record: remaining metres along the planned route and the length-weighted risk (0..1) of what is left */
+    function routeRecord(c) {
+      var r = c.run; if (!r) return null;
+      var rem = 0, riskLen = 0, cur = 0;
+      if (c.target) { var p = { lat: c.lat, lon: c.lon }; [c.target].concat(c.path).forEach(function (q) { cur += distM(p, q); p = q; }); }
+      rem += cur; riskLen += cur * (r.leg ? r.leg.risk : 0);
+      if (r.plan && r.plan.legs && r.phase !== 'home') for (var j = r.i + 1; j < r.plan.legs.length; j++) { rem += r.plan.legs[j].lengthM; riskLen += r.plan.legs[j].lengthM * r.plan.legs[j].risk; }
+      var blocked = (r.plan && r.plan.blocked ? r.plan.blocked.length : 0) + (r.leg && r.leg.blocked ? 1 : 0);
+      return { order: r.order.slice(), remainingOrder: r.phase === 'home' ? [] : r.order.slice(r.i), current: r.phase === 'home' ? 'base' : r.order[r.i], remainingM: round(rem, 1), riskAhead: rem > 0 ? round(riskLen / rem, 3) : 0, optimized: !!r.optimize, replans: r.replans, blockedLegs: blocked };
     }
 
     /* ---- one physics step of ds simulated seconds ---- */
@@ -1336,8 +1407,8 @@ window.JEZERO_SPEEDS = {
           if (d > 0.01) c.headingDeg = bearing(c, c.target);
           if (d <= remaining) {
             c.lat = c.target.lat; c.lon = c.target.lon; remaining -= d;
-            if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             if (c.path.length) c.target = c.path.shift();
+            else if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             else if (c.thenReturn && c.mode === 'walking') {   // end of an excursion: head home
               c.thenReturn = false; c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.mode = 'returning';
             } else {
@@ -1387,6 +1458,7 @@ window.JEZERO_SPEEDS = {
     function tick(dtMs) {
       dtMs = num(dtMs, 0);
       if (!(dtMs > 0)) return;
+      objEpoch++;
       var dtS = Math.min(dtMs, 5000) / 1000 * clock;   // a stalled page never "catches up" more than 5 real seconds
       var n = Math.min(C.MAX_CHUNKS, Math.max(1, Math.ceil(dtS / C.MAX_CHUNK_S))), ds = dtS / n;
       for (var i = 0; i < n; i++) {
@@ -1412,6 +1484,7 @@ window.JEZERO_SPEEDS = {
     function endRun(c) { c.run = null; c.stopId = null; c.taskId = null; }
 
     function command(cmd) {
+      objEpoch++;
       if (!cmd || typeof cmd !== 'object') return { ok: false, error: 'no command' };
       var name = String(cmd.cmd || '');
       var list;
@@ -1422,9 +1495,12 @@ window.JEZERO_SPEEDS = {
           if (!isFinite(n) || n <= 0) return { ok: false, error: 'n must be a positive number' };
           clock = clamp(n, 0.01, 100000); return { ok: true };
         case 'event':
+          var before = events.solar + '|' + events.dust;
           if (cmd.solar !== undefined) events.solar = !!cmd.solar;
           if (cmd.dust !== undefined) events.dust = !!cmd.dust;
-          refreshEnv(); return { ok: true };
+          refreshEnv();
+          if (before !== events.solar + '|' + events.dust) order.forEach(function (k) { replan(crew[k]); });   // running crews re-plan from where they are
+          return { ok: true };
         case 'addCrew': return addCrew(cmd);
         case 'removeCrew': return removeCrew(String(cmd.crew || ''));
         case 'walk': case 'stop': case 'return': case 'setSpeed': case 'setTravel': case 'runMission': case 'set':
@@ -1458,7 +1534,7 @@ window.JEZERO_SPEEDS = {
         } else if (name === 'setTravel') {
           if (!setTravel(c, cmd.mode)) err = 'mode must be rover or foot';
         } else if (name === 'runMission') {
-          err = startRun(c, cmd.speed);
+          err = startRun(c, cmd.speed, cmd);
         } else if (name === 'set') {
           err = setField(c, String(cmd.field || ''), cmd.value);
         }
@@ -1487,6 +1563,10 @@ window.JEZERO_SPEEDS = {
     }
 
     /* ---- world snapshot (schema: docs/MULTIPAGE.md) ---- */
+    function progressOf(c) {
+      var ch = chosenTasks(c);
+      return { done: ch.filter(function (t) { return isDone(c, t.id); }).length, total: ch.length, doneIds: c.doneIds.slice() };
+    }
     function record(c) {
       var p = xy(c.lat, c.lon);
       return {
@@ -1496,7 +1576,8 @@ window.JEZERO_SPEEDS = {
         suitTempC: round(c.suitT, 1), ambientTempC: round(c.amb, 1), radUsvH: round(c.rad, 2), doseMsv: round(c.dose, 4),
         mode: c.mode, speedMps: round(c.speed, 2),
         target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null,
-        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: { done: c.tasksDone, total: info.tasks.length },
+        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: progressOf(c),
+        route: routeRecord(c),
         distM: c.target ? round(distM(c, c.target), 1) : null,
         etaS: c.run && c.run.phase === 'eva' ? Math.max(0, Math.round(c.run.evaTotal - c.run.evaT)) : c.target && speedOf(c) > 0 ? Math.round(distM(c, c.target) / speedOf(c)) : null
       };
@@ -1522,7 +1603,7 @@ window.JEZERO_SPEEDS = {
         c.o2 = clamp(num(r.o2Pct, 100), 0, 100); c.bat = clamp(num(r.batPct, 100), 0, 100); c.hr = num(r.hr, c.hr);
         c.suitT = num(r.suitTempC, c.suitT); c.dose = Math.max(0, num(r.doseMsv, 0)); c.speed = 0;
         c.travel = r.travel === 'rover' ? 'rover' : 'foot'; c.run = null; c.stopId = null; c.taskId = null;   // a mission run in progress is not part of the world: it stops at its current target
-        c.tasksDone = r.progress && isFinite(Number(r.progress.done)) ? Math.max(0, Number(r.progress.done)) : 0;
+        c.doneIds = r.progress && Array.isArray(r.progress.doneIds) ? r.progress.doneIds.filter(function (id) { return info.tasks.some(function (t) { return t.id === id; }); }).slice(0, 64) : [];
         c.mode = ['idle', 'walking', 'returning', 'resting'].indexOf(r.mode) >= 0 ? r.mode : 'idle';
         var sp = num(r.speedMps, 0); c.speedOverride = sp > 0 && Math.abs(sp - SPD[c.travel]) > 0.01 ? clamp(sp, 0.1, C.MAX_MPS) : null;
         c.target = pointOf(r.target); c.path = [];
@@ -1539,7 +1620,7 @@ window.JEZERO_SPEEDS = {
 
   var api = {
     create: create, C: C, missionInfo: missionInfo, speeds: speeds, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
-    localHour: localHour, localMarsTime: localMarsTime, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
+    localHour: localHour, localMarsTime: localMarsTime, objectiveOf: objectiveOf, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JdaSim = api;
@@ -1695,6 +1776,145 @@ window.JEZERO_SPEEDS = {
 
 </script>
 <script>
+/* JdaObjective: which mission objective(s) the user wants to fulfil.
+   choice: 1 (microbial life), 2 (sustaining human life) or 'both'. null = not chosen yet (no silent default).
+   Plain browser JS, no dependencies (uses Atlas.bus / JdaLink when they exist); the pure helpers also work under Node.
+
+   JdaObjective.get(crewId?)          -> 1 | 2 | 'both' | null   (crewId defaults to the current one)
+   JdaObjective.set(choice, crewId?)  -> true | false           stores it, publishes it to the room, tells the listeners
+   JdaObjective.has(crewId?)          -> true when a choice exists
+   JdaObjective.pending()             -> true when the current crew has not chosen yet
+   JdaObjective.tasks(mission, crewId?) -> mission.tasks (or an array of {objective}) restricted to the chosen objective(s);
+                                          all tasks while nothing is chosen, so a page never shows an empty list (check has())
+   JdaObjective.filter(list, choice)  -> same, with an explicit choice (pure)
+   JdaObjective.includes(objectiveId, crewId?) -> boolean
+   JdaObjective.count(mission, crewId?) -> number of tasks in scope (5 or 10)
+   JdaObjective.label(choice) / .short(choice) -> text for the UI
+   JdaObjective.crewId()              -> JdaLink.room.id when a room is joined, else 'local'
+   JdaObjective.on(fn) -> off()       fn(choice, {crewId, source:'local'|'remote'|'init'}) when the choice of the CURRENT crew changes
+   Storage: localStorage 'jda.objective' (no room) or 'jda.objective.<crewId>' as {choice, t}.
+   Shared: JdaLink.setState('objective:<crewId>', {choice, t}) when a room is joined; changes from other pages of the same crew are mirrored
+   (never echoed back: only a newer t is taken, and only local set() publishes). */
+(function (root) {
+  'use strict';
+  var TITLES = { 1: 'Find evidence of ancient microbial life', 2: 'Assess whether the site can sustain human life', both: 'Both objectives' };
+  var SHORT = { 1: 'Objective 1: microbial life', 2: 'Objective 2: sustaining human life', both: 'Both objectives' };
+
+  function norm(c) {
+    if (c === 1 || c === '1') return 1;
+    if (c === 2 || c === '2') return 2;
+    if (c === 'both') return 'both';
+    return null;
+  }
+  function filter(list, choice) {
+    var arr = Array.isArray(list) ? list : (list && Array.isArray(list.tasks) ? list.tasks : []);
+    var c = norm(choice);
+    if (c === null || c === 'both') return arr.slice();
+    return arr.filter(function (t) { return t && Number(t.objective) === c; });
+  }
+
+  var api = { norm: norm, filter: filter, label: function (c) { c = norm(c); return c === null ? 'Not chosen' : TITLES[c]; }, short: function (c) { c = norm(c); return c === null ? 'Not chosen' : SHORT[c]; } };
+  api.TITLES = TITLES;
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined' && module.exports) module.exports = api; return; }
+
+  var mem = {}, subs = [], cur = null, offState = null, watchKey = null, lastPub = {};
+  function slug(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32); }
+  function link() { var L = root.JdaLink; return L && L.room && !L.room.implicit ? L : null; }   // a real joined room only (never trigger the implicit legacy room)
+  function crewId() { var L = link(), id = L ? slug(L.room.id) : ''; return id || 'local'; }
+  function skey(id) { return id === 'local' ? 'objective' : 'objective.' + id; }
+  function read(id) {
+    var raw = null, k = 'jda.' + skey(id);
+    try { raw = root.localStorage.getItem(k); } catch (e) { raw = null; }
+    var v = null;
+    if (raw !== null) { try { v = JSON.parse(raw); } catch (e) { v = null; } }
+    else if (Object.prototype.hasOwnProperty.call(mem, k)) v = mem[k];
+    if (v && typeof v === 'object' && !Array.isArray(v) && norm(v.choice) !== null) return { choice: norm(v.choice), t: typeof v.t === 'string' ? v.t : '' };
+    if (norm(v) !== null) return { choice: norm(v), t: '' };   // a bare value written by hand or by an older version
+    return null;
+  }
+  function write(id, rec) {
+    var k = 'jda.' + skey(id); mem[k] = rec;
+    try { root.localStorage.setItem(k, JSON.stringify(rec)); } catch (e) { /* ignore */ }
+  }
+  function tms(s) { var n = Date.parse(s); return isFinite(n) ? n : 0; }
+  function emit(id, source) {
+    if (id !== crewId()) return;
+    var c = api.get(id);
+    subs.slice().forEach(function (fn) { try { fn(c, { crewId: id, source: source }); } catch (e) { if (root.console) console.error('JdaObjective listener failed', e); } });
+    try { if (root.Atlas && root.Atlas.bus) root.Atlas.bus.emit('objective:changed', { choice: c, crewId: id, source: source }); } catch (e) { /* ignore */ }
+  }
+  function publish(id, rec) {
+    var L = link(); if (!L || !rec) return;
+    try { L.setState('objective:' + id, { choice: rec.choice, t: rec.t }); lastPub[id] = rec.t; } catch (e) { /* link not ready */ }
+  }
+
+  api.crewId = crewId;
+  api.get = function (id) { var r = read(id || crewId()); return r ? r.choice : null; };
+  api.has = function (id) { return api.get(id) !== null; };
+  api.pending = function () { return !api.has(); };
+  api.set = function (choice, id) {
+    var c = norm(choice); if (c === null) return false;
+    id = id ? slug(id) || 'local' : crewId();
+    var before = read(id);
+    var rec = { choice: c, t: new Date().toISOString() };
+    if (before && before.t && tms(rec.t) <= tms(before.t)) rec.t = new Date(tms(before.t) + 1).toISOString();   // always strictly newer, so it wins
+    write(id, rec); publish(id, rec);
+    emit(id, 'local');
+    return true;
+  };
+  api.tasks = function (mission, id) { return filter(mission, api.get(id)); };
+  api.includes = function (objectiveId, id) { var c = api.get(id); return c === null || c === 'both' || Number(objectiveId) === c; };
+  api.count = function (mission, id) { return api.tasks(mission, id).length; };
+  api.on = function (fn) {
+    if (typeof fn !== 'function') return function () { };
+    subs.push(fn);
+    return function () { var i = subs.indexOf(fn); if (i >= 0) subs.splice(i, 1); };
+  };
+
+  /* ---- remote mirror ---- */
+  function incoming(id, v, meta) {
+    if (!v || typeof v !== 'object') return;
+    var c = norm(v.choice); if (c === null) return;
+    var t = typeof v.t === 'string' && isFinite(Date.parse(v.t)) ? v.t : new Date(meta && meta.t || Date.now()).toISOString();
+    var mine = read(id);
+    if (mine && tms(mine.t) >= tms(t)) return;   // not newer: nothing to do, so no echo loop
+    write(id, { choice: c, t: t });
+    if (!mine || mine.choice !== c) emit(id, 'remote');
+  }
+  function attach() {
+    var L = link(), id = crewId(), key = L ? 'objective:' + id : null;
+    if (key === watchKey) return;
+    if (offState) { try { offState(); } catch (e) { /* ignore */ } offState = null; }
+    watchKey = key;
+    if (!L) { var now = read('local'); if (now && now.choice !== cur) { cur = now.choice; emit('local', 'remote'); } return; }
+    // a choice made before joining (stored for 'local') carries over to this crew when it has none, and is shared with the room
+    var mineHere = read(id), loc = id !== 'local' ? read('local') : null;
+    if (!mineHere && loc) { write(id, loc); mineHere = loc; }
+    try {
+      var cur0 = L.getState(key);
+      if (cur0 && cur0.value) incoming(id, cur0.value, cur0);
+      mineHere = read(id);
+      if (mineHere && (!cur0 || !cur0.value || tms(mineHere.t) > tms(cur0.value.t))) publish(id, mineHere);
+      offState = L.onState(key, function (v, meta) { incoming(id, v, meta); });
+    } catch (e) { /* link not ready: tried again on the next tick */ watchKey = null; }
+    var after = api.get(id);
+    if (after !== cur) { cur = after; emit(id, 'init'); }
+  }
+  cur = api.get();
+  try { root.addEventListener('storage', function (e) {   // another tab of this browser changed the stored choice
+    if (!e.key || e.key.indexOf('jda.objective') !== 0) return;
+    var id = crewId(); if (e.key !== 'jda.' + skey(id)) return;
+    var r = read(id); if (r && r.choice !== cur) { cur = r.choice; emit(id, 'remote'); }
+    if (r && link()) publish(id, r);
+  }); } catch (e) { /* ignore */ }
+  api.on(function (c) { cur = c; });
+  setInterval(attach, 700);   // a room can be joined (or changed) at any time by link-ui
+  attach();
+  root.JdaObjective = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
 /* Helmet HUD. Reads crew data only through JdaWorld, messages and tasks through JdaLink. Plain browser JS. */
 (function () {
   'use strict';
@@ -1845,33 +2065,49 @@ window.JEZERO_SPEEDS = {
   }
 
   /* ---------- next task ---------- */
-  function missionTasks() { var M = window.JEZERO_MISSION; return M && M.tasks ? M.tasks : []; }
+  /* tasks of the objective the crew chose (JdaObjective: 1, 2 or 'both'); all tasks while nothing is chosen */
+  function objChoice() {
+    var JO = window.JdaObjective, c = null;
+    try { c = JO && JO.get ? JO.get(crewId || undefined) : null; } catch (e) { c = null; }
+    if (c == null && task && (task.objective === 1 || task.objective === 2 || task.objective === 'both')) c = task.objective;
+    return c;
+  }
+  function missionTasks() {
+    var M = window.JEZERO_MISSION, all = M && M.tasks ? M.tasks : [], c = objChoice();
+    return c === 1 || c === 2 ? all.filter(function (t) { return Number(t.objective) === c; }) : all;
+  }
   function stopName(id) {
     var M = window.JEZERO_MISSION, st = M && M.stops ? M.stops.filter(function (x) { return x.id === id; })[0] : null;
     return st ? (st.n ? 'Stop ' + st.n + ': ' : '') + st.name : '';
   }
+  /* tasks finished: what the run reports (progress.doneIds, every objective) plus what the tablet marked done (its manual checks win) */
   function doneIds() {
-    var set = {}, ms = task && Array.isArray(task.missions) ? task.missions : null;
-    if (ms) ms.forEach(function (x) { if (x && x.done) set[x.id] = 1; });
+    var set = {}, m = lastWorld, w = m && m.progress && Array.isArray(m.progress.doneIds) ? m.progress.doneIds : null;
+    if (w) w.forEach(function (id) { if (typeof id === 'string') set[id] = 1; });
+    if (task && Array.isArray(task.doneIds)) { set = {}; task.doneIds.forEach(function (id) { if (typeof id === 'string') set[id] = 1; }); }   // the tablet's merged list (manual overrides included)
+    else if (task && Array.isArray(task.missions)) task.missions.forEach(function (x) { if (x && x.done) set[x.id] = 1; else if (x && x.done === false) delete set[x.id]; });
     return set;
   }
-  /* next undone task of the ordered list; a world record naming a task (taskId) sets the starting point */
+  /* next task of the chosen list that is not done; no positional guessing */
   function nextTask(m) {
-    var list = missionTasks(), done = task && Array.isArray(task.missions) ? doneIds() : null, i = 0, n;
+    var list = missionTasks(), i = 0, n;
     if (!list.length) {
       n = task && task.next && typeof task.next === 'object' ? task.next : null;
       return n ? { title: str(n.title, 120), where: str(n.stopName, 80), startISO: n.startISO || null } : null;
     }
-    if (m && m.taskId) { for (var k = 0; k < list.length; k++) if (list[k].id === m.taskId) { i = k; break; } }
-    else if (m && m.stopId) { for (var j = 0; j < list.length; j++) if (list[j].stopId === m.stopId) { i = j; break; } }
-    else if (m && !done && m.progress && isFinite(Number(m.progress.done))) i = Math.max(0, Math.min(list.length, Math.floor(Number(m.progress.done))));   // no tablet data and no task in the record (e.g. after a fallback): continue after the tasks the run finished
-    for (; i < list.length; i++) if (!done || !done[list[i].id]) break;
-    if (i >= list.length) return { done: true };
-    if (!(m && (m.taskId || m.stopId)) && !done && task && task.next && task.next.taskId) {
-      for (var q = 0; q < list.length; q++) if (list[q].id === task.next.taskId) { i = q; break; }
+    var ord = m && m.route && Array.isArray(m.route.order) ? m.route.order : null;   // the run may visit the stops in another order
+    if (ord) list = list.map(function (t, k) { return { t: t, k: k, o: ord.indexOf(t.stopId) < 0 ? 99 : ord.indexOf(t.stopId) }; }).sort(function (a, b) { return a.o - b.o || a.k - b.k; }).map(function (x) { return x.t; });
+    var hasIds = (m && m.progress && Array.isArray(m.progress.doneIds)) || (task && (Array.isArray(task.doneIds) || Array.isArray(task.missions))), done = doneIds();
+    if (!hasIds && m && m.progress && isFinite(Number(m.progress.done))) {   // an older world record without doneIds: fall back to the first N tasks in order
+      var cnt = Math.max(0, Math.floor(Number(m.progress.done))); for (var q = 0; q < list.length && q < cnt; q++) done[list[q].id] = 1;
     }
-    var t = list[i], n2 = task && task.next && task.next.taskId === t.id ? task.next : null;
-    return { title: str(t.title, 120), where: stopName(t.stopId), startISO: n2 && n2.startISO ? n2.startISO : null };
+    for (; i < list.length; i++) if (!done[list[i].id]) break;
+    if (i >= list.length) return { done: true };
+    var cur = m && (m.taskId || m.stopId) ? list.filter(function (x) { return !done[x.id] && (m.taskId ? x.id === m.taskId : x.stopId === m.stopId); })[0] : null;
+    if (cur) i = list.indexOf(cur);
+    var t = list[i], n2 = task && task.next && task.next.taskId === t.id ? task.next : null, ndone = 0;
+    list.forEach(function (x) { if (done[x.id]) ndone++; });
+    return { title: str(t.title, 120), where: stopName(t.stopId), startISO: n2 && n2.startISO ? n2.startISO : null, no: ndone, of: list.length };
   }
   function watchTasks(id) {
     if (!id || id === taskFor || !window.JdaLink || !JdaLink.onState) return;
@@ -1883,7 +2119,7 @@ window.JEZERO_SPEEDS = {
     var nt = nextTask(lastWorld), title, when = '';
     if (nt && nt.done) title = 'All tasks complete';
     else if (nt) {
-      title = nt.title; when = nt.where;
+      title = nt.title; when = nt.where + (nt.of ? (nt.where ? ' - ' : '') + nt.no + ' of ' + nt.of + ' done' : '');
       var d = nt.startISO ? new Date(nt.startISO) : null, nw = now();
       if (d && !isNaN(d) && nw) {
         var mins = Math.round((d - nw) / 60000);
@@ -1943,6 +2179,7 @@ window.JEZERO_SPEEDS = {
       if (window.JdaLink && JdaLink.on) JdaLink.on(onMsg);
     } catch (e) {}
     try { if (window.JdaWorld && JdaWorld.on) JdaWorld.on(render); } catch (e) {}
+    try { if (window.JdaObjective && JdaObjective.on) JdaObjective.on(function () { renderTask(); }); } catch (e) {}
     setInterval(render, 1000);
     window.addEventListener('resize', function () { minimap(lastWorld); });
     render();

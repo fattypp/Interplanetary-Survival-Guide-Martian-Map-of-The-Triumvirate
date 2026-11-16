@@ -107,7 +107,7 @@
     W: core.W, H: core.H,
     ll: core.ll, xy: core.xy, el: core.el, h: h, icon: icon,
     setInfo: core.setInfo,   // also opens the Map tab through core.onInfo (set below)
-    focus: core.focus,
+    focus: core.focus, focusAt: core.focusAt, view: core.view, setViewPad: core.setPad, onView: core.onView,   // focusAt(x,y,zoom,screenX,screenY); view() -> {k,x,y,w,h}; onView(fn) after every pan/zoom
     mapData: core.mapData, store: store, bus: bus, clock: clock, now: clock.now
   };
 
@@ -279,7 +279,7 @@
     var node = L.raster ? L.def.canvas : L.def.node;
     if (node) node.style.display = L.on ? '' : 'none';
     if (L.raster && node) node.style.opacity = L.opacity;
-    if (L.cb) L.cb.checked = L.on;
+    if (L.cb) { L.cb.checked = L.on; if (L.def.locked) L.cb.disabled = true; }
     if (L.slider) { L.slider.value = Math.round(L.opacity * 100); L.slider.disabled = !L.on; }
   }
   function addLayer(def, raster) {
@@ -289,7 +289,7 @@
     var op = Number(saved.opacity); if (saved.opacity === null || saved.opacity === '' || typeof saved.opacity === 'boolean' || !isFinite(op)) op = def.opacity !== undefined ? def.opacity : 0.7;
     var L = layers[def.id] = {
       def: def, raster: raster,
-      on: typeof saved.on === 'boolean' ? saved.on : !!def.on,
+      on: def.locked ? true : typeof saved.on === 'boolean' ? saved.on : !!def.on,   // a locked layer (def.locked) cannot be switched off
       opacity: Math.min(1, Math.max(0, op))
     };
     if (raster) {
@@ -309,7 +309,7 @@
   Atlas.registerRasterLayer = function (def) { addLayer(def, true); };
   Atlas.layers = {
     setOn: function (id, on) {
-      var L = layers[id]; if (!L) return; L.on = !!on; applyLayer(L); saveLayers();
+      var L = layers[id]; if (!L || L.def.locked) return; L.on = !!on; applyLayer(L); saveLayers();
       bus.emit('layer:changed', { id: id, on: L.on, opacity: L.opacity });
     },
     isOn: function (id) { return !!(layers[id] && layers[id].on); },
@@ -328,10 +328,10 @@
       Object.keys(layers).forEach(function (id) {
         var L = layers[id]; if ((L.def.group || 'Other') !== g) return;
         var dot = h('span', { class: 'dot' }); dot.style.borderColor = L.def.color || '#999';
-        L.cb = h('input', { type: 'checkbox', checked: L.on, onchange: function () { Atlas.layers.setOn(id, L.cb.checked); } });
+        L.cb = h('input', { type: 'checkbox', checked: L.on, disabled: !!L.def.locked, onchange: function () { Atlas.layers.setOn(id, L.cb.checked); } });
         var row = h('div', { class: 'ls-row' }, [
           h('label', { class: 'ls-chk' }, [L.cb, h('span', { class: 'box' }), dot, h('span', { text: L.def.label || id }),
-            h('span', { class: 'n', text: L.def.count !== undefined && L.def.count !== null ? String(L.def.count) : '' })])
+            h('span', { class: 'n', text: L.def.locked ? 'always on' : L.def.count !== undefined && L.def.count !== null ? String(L.def.count) : '' })])
         ]);
         if (L.raster) {
           L.slider = h('input', { type: 'range', min: 0, max: 100, step: 1, attrs: { 'aria-label': 'Opacity of ' + (L.def.label || id) }, oninput: function () { Atlas.layers.setOpacity(id, L.slider.value / 100); } });

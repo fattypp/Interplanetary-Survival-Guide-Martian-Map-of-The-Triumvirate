@@ -89,10 +89,15 @@
   function walkTo(id, p, travel) { return run({ cmd: 'walk', crew: id, to: { lat: p.lat, lon: p.lon, label: p.name }, travel: travel }); }
   function destinations() { return [MI.base].concat(MI.stops); }
 
+  /* ONE truth for the stop-order option: the shared state 'route:options' (also written by the tablet). The checkbox mirrors it; Run mission
+     sends an explicit flag only when no shared value exists (stand-alone page), otherwise the engine reads the shared value itself. */
+  function sharedOptimize() { var L = window.JdaLink, st = null; try { st = L && L.getState && L.room ? L.getState('route:options') : null; } catch (e) { st = null; } return st && st.value && typeof st.value.optimizeOrder === 'boolean' ? st.value.optimizeOrder : null; }
+  function runCmd(id) { var c = { cmd: 'runMission', crew: id }; if (sharedOptimize() === null) c.optimize = $('optOrder').checked; return c; }
+  function onRouteOptions(v) { if (v && typeof v.optimizeOrder === 'boolean') { $('optOrder').checked = v.optimizeOrder; routeSig = {}; } }
   function runMission() {
     var id = $('heroCrew').value; if (!id || !W.crew[id]) { logLine('Run mission: no crew member selected (add one first).'); return; }
     if (W.clockSpeed < 60) run({ cmd: 'setClockSpeed', n: 600 });
-    run({ cmd: 'runMission', crew: id });
+    run(runCmd(id));
   }
   /* simulated seconds as h/min, plus the real time it takes at the current clock multiplier */
   function dur(s) {
@@ -131,6 +136,10 @@
     $('evDust').addEventListener('change', function () { run({ cmd: 'event', dust: this.checked }); });
     $('resetBtn').addEventListener('click', function () { var b = this; confirmStep(b, 'Reset the simulation (positions, vitals, dose, clock)? A running mission stops.', 'Yes, reset', function () { run({ cmd: 'reset' }); }); });
     $('runMission').addEventListener('click', runMission);
+    $('optOrder').addEventListener('change', function () {
+      var L = window.JdaLink; try { if (L && L.setState && L.room) L.setState('route:options', { optimizeOrder: this.checked, t: new Date().toISOString() }); } catch (e) { /* link not ready */ }
+      routeSig = {};
+    });
     $('addForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var name = $('addName').value.replace(/\s+/g, ' ').trim();
@@ -170,6 +179,7 @@
       el[k] = h('dd', { text: '-' });
       vit.appendChild(h('div', {}, [h('dt', { text: { o2: 'Oxygen', bat: 'Battery', hr: 'Heart rate', suit: 'Suit temp', amb: 'Ambient', rad: 'Radiation', dose: 'Dose', speed: 'Speed', pos: 'Map x,y', travel: 'Travel', where: 'Stop / task', dist: 'Distance left', eta: 'ETA' }[k] }), el[k]]));
     });
+    el.route = h('div', { class: 'routebox', role: 'group', 'aria-label': 'Route of ' + id }, [h('p', { class: 'route-head', text: 'Route' }), h('p', { class: 'route-sum', text: '-' }), h('ul', { class: 'route-notes' })]);
     el.mode = h('span', { class: 'mode', text: 'idle' });
     el.name = h('span', { text: id });
     var dest = h('select', { 'aria-label': 'Destination for ' + id });
@@ -193,8 +203,9 @@
       h('h3', {}, [el.name, el.mode]),
       vit,
       h('div', { class: 'progrow' }, [el.prog, el.progText]),
+      el.route,
       h('div', { class: 'btnrow' }, [h('span', { class: 'lbl', text: 'Travel' }), tsw,
-        h('button', { type: 'button', class: 'btn', text: 'Run mission', onclick: function () { run({ cmd: 'runMission', crew: id }); } })]),
+        h('button', { type: 'button', class: 'btn', text: 'Run mission', onclick: function () { run(runCmd(id)); } })]),
       h('div', { class: 'btnrow' }, [
         h('button', { type: 'button', class: 'btn primary', text: 'Walk', onclick: function () { walkTo(id, destinations()[Number(dest.value)]); } }),
         h('button', { type: 'button', class: 'btn', text: 'Stop', onclick: function () { run({ cmd: 'stop', crew: id }); } }),
@@ -240,6 +251,7 @@
     }
     ids.forEach(function (id) {
       var c = W.crew[id], e = cards[id]; if (!e) return;
+      renderRoute(id, c, e);
       e.name.textContent = c.name;
       e.card.setAttribute('aria-label', c.name);
       e.mode.textContent = c.mode; e.mode.className = 'mode ' + c.mode;
@@ -273,6 +285,24 @@
     Array.prototype.forEach.call($('clockBtns').children, function (b) { b.setAttribute('aria-pressed', Number(b.dataset.n) === W.clockSpeed ? 'true' : 'false'); });
     if (document.activeElement !== $('evSolar')) $('evSolar').checked = W.events.solar;
     if (document.activeElement !== $('evDust')) $('evDust').checked = W.events.dust;
+  }
+  /* route summary per crew: planned (or running) route, length against the straight line, detours, risk */
+  var routeSig = {};
+  function km(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+  function renderRoute(id, c, e) {
+    var R = window.JdaRoute; if (!R || !R.plan) { e.route.hidden = true; return; }
+    var choice = Sim.objectiveOf ? Sim.objectiveOf(id) : 'both', opt = $('optOrder').checked, ev = W.events || {};
+    var sig = [choice, opt, ev.solar, ev.dust, c.route ? Math.round(c.route.remainingM / 50) : 'x'].join('|');
+    if (routeSig[id] === sig) return; routeSig[id] = sig;
+    var p = R.plan({ objective: choice, optimizeOrder: opt, hazards: { solar: !!ev.solar, dust: !!ev.dust } });
+    var order = (c.route ? c.route.order : p.order).map(function (sid) { var s = MI.stops.filter(function (x) { return x.id === sid; })[0]; return s ? s.n : sid; }).join(' > ');
+    var sum = 'Order ' + order + (opt && !c.route ? ' (optimised)' : '') + '. Planned ' + km(p.totalM) + ' vs ' + km(p.straightM) + ' direct (+' + km(p.detourM) + '), ' + p.avoided.craters + ' crater' + (p.avoided.craters === 1 ? '' : 's') + ' avoided, risk ' + p.riskLevel + ' (' + Math.round(p.risk * 100) + ' %' + (p.worst && p.worst.reason !== 'none' ? ', worst leg ' + (p.worst.index + 1) + ': ' + p.worst.reason : '') + '), drive ' + dur(p.etaRoverS) + ', EVA ' + dur(p.evaTotalMin * 60) + ' (' + p.taskCount + ' tasks).';
+    if (c.route) sum = 'Running: ' + km(c.route.remainingM) + ' left, risk ahead ' + Math.round(c.route.riskAhead * 100) + ' %' + (c.route.replans ? ', re-planned ' + c.route.replans + 'x' : '') + '. ' + sum;
+    e.route.querySelector('.route-sum').textContent = sum;
+    var ul = e.route.querySelector('.route-notes'); while (ul.firstChild) ul.removeChild(ul.firstChild);
+    p.hazardNotes.slice(0, 5).forEach(function (n) { ul.appendChild(h('li', { text: n, class: /WARNING/.test(n) ? 'warn' : '' })); });
+    if (p.hazardNotes.length > 5) ul.appendChild(h('li', { text: '+ ' + (p.hazardNotes.length - 5) + ' more notes (see the route on the tablet)' }));
+    e.route.hidden = false;
   }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -377,8 +407,8 @@
     $('roomCode').textContent = code || 'none';
     if (offLink) { try { offLink(); } catch (e) { /* ignore */ } offLink = null; }
     if (code && typeof L.on === 'function') {
-      var offMsg = L.on(onMessage), offSt = typeof L.onState === 'function' ? L.onState('world', onWorldState) : null;
-      offLink = function () { try { offMsg(); } catch (e) { /* ignore */ } if (offSt) { try { offSt(); } catch (e) { /* ignore */ } } };
+      var offMsg = L.on(onMessage), offSt = typeof L.onState === 'function' ? L.onState('world', onWorldState) : null, offRo = typeof L.onState === 'function' ? L.onState('route:options', onRouteOptions) : null;
+      offLink = function () { try { offMsg(); } catch (e) { /* ignore */ } if (offSt) { try { offSt(); } catch (e) { /* ignore */ } } if (offRo) { try { offRo(); } catch (e) { /* ignore */ } } };
       logLine('Joined room ' + code);
       otherEvents = 0; lastOther = null; resumed = false; observeUntil = Date.now() + 3000; setRole('observing');
     }

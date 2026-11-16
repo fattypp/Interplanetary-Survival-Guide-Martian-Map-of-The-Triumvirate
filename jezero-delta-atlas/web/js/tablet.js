@@ -124,24 +124,424 @@
     updateNote();
   }
 
-  /* dashed route: base camp -> stops 1..5 -> base camp, from JEZERO_MISSION */
+  /* stop points of the mission (base camp, stops 1..5, base camp), used to fit the view; the drawn route comes from JdaRoute below */
   function routePts() {
     var pts = [], b = MD.base;
     if (!b || !isFinite(b.lat) || !(MD.stops || []).length) return pts;
     pts.push(b); (MD.stops || []).forEach(function (s) { if (isFinite(s.lat) && isFinite(s.lon)) pts.push(s); }); pts.push(b);
     return pts;
   }
-  function drawRoute() {
-    if (view.ppd < 150) return;
-    var pts = routePts(); if (pts.length < 3) return;
-    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash([9, 7]);
-    [['#000', 5], ['#ffd23f', 2.5]].forEach(function (st) {
-      ctx.strokeStyle = st[0]; ctx.lineWidth = st[1]; ctx.beginPath();
-      pts.forEach(function (q, i) { var p = project(q.lon, q.lat); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
-      ctx.stroke();
+  /* ---------- safe route (JdaRoute) ---------- */
+  var RISK_COL = { low: '#6fe39b', medium: '#ffd23f', high: '#ff5a4d' };
+  var runKey = '', plan = null, planBase = null, planErr = '', optimizeOn = false, path = null, routeProg = null, routeLastDone = 0, planKey = '', lastEvents = null;
+  var zones = null;
+  function JR() { return window.JdaRoute && typeof window.JdaRoute.plan === 'function' ? window.JdaRoute : null; }
+  function riskClass(r) { r = +r; return r >= 0.67 ? 'high' : r >= 0.34 ? 'medium' : 'low'; }
+  function riskWord(c) { return c === 'high' ? 'high risk' : c === 'medium' ? 'medium risk' : 'low risk'; }
+  function flatM(a, b) { var dy = (b.lat - a.lat) * 59160, dx = (b.lon - a.lon) * 59160 * Math.cos((a.lat + b.lat) / 2 * D2R); return Math.hypot(dx, dy); }
+  function hazards() {
+    var w = null; try { w = window.JdaWorld && window.JdaWorld.world ? window.JdaWorld.world() : null; } catch (e) { w = null; }
+    w = w || lastWorld; var ev = (w && w.events) || {};
+    return { solar: !!ev.solar, dust: !!ev.dust };
+  }
+  /* crater danger zones: the craters the planner treats as blocked (confidence >= minConf), out to rim radius x margin */
+  function buildZones(dust) {
+    zones = [];
+    var C = window.JEZERO_CRATERS, RP = window.RoutePlanner, d = (RP && RP.DEFAULTS) || { margin: 1.25, minConf: 0.6 };
+    var PP = JR() && window.JdaRoute.params && typeof window.JdaRoute.params === 'object' ? window.JdaRoute.params : null;
+    if (PP && isFinite(PP.margin)) d = { margin: dust && isFinite(PP.dustMargin) ? PP.dustMargin : PP.margin, minConf: isFinite(PP.minConf) ? PP.minConf : d.minConf };
+    if (!C || !C.craters || !C.meta) return;
+    var b = C.meta.bbox, pw = C.meta.page[0], ph = C.meta.page[1], lonPx = (b.lon1 - b.lon0) / pw, latPx = (b.lat1 - b.lat0) / ph;
+    var mpp = RP && RP.metersPerPx ? RP.metersPerPx(C.meta) : 5.55;
+    C.craters.forEach(function (c) {
+      if (!(c.confidence >= d.minConf) || !c.page) return;
+      var R = c.page[2] * d.margin;
+      zones.push({ lat: b.lat1 - c.page[1] * latPx, lon: b.lon0 + c.page[0] * lonPx, rLon: R * lonPx, rLat: R * latPx, rM: R * mpp, id: c.id });
+    });
+  }
+  function legBlocked(l, i) {
+    var bl = plan && plan.blocked || [];
+    return l.blocked === true || bl.some(function (b) { return b === i || b === l.id || (typeof b === 'string' && l.fromId && l.toId && b.indexOf(String(l.fromId)) >= 0 && b.indexOf(String(l.toId)) >= 0); });
+  }
+  function validPlan(p) { return p && Array.isArray(p.legs) && p.legs.length && p.legs.every(function (l) { return l && Array.isArray(l.points) && l.points.length > 1; }); }
+  function stopLabel(id) {
+    if (id === 'base') return 'base camp';
+    var s = stopList.filter(function (x) { return x.id === id; })[0]; return s ? 'stop ' + s.no : String(id);
+  }
+  function buildPath() {
+    path = null; if (!validPlan(plan)) return;
+    var s = 0; path = { legs: [], total: 0 };
+    plan.legs.forEach(function (l) {
+      var pts = l.points.filter(function (q) { return isFinite(q.lat) && isFinite(q.lon); }), cum = [0];
+      for (var i = 1; i < pts.length; i++) cum.push(cum[i - 1] + flatM(pts[i - 1], pts[i]));
+      path.legs.push({ pts: pts, cum: cum, s0: s, s1: s + cum[cum.length - 1] }); s += cum[cum.length - 1];
+    });
+    path.total = s;
+  }
+  function runOrder() {   // the order the running mission follows (authoritative), or null
+    var m = me(), r = m && m.route;
+    return r && Array.isArray(r.order) && r.order.length ? r.order.filter(function (x) { return typeof x === 'string'; }) : null;
+  }
+  function computePlan() {
+    var R = JR(); plan = null; planBase = null; planErr = '';
+    if (!R) { planErr = 'The route planner is not available.'; path = null; routeProg = null; renderRoute(); queueDraw(); return; }
+    var o = objChoice() || 'both', h = hazards();
+    try {
+      var ro = runOrder();
+      planBase = R.plan({ objective: o, optimizeOrder: false, hazards: h });
+      plan = ro ? R.plan({ objective: o, order: ro, optimizeOrder: false, hazards: h }) : optimizeOn ? R.plan({ objective: o, optimizeOrder: true, hazards: h }) : planBase;
+      runKey = ro ? ro.join(',') : '';
+      if (!validPlan(plan)) { plan = null; planErr = 'No route could be calculated.'; }
+    } catch (e) { plan = null; planErr = 'The route could not be calculated.'; if (window.console) console.warn('route plan failed', e); }
+    buildZones(h.dust); radCells = null; lastEvents = h; routeLastDone = 0; routeProg = null; buildPath(); updateRouteProgress(true); renderRoute(); queueDraw();
+  }
+  /* where the crew is along the route: nearest point at or after the previous position (the route starts and ends at base camp) */
+  function updateRouteProgress(reset) {
+    if (!path) { routeProg = null; return; }
+    var y = youLL(), m = me(), done = m && m.progress && isFinite(m.progress.done) ? +m.progress.done : 0;
+    if (reset || done < routeLastDone) routeProg = null; routeLastDone = done;
+    var from = routeProg ? Math.max(0, routeProg.s - 30) : 0, best = null, la = Math.cos(y.lat * D2R);
+    path.legs.forEach(function (L, li) {
+      for (var i = 1; i < L.pts.length; i++) {
+        var a = L.pts[i - 1], b = L.pts[i];
+        if (L.s0 + L.cum[i] < from) continue;
+        var ax = (a.lon - y.lon) * la * 59160, ay = (a.lat - y.lat) * 59160, bx = (b.lon - y.lon) * la * 59160, by = (b.lat - y.lat) * 59160;
+        var dx = bx - ax, dy = by - ay, LL = dx * dx + dy * dy, t = LL ? clamp(-(ax * dx + ay * dy) / LL, 0, 1) : 0;
+        var d = Math.hypot(ax + dx * t, ay + dy * t), s = L.s0 + L.cum[i - 1] + (L.cum[i] - L.cum[i - 1]) * t;
+        if (s < from) s = from;
+        if (!best || d < best.off - 20 || (d <= best.off + 20 && s < best.s)) best = { s: s, off: d, lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t };
+      }
+    });
+    if (!best) { best = routeProg || { s: 0, off: 0, lat: y.lat, lon: y.lon }; }
+    var idx = path.legs.length - 1;
+    for (var k = 0; k < path.legs.length; k++) if (path.legs[k].s1 - best.s > 10) { idx = k; break; }
+    best.leg = idx; best.atEnd = best.s >= path.total - 10;
+    var changed = !routeProg || routeProg.leg !== idx || Math.abs(routeProg.s - best.s) > 5 || routeProg.off !== best.off;
+    routeProg = best; if (changed) { refreshRouteLive(); }
+  }
+
+  function strokePoly(pts, w, col, alpha, dash) {
+    ctx.globalAlpha = alpha; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath();
+    pts.forEach(function (p, i) { if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }); ctx.stroke();
+  }
+  function arrowAt(x, y, ang, sz) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(sz, 0); ctx.lineTo(-sz * .7, -sz * .75); ctx.lineTo(-sz * .35, 0); ctx.lineTo(-sz * .7, sz * .75); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
+  }
+  function labelAt(x, y, text, col) {
+    ctx.save(); ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.font = '700 11px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.fillStyle = col || '#fff';
+    ctx.strokeText(text, x, y); ctx.fillText(text, x, y); ctx.restore();
+  }
+  var radCells = null;
+  /* areas above the radiation caution limit in normal conditions (JdaRoute.radiationAt on the same grid the planner uses) */
+  function buildRadCells() {
+    radCells = []; var R = JR(), C = window.JEZERO_CRATERS;
+    if (!R || !R.radiationAt || !C || !C.meta || !plan || !plan.limits || !plan.limits.radiationData) return;
+    var b = C.meta.bbox, pw = C.meta.page[0], ph = C.meta.page[1], st = 16, lonPx = (b.lon1 - b.lon0) / pw, latPx = (b.lat1 - b.lat0) / ph, cau = plan.limits.caution, dan = plan.limits.danger;
+    for (var y = 0; y < ph; y += st) for (var x = 0; x < pw; x += st) {
+      var v = R.radiationAt(x + st / 2, y + st / 2, { solar: false });
+      if (v >= cau) radCells.push({ lon: b.lon0 + x * lonPx, lat: b.lat1 - y * latPx, w: st * lonPx, h: st * latPx, danger: v >= dan });
+    }
+  }
+  function drawZones() {
+    if (!zones) buildZones();
+    if (!radCells) buildRadCells();
+    ctx.save();
+    radCells.forEach(function (c) {
+      var p = project(c.lon, c.lat), w = c.w * view.ppd + .6, h = c.h * view.ppd + .6;
+      if (p.x + w < 0 || p.x > W || p.y + h < 0 || p.y > H) return;
+      ctx.fillStyle = c.danger ? 'rgba(190,60,255,.28)' : 'rgba(255,190,40,.22)'; ctx.fillRect(p.x, p.y, w, h);
+    });
+    ctx.restore();
+    ctx.save(); ctx.setLineDash([5, 4]);
+    zones.forEach(function (z) {
+      var p = project(z.lon, z.lat), rx = z.rLon * view.ppd, ry = z.rLat * view.ppd;
+      if (p.x + rx < 0 || p.x - rx > W || p.y + ry < 0 || p.y - ry > H) return;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, 6.2832); ctx.fillStyle = 'rgba(255,70,60,.17)'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,140,120,.9)'; ctx.stroke();
     });
     ctx.restore();
   }
+  function drawRoute() {
+    if (view.ppd < 150) return;
+    if (!plan || !path) {
+      if (JR()) { drawZones(); return; }
+      // no planner on this page: plain straight line through the stops
+      var pts = routePts(); if (pts.length < 3) return;
+      ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash([9, 7]);
+      [['#000', 5], ['#ffd23f', 2.5]].forEach(function (st) {
+        ctx.strokeStyle = st[0]; ctx.lineWidth = st[1]; ctx.beginPath();
+        pts.forEach(function (q, i) { var p = project(q.lon, q.lat); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+        ctx.stroke();
+      });
+      ctx.restore(); return;
+    }
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    drawZones();
+    // straight-line comparison, thin and faint
+    plan.legs.forEach(function (l) {
+      var a = l.points[0], b = l.points[l.points.length - 1], pa = project(a.lon, a.lat), pb = project(b.lon, b.lat);
+      strokePoly([pa, pb], 1.3, '#ffffff', .5, [3, 6]);
+    });
+    var cur = routeProg ? routeProg.leg : 0, sNow = routeProg ? routeProg.s : 0;
+    path.legs.forEach(function (L, li) {
+      var meta = plan.legs[li], blocked = legBlocked(meta, li), cls = riskClass(meta.risk), col = blocked ? '#ff3b30' : RISK_COL[cls];
+      var sp = L.pts.map(function (q) { return project(q.lon, q.lat); }), hi = li === cur && !(routeProg && routeProg.atEnd);
+      var wCol = hi ? 5 : 3.5, dash = blocked ? [10, 8] : null;
+      if (hi) strokePoly(sp, wCol + 6, '#ffffff', .35);
+      strokePoly(sp, wCol + 3, '#000', li < cur ? .35 : .85, dash);
+      // part already driven is dimmed
+      var split = 0, i; for (i = 1; i < L.pts.length; i++) if (L.s0 + L.cum[i] <= sNow) split = i;
+      if (li < cur) strokePoly(sp, wCol, col, .3, dash);
+      else if (li > cur) strokePoly(sp, wCol, col, 1, dash);
+      else {
+        if (split > 0) strokePoly(sp.slice(0, split + 1), wCol, col, .3, dash);
+        strokePoly(sp.slice(split), wCol, col, 1, dash);
+      }
+      // arrows every ~140 px of screen length, and one at least
+      var acc = 0, next = 60, total = 0, k;
+      for (k = 1; k < sp.length; k++) total += Math.hypot(sp[k].x - sp[k - 1].x, sp[k].y - sp[k - 1].y);
+      if (total > 40) for (k = 1; k < sp.length; k++) {
+        var sg = Math.hypot(sp[k].x - sp[k - 1].x, sp[k].y - sp[k - 1].y);
+        while (acc + sg >= next && next < total) {
+          var f = (next - acc) / (sg || 1), x = sp[k - 1].x + (sp[k].x - sp[k - 1].x) * f, y = sp[k - 1].y + (sp[k].y - sp[k - 1].y) * f;
+          if (x > -20 && x < W + 20 && y > -20 && y < H + 20) { ctx.globalAlpha = li < cur ? .4 : 1; arrowAt(x, y, Math.atan2(sp[k].y - sp[k - 1].y, sp[k].x - sp[k - 1].x), hi ? 7 : 6); }
+          next += 140;
+        }
+        acc += sg;
+      }
+      if (total > 110) {   // leg label with its risk in words (colour is never the only cue)
+        var half = total / 2; acc = 0;
+        for (k = 1; k < sp.length; k++) {
+          var sg2 = Math.hypot(sp[k].x - sp[k - 1].x, sp[k].y - sp[k - 1].y);
+          if (acc + sg2 >= half) { var f2 = (half - acc) / (sg2 || 1); labelAt(sp[k - 1].x + (sp[k].x - sp[k - 1].x) * f2 + 18, sp[k - 1].y + (sp[k].y - sp[k - 1].y) * f2 - 12, (blocked ? 'LEG ' + (li + 1) + ' BLOCKED' : 'Leg ' + (li + 1) + ' ' + cls), col); break; }
+          acc += sg2;
+        }
+      }
+    });
+    if (routeProg) {   // you on the route
+      var rp = project(routeProg.lon, routeProg.lat), yl = youLL(), yp = project(yl.lon, yl.lat);
+      if (routeProg.off > 40) strokePoly([rp, yp], 1.5, '#5ee0ff', .9, [2, 4]);
+      ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(rp.x, rp.y, 7, 0, 6.2832); ctx.lineWidth = 3; ctx.strokeStyle = '#5ee0ff'; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ---------- route panel ---------- */
+  var routePanel = $('route'), rEls = {};
+  function fmtM(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+  function fmtDur(s) { if (!isFinite(s)) return 'n/a'; var m = Math.round(s / 60), h = Math.floor(m / 60); return h ? h + ' h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + ' min' : m + ' min'; }
+  function orderText(p) { return (p && p.order || []).map(function (id) { return String(id).replace(/^stop-/, ''); }).join(' ').replace('base', 'B'); }
+  function legendSvg(col, dash, w) {
+    var NS = 'http://www.w3.org/2000/svg', s = document.createElementNS(NS, 'svg'), l = document.createElementNS(NS, 'line');
+    s.setAttribute('viewBox', '0 0 46 12'); s.setAttribute('aria-hidden', 'true');
+    l.setAttribute('x1', '2'); l.setAttribute('x2', '44'); l.setAttribute('y1', '6'); l.setAttribute('y2', '6'); l.setAttribute('stroke', col); l.setAttribute('stroke-width', String(w || 4)); if (dash) l.setAttribute('stroke-dasharray', dash);
+    s.appendChild(l); return s;
+  }
+  function renderRoute() {
+    var b = $('route-body'); b.textContent = ''; rEls = {};
+    var h = hazards();
+    if (!plan || !path) {
+      b.appendChild(el('p', { class: 'rwarn', attrs: { role: 'alert' }, text: planErr || 'No route available.' }));
+      b.appendChild(el('div', { class: 'opt' }, [el('button', { type: 'button', text: 'Recalculate', onclick: function () { computePlan(); toast(plan ? 'Route recalculated.' : 'Route not available.', plan ? 'info' : 'warn'); } })]));
+      $('route-cnt').textContent = ''; return;
+    }
+    var total = plan.totalM, straight = 0; plan.legs.forEach(function (l) { straight += +l.straightM || 0; });
+    var maxRisk = plan.legs.reduce(function (m, l) { return Math.max(m, +l.risk || 0); }, 0), cls = riskClass(maxRisk), blockedAny = (plan.blocked || []).length > 0;
+    $('route-cnt').textContent = fmtM(total);
+    var rs = JEZERO_SPEEDS_safe();
+    b.appendChild(el('p', { class: 'sum' }, [document.createTextNode('Route ' + fmtM(total)), el('span', { class: 'dim', text: straight ? ' (straight line ' + fmtM(straight) + (total > straight ? ', +' + Math.round((total / straight - 1) * 100) + '%' : '') + ')' : '' })]));
+    b.appendChild(el('p', {}, [document.createTextNode('Risk: '), el('span', { class: 'rbadge ' + cls, text: cls })]));
+    b.appendChild(el('p', { text: 'Estimated time: ' + fmtDur(isFinite(plan.etaRoverS) ? plan.etaRoverS : total / rs.rover) + ' by rover, ' + fmtDur(isFinite(plan.etaFootS) ? plan.etaFootS : total / rs.foot) + ' on foot.' }));
+    if (plan.avoided && isFinite(plan.avoided.craters)) b.appendChild(el('p', { class: 'dim', text: 'Avoids ' + plan.avoided.craters + ' crater' + (plan.avoided.craters === 1 ? '' : 's') + ' on the way.' }));
+    rEls.prog = el('p', { class: 'prog' }); b.appendChild(rEls.prog);
+    if (blockedAny) b.appendChild(el('p', { class: 'rwarn', attrs: { role: 'alert' }, text: 'Warning: no safe path was found for ' + (plan.blocked.length === 1 ? 'one leg' : plan.blocked.length + ' legs') + ' (marked BLOCKED on the map). The line drawn there is not safe. Choose another stop order or wait for conditions to change.' }));
+    if (h.solar || h.dust) b.appendChild(el('p', { class: 'rnote', text: (h.solar && h.dust ? 'A solar particle event and a dust storm are active.' : h.solar ? 'A solar particle event is active.' : 'A dust storm is active.') + ' The route was recalculated for these conditions.' }));
+    if (runKey) b.appendChild(el('p', { class: 'rnote', text: 'The running mission sets the stop order: ' + orderText(plan) + '.' }));
+    var opt = el('div', { class: 'opt' });
+    rEls.optBtn = el('button', { type: 'button', text: 'Optimize stop order', attrs: { 'aria-pressed': optimizeOn ? 'true' : 'false' }, onclick: function () {
+      optimizeOn = !optimizeOn; lsSet('tablet.optimize.' + crewId(), optimizeOn); publishRouteOpts(); computePlan();
+      toast(runKey ? 'A mission is running: the next run uses this setting.' : optimizeOn ? 'Stop order optimized.' : 'Guide stop order restored.', 'info');
+      var nb = $('route-body').querySelector('.optbtn'); if (nb) nb.focus({ preventScroll: true });
+    } });
+    rEls.optBtn.classList.add('optbtn');
+    opt.appendChild(rEls.optBtn);
+    opt.appendChild(el('button', { type: 'button', text: 'Recalculate', onclick: function () { computePlan(); toast('Route recalculated.', 'info'); var nb = $('route-body').querySelector('.opt button:nth-child(2)'); if (nb) nb.focus({ preventScroll: true }); } }));
+    b.appendChild(opt);
+    if (planBase && validPlan(planBase)) {
+      var same = orderText(planBase) === orderText(plan);
+      b.appendChild(el('p', { class: 'dim', text: optimizeOn && !runKey
+        ? (same ? 'Guide order ' + orderText(planBase) + ' is already the best order (' + fmtM(planBase.totalM) + ').' : 'Guide order ' + orderText(planBase) + ': ' + fmtM(planBase.totalM) + '. Optimized order ' + orderText(plan) + ': ' + fmtM(plan.totalM) + ' (' + (plan.totalM <= planBase.totalM ? '' : '+') + Math.round((plan.totalM / planBase.totalM - 1) * 100) + '%)' + (plan.cost && isFinite(plan.cost.guideM) && isFinite(plan.cost.chosenM) ? '; hazard-weighted cost ' + fmtM(plan.cost.guideM) + ' to ' + fmtM(plan.cost.chosenM) : '') + '.')
+        : 'Stop order ' + orderText(plan) + '.' }));
+    }
+    b.appendChild(el('h3', { text: 'Legs' }));
+    var ul = el('ul'); rEls.legs = [];
+    plan.legs.forEach(function (l, i) {
+      var c = riskClass(l.risk), blocked = legBlocked(l, i), det = isFinite(l.detourM) ? +l.detourM : (+l.lengthM || 0) - (+l.straightM || 0), n = isFinite(l.craterHits) ? l.craterHits : 0;
+      var li = el('li', { class: blocked ? 'blocked' : '' }), t = 'Leg ' + (i + 1) + ': ' + stopLabel(l.fromId) + ' to ' + stopLabel(l.toId) + ', ' + fmtM(l.lengthM) + ', ' + (blocked ? 'BLOCKED' : riskWord(c));
+      li.appendChild(el('b', { text: t }));
+      if (det >= 20) li.appendChild(el('div', { text: 'Leg ' + (i + 1) + ' detours ' + Math.round(det) + ' m' + (n ? ' around ' + n + ' crater' + (n === 1 ? '' : 's') : '') + '.' }));
+      else li.appendChild(el('div', { class: 'dim', text: 'Almost straight.' }));
+      (l.notes || []).filter(function (nt) { return !/^Detours/.test(String(nt)); }).forEach(function (nt) { li.appendChild(el('div', { class: 'dim', text: String(nt) })); });
+      ul.appendChild(li); rEls.legs.push(li);
+    });
+    b.appendChild(ul);
+    if ((plan.hazardNotes || []).length) {
+      b.appendChild(el('h3', { text: 'Hazard notes' }));
+      var hn = el('ul'); plan.hazardNotes.forEach(function (n) { hn.appendChild(el('li', { text: String(n) })); }); b.appendChild(hn);
+    }
+    b.appendChild(el('h3', { text: 'Key' }));
+    [['low', null, 'Low risk (solid, green)'], ['medium', null, 'Medium risk (solid, amber, labelled)'], ['high', null, 'High risk (solid, red, labelled)']].forEach(function (k) {
+      b.appendChild(el('div', { class: 'rleg' }, [legendSvg(RISK_COL[k[0]], null, 4), el('span', { text: k[2] })]));
+    });
+    b.appendChild(el('div', { class: 'rleg' }, [legendSvg('#ff3b30', '8 6', 4), el('span', { text: 'Blocked leg (dashed red)' })]));
+    b.appendChild(el('div', { class: 'rleg' }, [legendSvg('#ffffff', '3 6', 1.5), el('span', { text: 'Straight line, for comparison' })]));
+    b.appendChild(el('div', { class: 'rleg' }, [legendSvg('rgba(255,140,120,.9)', '5 4', 4), el('span', { text: 'Crater to avoid, with safety margin' })]));
+    if (!radCells) buildRadCells();
+    if (radCells && radCells.length) b.appendChild(el('div', { class: 'rleg' }, [legendSvg('rgba(255,190,40,.55)', null, 10), el('span', { text: 'Radiation above the caution limit (' + plan.limits.caution + ' uSv/h)' })]));
+    b.appendChild(el('p', { class: 'dim', text: 'Arrows show the driving direction. The part already driven is dimmed and the next leg is thicker.' }));
+    refreshRouteLive();
+  }
+  function JEZERO_SPEEDS_safe() { var S = window.JEZERO_SPEEDS || {}; return { rover: (S.rover && S.rover.mps) || 2.8, foot: (S.foot && S.foot.mps) || 1.4 }; }
+  function refreshRouteLive() {
+    if (!rEls.prog || !path || !routeProg) return;
+    var p = routeProg, k = plan.totalM && path.total ? plan.totalM / path.total : 1, left = Math.max(0, path.total - p.s) * k, lg = plan.legs[p.leg], rs = JEZERO_SPEEDS_safe(), txt;
+    if (p.atEnd) txt = 'Route complete: you are back at base camp.';
+    else txt = 'Driven ' + fmtM(p.s * k) + ' of ' + fmtM(plan.totalM) + '. Next: leg ' + (p.leg + 1) + ' to ' + stopLabel(lg.toId) + ', ' + fmtM(Math.max(0, path.legs[p.leg].s1 - p.s) * k) + ' to go, about ' + fmtDur(left / rs.rover) + ' for the rest by rover.';
+    if (p.off > 150) txt += ' You are ' + fmtM(p.off * k) + ' off the route.';
+    rEls.prog.textContent = txt;
+    (rEls.legs || []).forEach(function (li, i) { li.classList.toggle('cur', i === p.leg && !p.atEnd); li.classList.toggle('past', i < p.leg || p.atEnd); });
+  }
+  /* the stop-order option is shared with the control page ('route:options'), so the run follows the route shown here */
+  var roOff = null, roKey = null;
+  function publishRouteOpts() { try { var l = link(); if (l && isJoined() && l.setState) l.setState('route:options', { optimizeOrder: optimizeOn, t: new Date().toISOString() }); } catch (e) { /* link not ready */ } }
+  function watchRouteOpts() {
+    var l = link(); if (!l || !isJoined() || !l.onState) return;
+    var key = l.room.code; if (roKey === key) return; roKey = key;
+    if (roOff) { try { roOff(); } catch (e) { /* ignore */ } }
+    roOff = l.onState('route:options', function (v) {
+      if (!v || typeof v !== 'object' || typeof v.optimizeOrder !== 'boolean' || v.optimizeOrder === optimizeOn) return;
+      optimizeOn = v.optimizeOrder; lsSet('tablet.optimize.' + crewId(), optimizeOn); if (rEls.optBtn) rEls.optBtn.setAttribute('aria-pressed', optimizeOn ? 'true' : 'false'); computePlan();
+    });
+    try { if (!l.getState('route:options') && optimizeOn) publishRouteOpts(); } catch (e) { /* ignore */ }
+  }
+  function eventsKey(h) { return (h.solar ? 's' : '') + (h.dust ? 'd' : ''); }
+  function checkEvents() {
+    if (!JR()) return;
+    var h = hazards(), ro = runOrder();
+    if (lastEvents && (ro ? ro.join(',') : '') !== runKey) { computePlan(); toast(ro ? 'Route follows the order of the running mission.' : 'Route recalculated.', 'info'); return; }
+    if (lastEvents && eventsKey(h) !== eventsKey(lastEvents)) {
+      var was = lastEvents; computePlan();
+      var on = (h.solar && !was.solar ? 'Solar particle event' : h.dust && !was.dust ? 'Dust storm' : null);
+      toast(on ? on + ' active: route recalculated.' : 'Conditions cleared: route recalculated.', on ? 'warn' : 'info');
+    }
+  }
+
+  /* ---------- objective choice (shared state 'objective:<crewId>', helper JdaObjective when present) ---------- */
+  var objCache = null;
+  function normChoice(v) {
+    if (v && typeof v === 'object') v = v.choice;
+    if (v === 'both' || v === 1 || v === 2) return v;
+    if (v === '1' || v === '2') return +v;
+    return null;
+  }
+  function objChoice() {
+    var id = crewId(), v = null, JO = window.JdaObjective;
+    if (JO && typeof JO.get === 'function') { try { v = normChoice(JO.get(id)); } catch (e) { v = null; } if (v) return v; }
+    try { var l = link(), st = l && isJoined() && l.getState ? l.getState('objective:' + id) : null; v = normChoice(st && st.value); } catch (e) { v = null; }
+    return v || normChoice(lsGet('objective.' + id, null)) || normChoice(lsGet('objective', null));
+  }
+  function setObjective(c) {
+    var id = crewId(), JO = window.JdaObjective, done = false;
+    if (JO && typeof JO.set === 'function') { try { JO.set(c, id); done = true; } catch (e) { done = false; } }
+    if (!done) {
+      var rec = { choice: c, t: new Date().toISOString() }; lsSet('objective.' + id, rec);
+      try { var l = link(); if (l && isJoined() && l.setState) l.setState('objective:' + id, rec); } catch (e) { /* link not ready */ }
+    }
+    onObjChange(true);
+  }
+  function objFilter(list) {
+    var c = objChoice();
+    return c === 1 || c === 2 ? list.filter(function (t) { return t.objective === c; }) : list;
+  }
+  function objLabel(c) {
+    if (c === 'both') return 'Both objectives';
+    return c ? objShort(c) : 'not chosen';
+  }
+  function updateObjUi() {
+    var c = objChoice();
+    $('obj-txt').textContent = 'Objective: ' + objLabel(c);
+    $('obj-change').textContent = c ? 'Change' : 'Choose';
+    $('obj-change').setAttribute('aria-label', c ? 'Change objective, now ' + objLabel(c) : 'Choose your objective');
+  }
+  function onObjChange(force) {
+    var c = objChoice(), key = String(c);
+    if (!force && key === objCache) return;
+    objCache = key; if (c && !$('obj-back').hidden && !objManual) closeObjDlg();
+    buildTasks(); renderList(); updateProgress(); renderDetail(); refreshStopDots(); updateTaskPin(); updateObjUi(); publish(); computePlan();
+  }
+  var objAsked = false, objReturn = null, objOff = [], objWatched = null;
+  function watchObjective() {
+    var id = crewId(); if (objWatched === id + '|' + (isJoined() ? 1 : 0)) return; objWatched = id + '|' + (isJoined() ? 1 : 0);
+    objOff.forEach(function (f) { try { f(); } catch (e) { /* ignore */ } }); objOff = [];
+    try { var JO = window.JdaObjective; if (JO && typeof JO.on === 'function') { var o = JO.on(function () { onObjChange(false); }); if (typeof o === 'function') objOff.push(o); } } catch (e) { /* ignore */ }
+    try { var l = link(); if (l && isJoined() && l.onState) objOff.push(l.onState('objective:' + id, function () { onObjChange(false); })); } catch (e) { /* ignore */ }
+  }
+  var objManual = false;
+  function openObjDlg(first) {
+    objManual = !first;
+    var box = $('obj-opts'), cur = objChoice() || (first ? null : 'both'); box.textContent = '';
+    var opts = [[1, objShort(1), (MD.objectives[0] || {}).title], [2, objShort(2), (MD.objectives[1] || {}).title], ['both', 'Both objectives', 'All ten tasks, two at each stop.']];
+    opts.forEach(function (o) {
+      var inp = el('input', { type: 'radio', name: 'obj', value: String(o[0]), checked: String(cur) === String(o[0]) });
+      var lab = el('label', { class: String(cur) === String(o[0]) ? 'on' : '' }, [inp, el('span', {}, [el('b', { text: o[1] }), el('small', { text: o[2] || '' })])]);
+      inp.addEventListener('change', function () { Array.prototype.forEach.call(box.children, function (x) { x.classList.remove('on'); }); lab.classList.add('on'); $('obj-ok').disabled = false; });
+      box.appendChild(lab);
+    });
+    $('obj-ok').disabled = !box.querySelector('input:checked');
+    $('obj-cancel').hidden = !!first; $('obj-cancel').textContent = 'Cancel';
+    objReturn = document.activeElement; $('obj-back').hidden = false;
+    var ch = box.querySelector('input:checked'); (ch || box.querySelector('input')).focus();
+  }
+  function closeObjDlg() { $('obj-back').hidden = true; if (objReturn && objReturn.focus && document.contains(objReturn)) { try { objReturn.focus({ preventScroll: true }); } catch (e) { /* ignore */ } } }
+  function confirmObj() {
+    var r = $('obj-opts').querySelector('input:checked'); if (!r) return;
+    var v = r.value === 'both' ? 'both' : +r.value; closeObjDlg(); setObjective(v);
+  }
+  $('obj-ok').addEventListener('click', confirmObj);
+  $('obj-cancel').addEventListener('click', closeObjDlg);
+  $('obj-change').addEventListener('click', function () { openObjDlg(!objChoice()); });
+  $('obj-back').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.stopPropagation(); if (objManual) closeObjDlg(); return; }
+    if (e.key !== 'Tab') return;
+    var f = Array.prototype.slice.call($('obj-back').querySelectorAll('input,button')).filter(function (x) { return !x.hidden && !x.disabled && (x.type !== 'radio' || x.checked); }), i = f.indexOf(document.activeElement);
+    if (!f.length) return;
+    if (e.shiftKey && i <= 0) { f[f.length - 1].focus(); e.preventDefault(); } else if (!e.shiftKey && i === f.length - 1) { f[0].focus(); e.preventDefault(); }
+  });
+  function askObjectiveOnce() { if (objAsked || objChoice() || !$('obj-back').hidden) return; objAsked = true; openObjDlg(true); }
+
+  /* ---------- stop pictures ---------- */
+  var RAW_URL = 'https://mars.nasa.gov/mars2020/multimedia/raw-images/';
+  function stopPicture(st) {
+    var all = window.JEZERO_STOP_IMAGES, im = all && st ? all[st.id] : null, fig = el('figure', { class: 'pic' }), fr = el('div', { class: 'frame' });
+    fig.style.margin = '';
+    var cap = el('figcaption');
+    function none() { fr.textContent = ''; fr.appendChild(el('span', { class: 'none', text: 'Picture not available yet' })); }
+    if (!im || typeof im.src !== 'string' || !im.src) { none(); }
+    else {
+      var pic = new Image(); pic.alt = (typeof im.caption === 'string' && im.caption) || 'Picture of the area near ' + st.name; pic.decoding = 'async';
+      pic.addEventListener('error', function () { none(); cap.textContent = ''; });
+      pic.addEventListener('load', function () { layoutSoon(); });
+      pic.src = im.src; fr.appendChild(pic);
+      cap.appendChild(el('span', { text: 'NASA/JPL-Caltech, Perseverance' + (im.sol != null ? ' sol ' + String(im.sol).slice(0, 8) : '') + (im.camera ? ', ' + String(im.camera).slice(0, 60) : '') + '. ' }));
+      cap.appendChild(el('a', { href: RAW_URL, target: '_blank', rel: 'noopener', text: 'NASA raw images' }));
+      if (typeof im.caption === 'string' && im.caption) cap.appendChild(el('div', { text: im.caption.slice(0, 200) }));
+    }
+    fig.appendChild(fr); fig.appendChild(cap); return fig;
+  }
+  var layoutT = null;
+  function layoutSoon() { clearTimeout(layoutT); layoutT = setTimeout(function () { applyLayout(); ensureVisible(0); }, 30); }
+
   /* view that shows base camp and all five stops inside the free part of the screen */
   function jezeroView() {
     var pts = routePts(), j = SITES.jezero; if (!pts.length) return { lat: j.lat, lon: j.lon, ppd: j.ppd };
@@ -254,9 +654,17 @@
   /* what the shared world says is already done (by the crew's current task or its progress count); a manual check always wins */
   function worldDoneSet() {
     var m = me(), set = {}; if (!m) return set;
-    var idx = -1, i;
-    if (m.taskId) for (i = 0; i < mtasks.length; i++) if (mtasks[i].id === m.taskId) idx = i;
-    var n = idx >= 0 ? idx : (m.progress && isFinite(m.progress.done) ? Math.max(0, Math.min(mtasks.length, +m.progress.done)) : 0);
+    var full = (MD.tasks || []), pos = {}, i, idx = -1;
+    if (m.progress && Array.isArray(m.progress.doneIds)) {   // every task the run actually finished, independent of the chosen objective
+      m.progress.doneIds.forEach(function (id) { if (typeof id === 'string') set[id] = true; });
+      return set;
+    }
+    full.forEach(function (t, k) { pos[t.id] = k; });
+    var ref = -1;   // position in the full ordered list: tasks of the chosen objective before it count as done
+    if (m.taskId && pos[m.taskId] != null) ref = pos[m.taskId];
+    else if (m.stopId) { for (i = 0; i < full.length; i++) if (full[i].stopId === m.stopId) { ref = i; break; } }
+    if (ref >= 0) { for (i = 0; i < mtasks.length; i++) if (pos[mtasks[i].id] < ref) set[mtasks[i].id] = true; return set; }
+    var n = m.progress && isFinite(m.progress.done) ? Math.max(0, Math.min(mtasks.length, +m.progress.done)) : 0;
     for (i = 0; i < n; i++) set[mtasks[i].id] = true;
     return set;
   }
@@ -271,7 +679,7 @@
       return { id: s.id, kind: 'stop', no: s.n, name: s.name, title: s.name, sub: 'Stop ' + s.n, desc: s.description || '', lat: +s.lat, lon: +s.lon };
     });
     var stopBy = {}; stopList.forEach(function (s) { stopBy[s.id] = s; });
-    mtasks = (MD.tasks || []).filter(function (t) { return t && stopBy[t.stopId]; }).map(function (t) {
+    mtasks = objFilter((MD.tasks || []).filter(function (t) { return t && stopBy[t.stopId]; })).map(function (t) {
       var st = stopBy[t.stopId];
       return { id: t.id, kind: 'mtask', stop: st, stopId: t.stopId, obj: t.objective, tag: objShort(t.objective), title: t.title, desc: t.description || '', estMin: t.estMin, lat: st.lat, lon: st.lon };
     });
@@ -292,7 +700,16 @@
     var d = lsGet('tablet.done.' + c, {}); doneMap = d && typeof d === 'object' && !Array.isArray(d) ? d : {};
     var o = lsGet('tablet.tasks.' + c, []); ownTasks = Array.isArray(o) ? o.filter(function (x) { return x && typeof x.id === 'string' && typeof x.title === 'string'; }) : [];
     var l = lsGet('tablet.locs.' + c, []); locs = Array.isArray(l) ? l.filter(function (x) { return x && isFinite(x.lat) && isFinite(x.lon) && typeof x.name === 'string'; }) : [];
+    optimizeOn = lsGet('tablet.optimize.' + c, false) === true;
     buildTasks();
+  }
+  function allDoneIds() {   // done tasks of every objective: manual checks first, then what the run finished
+    var out = [], w = worldDoneSet();
+    (MD.tasks || []).forEach(function (t) {
+      var d = Object.prototype.hasOwnProperty.call(doneMap, t.id) ? !!doneMap[t.id] : !!w[t.id];
+      if (d) out.push(t.id);
+    });
+    return out;
   }
   function progress() { var d = 0; mtasks.forEach(function (t) { if (isDone(t)) d++; }); return { done: d, total: mtasks.length }; }
   function updateProgress() {
@@ -302,7 +719,7 @@
     $('pop-cnt').textContent = p.done + ' of ' + p.total + ' done';
   }
   function refreshWorldDone() {
-    var n = worldDoneSet(), ch = Object.keys(n).length !== Object.keys(wDone).length;
+    var n = worldDoneSet(), ch = Object.keys(n).sort().join() !== Object.keys(wDone).sort().join();
     if (!ch) return; wDone = n; updateProgress(); mtasks.forEach(refreshRow); refreshStopDots(); publish();
   }
   var pubT = null;
@@ -315,7 +732,7 @@
         var t = mtasks[i]; next = { title: t.title.slice(0, 80), startISO: null, kind: 'task', taskId: t.id, stopId: t.stopId, stopName: t.stop.name.slice(0, 60), objective: t.obj, estMin: t.estMin == null ? null : t.estMin }; break;
       }
       try {
-        l.setState('tasks:' + crewId(), { next: next, missions: mtasks.map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t), stopId: t.stopId, objective: t.obj }; }), progress: progress() });
+        l.setState('tasks:' + crewId(), { next: next, missions: mtasks.map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t), stopId: t.stopId, objective: t.obj }; }), progress: progress(), objective: objChoice(), doneIds: allDoneIds() });
       } catch (e) { if (window.console) console.warn('tasks state not published', e); }
     }, 120);
   }
@@ -385,6 +802,7 @@
     if (!sel) { d.hidden = true; return; }
     d.hidden = false; d.textContent = '';
     var t = sel, acts = el('div', { class: 'acts' }), st = t.kind === 'mtask' ? t.stop : t.kind === 'stop' ? t : null;
+    if (st) d.appendChild(stopPicture(st));
     d.appendChild(el('h3', { text: t.title }));
     d.appendChild(el('p', { text: t.kind === 'mtask' ? 'Stop ' + st.no + ': ' + st.name + ' - ' + t.tag + (t.estMin ? ' - about ' + t.estMin + ' min' : '') : t.kind === 'stop' ? 'Stop ' + t.no + ' of ' + stopList.length + ': tasks below are highlighted' : t.sub }));
     if (t.desc) d.appendChild(el('p', { text: t.desc }));
@@ -399,10 +817,11 @@
   var chatPanel = $('chat'), chatPlaced = false, chatPref = 'right', lastOpened = 'mission';
   var panels = [
     { name: 'mission', el: pop, hd: $('pop-hd'), get placed() { return userPlaced; }, set placed(v) { userPlaced = v; } },
-    { name: 'chat', el: chatPanel, hd: $('chat-hd'), get placed() { return chatPlaced; }, set placed(v) { chatPlaced = v; } }
+    { name: 'chat', el: chatPanel, hd: $('chat-hd'), get placed() { return chatPlaced; }, set placed(v) { chatPlaced = v; } },
+    { name: 'route', el: routePanel, hd: $('route-hd'), get placed() { return routePlaced; }, set placed(v) { routePlaced = v; } }
   ];
+  var routePlaced = false, routePref = 'right', openSeq = 0;
   function pvis(p) { return !p.el.hidden; }
-  function other(p) { return p === panels[0] ? panels[1] : panels[0]; }
   function relRect(node) {
     var r = node.getBoundingClientRect(), s = screen.getBoundingClientRect();
     return { x: (r.left - s.left) / SC, y: (r.top - s.top) / SC, w: r.width / SC, h: r.height / SC };
@@ -424,9 +843,16 @@
     vis.forEach(function (p) {
       if (p.placed) { p.el.dataset.dock = 'free'; clampFree(p); return; }
       resetBox(p.el);
-      var side = p === panels[0] ? dock : (pvis(panels[0]) && !userPlaced ? (dock === 'left' ? 'right' : 'left') : chatPref);
-      p.el.dataset.dock = side;
+      p.el.dataset.dock = sideOf(p);
     });
+  }
+  function prefOf(p) { return p === panels[0] ? dock : p === panels[1] ? chatPref : routePref; }
+  /* anchor order mission, chat, route: the first docked panel takes its preferred side, the next one the opposite side */
+  function sideOf(p) {
+    var docked = panels.filter(function (q) { return pvis(q) && !q.placed; }), i = docked.indexOf(p);
+    if (i <= 0) return prefOf(p);
+    var first = docked[0], fs = prefOf(first);
+    return i === 1 ? (fs === 'left' ? 'right' : 'left') : prefOf(p);
   }
   function clampFree(p) {
     var e = p.el, w = e.offsetWidth, h = e.offsetHeight, l = parseFloat(e.style.left) || 0, t = parseFloat(e.style.top) || 0;
@@ -524,11 +950,13 @@
   function setExpanded() {
     var m = !pop.hidden, c = !chatPanel.hidden;
     $('btn-mission').setAttribute('aria-expanded', m ? 'true' : 'false'); $('mbox').setAttribute('aria-expanded', m ? 'true' : 'false');
-    $('btn-chat').setAttribute('aria-expanded', c ? 'true' : 'false');
+    $('btn-chat').setAttribute('aria-expanded', c ? 'true' : 'false'); $('btn-route').setAttribute('aria-expanded', !routePanel.hidden ? 'true' : 'false');
   }
   function openPanel(p) {
-    if (isSheet() || W < 1000) other(p).el.hidden = true;     // one panel at a time on small screens
-    p.el.hidden = false; lastOpened = p.name; setExpanded();
+    var others = panels.filter(function (q) { return q !== p && pvis(q); });
+    if (isSheet() || W < 1000) others.forEach(function (q) { q.el.hidden = true; });     // one panel at a time on small screens
+    else if (others.length >= 2) { others.sort(function (a, b) { return (a.opened || 0) - (b.opened || 0); })[0].el.hidden = true; }   // at most two side by side
+    p.el.hidden = false; p.opened = ++openSeq; lastOpened = p.name; setExpanded();
   }
   function openPop(noFocus) {
     openPanel(panels[0]);
@@ -573,6 +1001,18 @@
   $('chat-x').addEventListener('click', closeChat);
   $('cdock-l').addEventListener('click', function () { chatPref = 'left'; chatPlaced = false; if (pvis(panels[0]) && !userPlaced) dock = 'right'; applyLayout(); ensureVisible(); });
   $('cdock-r').addEventListener('click', function () { chatPref = 'right'; chatPlaced = false; if (pvis(panels[0]) && !userPlaced) dock = 'left'; applyLayout(); ensureVisible(); });
+  function openRoute() { openPanel(panels[2]); applyLayout(); if (sel) ensureVisible(); var f = routePanel.querySelector('button'); if (f) f.focus({ preventScroll: true }); }
+  function closeRoute() { var had = routePanel.contains(document.activeElement); routePanel.hidden = true; setExpanded(); applyLayout(); if (had) $('btn-route').focus({ preventScroll: true }); }
+  $('btn-route').addEventListener('click', function () { if (routePanel.hidden) openRoute(); else closeRoute(); });
+  $('route-x').addEventListener('click', closeRoute);
+  function dockRoute(side) {
+    routePref = side; routePlaced = false;
+    var opp = side === 'left' ? 'right' : 'left';
+    if (pvis(panels[0]) && !userPlaced) dock = opp; else if (pvis(panels[1]) && !chatPlaced) chatPref = opp;
+    applyLayout(); ensureVisible();
+  }
+  $('rdock-l').addEventListener('click', function () { dockRoute('left'); });
+  $('rdock-r').addEventListener('click', function () { dockRoute('right'); });
   function incomingChat(m) {
     var l = link(), r = l && l.room; if (!r || m.type !== 'chat' || typeof m.text !== 'string') return;
     var from = m.from && typeof m.from === 'object' ? m.from : {};
@@ -705,7 +1145,7 @@
     $('coords-v').textContent = fmtLat(y.lat) + ', ' + fmtLon(y.lon) + ', z ' + (y.z == null ? 'n/a' : Math.round(y.z).toLocaleString('en-US') + ' m');
     if (youItem) { youItem.lat = y.lat; youItem.lon = y.lon; }
     if (baseItem) { var b = baseLL(); baseItem.lat = b.lat; baseItem.lon = b.lon; }
-    updateDist(); queueDraw();
+    updateDist(); updateRouteProgress(false); queueDraw();
   }
   function fmtDist(v) { return v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.round(v).toLocaleString('en-US'); }
   var rmBtn = null;
@@ -829,9 +1269,10 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!sosBack.hidden) closeSos(); else if (addOpen) { setAddOpen(false); $('btn-add').focus(); } else {
-      var inChat = chatPanel.contains(document.activeElement);
-      if (!chatPanel.hidden && (inChat || pop.hidden || lastOpened === 'chat')) closeChat(); else if (!pop.hidden) closePop();
+    if (!$('obj-back').hidden) return; if (!sosBack.hidden) closeSos(); else if (addOpen) { setAddOpen(false); $('btn-add').focus(); } else {
+      var inChat = chatPanel.contains(document.activeElement), inRoute = routePanel.contains(document.activeElement);
+      if (!routePanel.hidden && (inRoute || (lastOpened === 'route' && !inChat && !pop.contains(document.activeElement)))) closeRoute();
+      else if (!chatPanel.hidden && (inChat || pop.hidden || lastOpened === 'chat')) closeChat(); else if (!pop.hidden) closePop();
     }
   });
 
@@ -841,20 +1282,20 @@
   var joinedKey = null, offMsg = null;
   function onJoined() {
     var r = link().room; joinedKey = r.code + '|' + r.id;
-    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat(); setGroup(groupBy);
+    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat(); setGroup(groupBy); watchObjective(); watchRouteOpts(); onObjChange(true); setTimeout(askObjectiveOnce, 1500);
     if (offMsg) { try { offMsg(); } catch (e) { /* ignore */ } offMsg = null; }
     if (link().on) offMsg = link().on(onMsg);
   }
-  resize(); loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords();
+  resize(); loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); updateObjUi(); computePlan(); watchObjective();
   $('grp-stop').addEventListener('click', function () { setGroup('stop'); }); $('grp-objective').addEventListener('click', function () { setGroup('objective'); });
   setGroup(groupBy);
   // mount the room dialog first; nothing is published or sent before the crew member has joined
   try {
     if (window.JdaLinkUI && window.JdaLinkUI.mount) window.JdaLinkUI.mount({ role: 'tablet', ask: ['code', 'crew'], position: 'top-right', onJoin: function () { if (isJoined()) onJoined(); } });
   } catch (e) { if (window.console) console.error('JdaLinkUI.mount failed', e); }
-  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); refreshWorldDone(); }); } catch (e) { /* world not ready */ }
+  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); refreshWorldDone(); checkEvents(); }); } catch (e) { /* world not ready */ }
   setInterval(function () {
     if (isJoined() && joinedKey !== link().room.code + '|' + link().room.id) onJoined();
-    updateCoords();
+    updateCoords(); checkEvents();
   }, 1000);
 })();

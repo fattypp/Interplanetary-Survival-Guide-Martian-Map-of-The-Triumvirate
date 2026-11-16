@@ -70,3 +70,9 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--hud);font:600 c
 }
 @media (max-width:640px) and (orientation:portrait){.tl{top:19vmin;width:42vw;left:9vmin}.tc{top:9vmin;font-size:1.8em}.tr{top:19vmin;height:22vh}.bl{font-size:.8em;white-space:normal;max-width:44vw;bottom:10vmin}.br{max-width:42vw;bottom:10vmin}.br strong{font-size:1.1em}.toasts{bottom:30vmin;max-width:80vw;left:9vmin}.alerts{top:72vmin;width:86vw}.reads dt{min-width:6.5em}.reads div{flex-wrap:wrap}}
 @media (prefers-reduced-motion:reduce){.scan,.dot,.bar.danger,.alert.danger,.reads dd.danger{animation:none}.helmet.lowo2 .fog{animation:none;opacity:.35}.scene{transition:none}.toast{animation:none}.fill{transition:none}}
+/* short landscape (phones): alerts sit between the minimap and the bars, the bars start below the room pill */
+@media (max-height:520px){
+ .tr{top:44px;height:min(36vh,300px)}
+ .alerts{left:calc(9vmin + min(22vw,170px) + 14px);right:calc(9vmin + 96px);transform:none;width:auto;top:15vmin}
+ .alert{padding:.4em .7em}
+}

@@ -28,7 +28,10 @@
           <span class="bar-txt" id="bar-txt">MISSION PROGRESS</span>
         </span>
       </button>
+        <div class="tl-row">
         <button type="button" class="chatbtn" id="btn-chat" aria-haspopup="dialog" aria-controls="chat" aria-expanded="false" aria-label="Chat">Chat <span class="cbadge" id="chat-badge" hidden>0</span></button>
+        <button type="button" class="chatbtn" id="btn-route" aria-haspopup="dialog" aria-controls="route" aria-expanded="false">Route</button>
+        </div>
       </div>
 
       <div class="zoom" role="group" aria-label="Map view">
@@ -78,6 +81,7 @@
           <button type="button" id="grp-stop" aria-pressed="true">Stop</button>
           <button type="button" id="grp-objective" aria-pressed="false">Objective</button>
         </div>
+        <div class="pop-obj" id="pop-obj"><span id="obj-txt">Objective: not chosen</span> <button type="button" id="obj-change">Choose</button></div>
         <div class="pop-detail" id="pop-detail" hidden></div>
         <div class="pop-list" id="pop-list"></div>
         <form class="pop-add" id="pop-add">
@@ -99,6 +103,31 @@
         </header>
         <div class="chat-body" id="chat-body"><p class="hint" style="margin:12px">Join a room to chat with the crew and Earth control.</p></div>
       </section>
+
+      <section class="pop route" id="route" hidden role="dialog" aria-modal="false" aria-labelledby="route-h">
+        <header class="pop-hd" id="route-hd">
+          <h2 id="route-h">Safe route</h2>
+          <span class="pop-cnt" id="route-cnt"></span>
+          <span class="pop-tools">
+            <button type="button" id="rdock-l" class="dock" aria-label="Dock route panel left">Left</button>
+            <button type="button" id="rdock-r" class="dock" aria-label="Dock route panel right">Right</button>
+            <button type="button" id="route-x" aria-label="Close route panel (Escape)">Close</button>
+          </span>
+        </header>
+        <div class="route-body" id="route-body"></div>
+      </section>
+
+      <div class="modal" id="obj-back" hidden>
+        <div class="dlg obj-dlg" role="dialog" aria-modal="true" aria-labelledby="obj-t" aria-describedby="obj-d">
+          <h2 id="obj-t">Choose your objective</h2>
+          <p id="obj-d">Which objective will you fulfil on this mission? The task list, progress and next task follow your choice. You can change it later from the mission panel.</p>
+          <div class="obj-opts" role="radiogroup" aria-labelledby="obj-t" id="obj-opts"></div>
+          <div class="acts">
+            <button type="button" id="obj-cancel">Cancel</button>
+            <button type="button" class="primary" id="obj-ok">Confirm</button>
+          </div>
+        </div>
+      </div>
 
       <div class="modal" id="sos-back" hidden>
         <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="sos-t" aria-describedby="sos-d">
@@ -124,7 +153,13 @@
 <script src="../js/sim-core.js"></script>
 <script src="../js/world-client.js"></script>
 <script src="../data/mission-data.js"></script>
+<script src="../data/craters-data.js"></script>
+<script src="../data/science-layers-data.js"></script>
+<script src="../data/stop-images.js"></script>
 <script src="../data/mars-sites.js"></script>
+<script src="../js/route-planner.js"></script>
+<script src="../js/mission-route.js"></script>
+<script src="../js/objective.js"></script>
 <script src="../js/tablet.js"></script>
 </body>
 </html>

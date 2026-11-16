@@ -23,7 +23,7 @@
     var w = mk().world(), c = w.crew.jayesh;
     ok(w.v === 1 && typeof w.t === 'string' && w.clockSpeed === 1 && w.base.lat && w.events.solar === false && w.events.dust === false);
     ['id','name','lat','lon','zM','x','y','headingDeg','o2Pct','batPct','hr','suitTempC','ambientTempC','radUsvH','doseMsv','mode','speedMps','target','travel','stopId','taskId','progress','distM','etaS'].forEach(function (k) { ok(k in c, 'missing ' + k); });
-    ok(c.travel === 'foot' && c.stopId === null && c.taskId === null && c.progress.done === 0 && c.progress.total === MI.tasks.length);
+    ok(c.travel === 'foot' && c.stopId === null && c.taskId === null && c.progress.done === 0 && c.progress.total === MI.tasks.filter(function (t) { var ch = S.objectiveOf('jayesh'); return ch === 'both' || t.objective === ch; }).length);
     ok(c.mode === 'idle' && c.target === null);
   });
   test('deterministic with the same seed and inputs', function () {
@@ -84,7 +84,7 @@
   });
   test('run mission: base -> 5 stops by rover, EVA at each, back to base', function () {
     var s = mk(); ok(STOPS.length === 5 && MI.tasks.length === 10, 'mission data: ' + STOPS.length + ' stops, ' + MI.tasks.length + ' tasks');
-    ok(s.command({ cmd: 'setClockSpeed', n: 600 }).ok && s.command({ cmd: 'runMission', crew: 'jayesh' }).ok);
+    ok(s.command({ cmd: 'setClockSpeed', n: 600 }).ok && s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false, objective: 'both' }).ok);
     var visited = [], tasksSeen = {}, modes = {}, prevDone = 0, evaO2 = [], lastO2 = 100;
     for (var i = 0; i < 60000 && s.world().crew.jayesh.mode !== 'resting'; i++) {
       s.tick(100); var c = s.world().crew.jayesh;
@@ -105,14 +105,15 @@
   test('run mission: EVA time is the sum of the stop tasks, drive time uses the rover speed', function () {
     var s = mk(), tot = 0; MI.tasks.forEach(function (t) { tot += t.estMin * 60; });
     var legs = 0, p = BASE; STOPS.concat([BASE]).forEach(function (q) { legs += S.distM(p, q); p = q; });
-    s.command({ cmd: 'setClockSpeed', n: 100 }); s.command({ cmd: 'runMission', crew: 'jayesh' });
+    var RT = (globalThis.window || root).JdaRoute; if (RT && RT.plan) legs = RT.plan({}).totalM;   // the run follows the safe route, not the straight lines
+    s.command({ cmd: 'setClockSpeed', n: 100 }); s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false, objective: 'both' });
     var t0 = Date.parse(s.world().t); for (var i = 0; i < 200000 && s.world().crew.jayesh.mode !== 'resting'; i++) s.tick(100);
     var sim = (Date.parse(s.world().t) - t0) / 1000, expect = tot + legs / SP.rover + 0;
     near(sim, expect, expect * 0.02 + 120, 'mission duration s');
   });
   test('manual stop cancels a mission run; mission run is deterministic', function () {
     var a = mk(3), b = mk(3);
-    [a, b].forEach(function (s) { s.command({ cmd: 'setClockSpeed', n: 300 }); s.command({ cmd: 'runMission', crew: 'all' }); run(s, 8000); });
+    [a, b].forEach(function (s) { s.command({ cmd: 'setClockSpeed', n: 300 }); s.command({ cmd: 'runMission', crew: 'all', optimize: false, objective: 'both' }); run(s, 8000); });
     ok(JSON.stringify(a.world()) === JSON.stringify(b.world()));
     a.command({ cmd: 'stop', crew: 'jayesh' }); var c = a.world().crew.jayesh; ok(c.mode === 'idle' && c.stopId === null); run(a, 2000); ok(a.world().crew.jayesh.mode === 'idle');
   });
@@ -183,6 +184,97 @@
     ['all', 'earth', 'control', 'me'].forEach(function (id) { var r = s.addCrew({ id: id, name: id }); ok(r.ok && r.id !== id && !!s.world().crew[r.id], 'reserved id ' + id + ' -> ' + r.id); });
     ok(!s.world().crew.all);
   });
+
+  /* ---- safe route: the run follows JdaRoute waypoints, honours the objective, re-plans on events (needs JdaRoute on the page) ---- */
+  var RT = function () { return (globalThis.window || root).JdaRoute; };
+  function toM(p) { return { e: (p.lon - BASE.lon) * S.M_PER_DEG * Math.cos(BASE.lat * Math.PI / 180), n: (p.lat - BASE.lat) * S.M_PER_DEG }; }
+  function distToPoly(c, pts) {
+    var p = toM(c), best = Infinity;
+    for (var i = 1; i < pts.length; i++) {
+      var a = toM(pts[i - 1]), b = toM(pts[i]), dx = b.e - a.e, dn = b.n - a.n, l2 = dx * dx + dn * dn, t = l2 ? Math.max(0, Math.min(1, ((p.e - a.e) * dx + (p.n - a.n) * dn) / l2)) : 0;
+      best = Math.min(best, Math.hypot(p.e - (a.e + t * dx), p.n - (a.n + t * dn)));
+    }
+    return best;
+  }
+  test('run mission follows the JdaRoute waypoints (rover stays on the polyline) and reports route', function () {
+    if (!RT()) return;
+    var s = mk(), plan = RT().plan({}), poly = plan.waypoints.map(function (w) { return { lat: w.lat, lon: w.lon }; });
+    ok(s.world().crew.jayesh.route === null, 'no route while idle');
+    s.command({ cmd: 'setClockSpeed', n: 60 }); s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false, objective: 'both' });
+    var maxOff = 0, detoured = false, rem0 = null, lastRem = Infinity, n = 0;
+    for (var i = 0; i < 60000 && s.world().crew.jayesh.mode !== 'resting'; i++) {
+      s.tick(100); var c = s.world().crew.jayesh;
+      if (c.route) { if (rem0 === null) rem0 = c.route.remainingM; ok(c.route.order.join() === STOPS.map(function (p) { return p.id; }).join() && c.route.riskAhead >= 0 && c.route.riskAhead <= 1); }
+      if (c.travel === 'rover' && c.mode !== 'resting') { var d = distToPoly(c, poly); if (d > maxOff) maxOff = d; n++; }
+    }
+    ok(n > 100, 'driving samples ' + n); ok(maxOff < 8, 'max distance from the planned route ' + maxOff.toFixed(1) + ' m');
+    ok(rem0 > plan.totalM * 0.95 && rem0 < plan.totalM * 1.05, 'remaining at start ' + rem0 + ' vs ' + plan.totalM);
+    ok(plan.legs.some(function (l) { return l.lengthM > l.straightM * 1.2; }), 'plan has a detour leg');
+    var c2 = s.world().crew.jayesh; ok(c2.mode === 'resting' && S.distM(c2, BASE) < 1 && c2.route === null);
+  });
+  test('run mission honours the chosen objective: tasks, EVA time, progress total', function () {
+    [1, 2, 'both'].forEach(function (ob) {
+      var s = mk(), mine = MI.tasks.filter(function (t) { return ob === 'both' || t.objective === ob; }), seen = {};
+      s.command({ cmd: 'setClockSpeed', n: 100 }); s.command({ cmd: 'runMission', crew: 'jayesh', objective: ob, optimize: false });
+      ok(s.world().crew.jayesh.progress.total === mine.length, 'total ' + s.world().crew.jayesh.progress.total);
+      var t0 = Date.parse(s.world().t); for (var i = 0; i < 200000 && s.world().crew.jayesh.mode !== 'resting'; i++) { s.tick(100); var tk = s.world().crew.jayesh.taskId; if (tk) seen[tk] = 1; }
+      var c = s.world().crew.jayesh, sim = (Date.parse(s.world().t) - t0) / 1000, eva = 0; mine.forEach(function (t) { eva += t.estMin * 60; });
+      var drive = RT() ? RT().plan({ objective: ob }).totalM : 0; if (!drive) { var p = BASE; STOPS.concat([BASE]).forEach(function (q) { drive += S.distM(p, q); p = q; }); }
+      ok(Object.keys(seen).sort().join() === mine.map(function (t) { return t.id; }).sort().join(), 'tasks ' + Object.keys(seen));
+      ok(c.progress.done === mine.length && c.progress.total === mine.length, JSON.stringify(c.progress));
+      near(sim, eva + drive / SP.rover, (eva + drive / SP.rover) * 0.02 + 120, 'duration for objective ' + ob);
+    });
+    var s2 = mk(); if (S.objectiveOf('jayesh') === 'both') ok(s2.world().crew.jayesh.progress.total === MI.tasks.length, 'default both');   // a joined room may already hold a choice
+  });
+  function withObjective(get, f) {   // stub window.JdaObjective for the test (restored afterwards)
+    var W = globalThis.window || root, old = W.JdaObjective; W.JdaObjective = { get: get };
+    try { f(); } finally { if (old === undefined) delete W.JdaObjective; else W.JdaObjective = old; }
+  }
+  function idsOf(ob) { return MI.tasks.filter(function (t) { return t.objective === ob; }).map(function (t) { return t.id; }); }
+  test('progress.doneIds is the set of tasks really performed: objective 1 run, then switch to both -> 5 of 10, same 5 ids', function () {
+    var cur = 1;
+    withObjective(function () { return cur; }, function () {
+      var s = mk(); s.command({ cmd: 'setClockSpeed', n: 300 }); s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false });
+      for (var i = 0; i < 100000 && s.world().crew.jayesh.mode !== 'resting'; i++) s.tick(100);
+      var p = s.world().crew.jayesh.progress;
+      ok(p.done === 5 && p.total === 5 && p.doneIds.slice().sort().join() === idsOf(1).sort().join(), JSON.stringify(p));
+      cur = 'both'; s.tick(100); p = s.world().crew.jayesh.progress;
+      ok(p.done === 5 && p.total === 10 && p.doneIds.slice().sort().join() === idsOf(1).sort().join(), 'after switching to both: ' + JSON.stringify(p));
+      cur = 2; s.tick(100); p = s.world().crew.jayesh.progress; ok(p.done === 0 && p.total === 5 && p.doneIds.length === 5, 'objective 2 view: ' + JSON.stringify(p));
+      s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false }); ok(s.world().crew.jayesh.progress.doneIds.length === 0, 'a new run resets doneIds');
+    });
+  });
+  test('objective 2 started, switched to 1 at stop 2: doneIds keeps what was performed, remaining EVA comes from the chosen tasks not yet done', function () {
+    var cur = 2;
+    withObjective(function () { return cur; }, function () {
+      var s = mk(); s.command({ cmd: 'setClockSpeed', n: 300 }); s.command({ cmd: 'runMission', crew: 'jayesh', optimize: false });
+      var switched = false, c;
+      for (var i = 0; i < 100000 && s.world().crew.jayesh.mode !== 'resting'; i++) {
+        s.tick(100); c = s.world().crew.jayesh;
+        if (!switched && c.stopId === STOPS[1].id) { ok(c.progress.doneIds.join() === idsOf(2).slice(0, 1).join(), 'before the switch ' + c.progress.doneIds); cur = 1; switched = true; }
+      }
+      ok(switched, 'reached stop 2');
+      var exp = idsOf(2).slice(0, 1).concat(idsOf(1).slice(1)), p = s.world().crew.jayesh.progress;
+      ok(p.doneIds.slice().sort().join() === exp.slice().sort().join(), 'doneIds ' + p.doneIds + ' expected ' + exp);
+      ok(p.done === 4 && p.total === 5, JSON.stringify(p));
+    });
+  });
+  test('optimised stop order is followed and a solar/dust event mid-run re-plans from the current position', function () {
+    if (!RT()) return;
+    var s = mk(); s.command({ cmd: 'setClockSpeed', n: 600 }); s.command({ cmd: 'event', solar: true });
+    s.command({ cmd: 'runMission', crew: 'jayesh', optimize: true });
+    var ord = RT().plan({ optimizeOrder: true, hazards: { solar: true } }).order, c = s.world().crew.jayesh;
+    ok(c.route.order.join() === ord.join() && c.route.optimized === true && c.route.remainingOrder.join() === ord.join() && c.route.current === ord[0], 'order ' + c.route.order);
+    var visited = [], toggled = false, replans = 0;
+    for (var i = 0; i < 80000 && s.world().crew.jayesh.mode !== 'resting'; i++) {
+      s.tick(100); c = s.world().crew.jayesh;
+      if (c.stopId && visited[visited.length - 1] !== c.stopId) visited.push(c.stopId);
+      if (!toggled && c.travel === 'rover' && c.distM > 100 && c.target && c.target.label && i > 20) { toggled = true; var before = c.route.remainingM; s.command({ cmd: 'event', solar: false }); var after = s.world().crew.jayesh.route; replans = after.replans; ok(after.order.join() === ord.join() && after.remainingOrder.length >= 1 && after.replans === 1 && Math.abs(after.remainingM - before) < before * 0.5 + 5000, 're-plan record'); }
+    }
+    ok(toggled && replans === 1, 'event toggled mid-run'); ok(visited.join() === ord.join(), 'visited ' + visited);
+    c = s.world().crew.jayesh; ok(c.mode === 'resting' && S.distM(c, BASE) < 1 && c.progress.done === c.progress.total);
+  });
+  test('without JdaRoute-free inputs the world record still has the route key (null when idle)', function () { ok('route' in mk().world().crew.jayesh); });
 
   test('world-client fallback: in a joined room only this crew (plus known crew), stand-alone keeps the defaults', function () {
     var W = root.JdaWorld, L = root.JdaLink; if (!W || !W._localCrewList) return;   // browser pages that load world-client.js only

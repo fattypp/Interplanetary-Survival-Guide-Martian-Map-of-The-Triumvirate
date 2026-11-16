@@ -93,8 +93,8 @@
   /* The mission tasks (kind 'task' of Atlas.missions, from JEZERO_MISSION.tasks, in stop order: 2 per stop). They are what the planner
      and the automatic schedule treat as "mission" work; each carries its own estimate (estMin). */
   function objectives() {
-    var l = [];
-    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'task'; }); } catch (e) { l = []; }
+    var l = [];   // only the tasks of the objective(s) the user chose (m.inScope, js/objective.js)
+    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'task' && m.inScope !== false; }); } catch (e) { l = []; }
     return l;
   }
   function taskDone(id) { try { return !!(Atlas.missions && Atlas.missions.isDone(id)); } catch (e) { return false; } }
@@ -168,10 +168,11 @@
     return m;
   }
   /* work blocks that have started and are not ticked yet but are not missed yet: they keep their place and count as in progress */
+  function inScopeRef(id) { return objectives().some(function (m) { return String(m.id) === String(id); }); }   // a task of the other objective is no longer planned, not even one already under way
   function inflight(excludeIds) {
     var n = nowMs(), g = CFG.graceMinutes * MIN;
     return S.blocks.filter(function (b) {
-      return (b.type === 'task' || b.type === 'mission') && !S.blockDone[b.id] && ms(b.start) <= n && ms(b.end) + g > n && !(excludeIds && excludeIds.indexOf(b.id) >= 0);
+      return (b.type === 'task' || b.type === 'mission') && !S.blockDone[b.id] && ms(b.start) <= n && ms(b.end) + g > n && !(excludeIds && excludeIds.indexOf(b.id) >= 0) && (b.type !== 'mission' || inScopeRef(b.refId));
     });
   }
   function busyList(excludeIds) {
@@ -523,7 +524,7 @@
       }
       if (kind === 'mission') {
         var m = null; objectives().forEach(function (x) { if (String(x.id) === String(t.missionId)) m = x; });
-        if (m && typeof m.x === 'number' && typeof m.y === 'number') acts.appendChild(h('button', { type: 'button', text: 'Show on map', attrs: { 'aria-label': 'Show ' + t.title + ' on the map' }, onclick: function () { Atlas.focus(m.x, m.y, 3); } }));
+        if (m && typeof m.x === 'number' && typeof m.y === 'number') acts.appendChild(h('button', { type: 'button', text: 'Show on map', attrs: { 'aria-label': 'Show ' + t.title + ' on the map' }, onclick: function () { if (Atlas.missions && Atlas.missions.open) Atlas.missions.open(m.id); else Atlas.focus(m.x, m.y, 3); } }));
       }
       if (acts.childNodes.length) li.appendChild(acts);
       return li;
@@ -536,7 +537,7 @@
       var hi = healthItem();
       frag.push(h('h3', { class: 'pl-h', text: 'Health check' }));
       frag.push(hi ? h('ul', { class: 'pl-list' }, [todoRow(hi, 'health')]) : h('p', { class: 'pl-empty', text: CFG.health.enabled ? 'No health check in the plan yet.' : 'Health checks are switched off.' }));
-      frag.push(h('h3', { class: 'pl-h' }, ['Mission tasks ', h('span', { class: 'pl-sub', text: '(from the Mission tab, in stop order)' })]));
+      frag.push(h('h3', { class: 'pl-h' }, ['Mission tasks ', h('span', { class: 'pl-sub', text: '(your chosen objective, in stop order)' })]));
       var mi = missionItems();
       frag.push(mi.length ? h('ul', { class: 'pl-list' }, mi.map(function (t) { return todoRow(t, 'mission'); })) : h('p', { class: 'pl-empty', text: Atlas.missions ? 'The Mission tab has no tasks.' : 'Mission tasks appear here once the Mission tab has loaded.' }));
       if (doneL.length) frag.push(h('details', { class: 'pl-done' }, [h('summary', { text: 'Done (' + doneL.length + ')' }), h('ul', { class: 'pl-list' }, doneL.map(function (t) { return todoRow(t, 'task'); }))]));

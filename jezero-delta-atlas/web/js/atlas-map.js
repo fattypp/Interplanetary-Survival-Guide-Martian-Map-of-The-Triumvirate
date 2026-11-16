@@ -54,16 +54,21 @@ function fmt(x,y){var q=ll(x,y);return q[1].toFixed(4)+'°N  '+q[0].toFixed(4)+'
 
 // pan / zoom
 var map=document.getElementById('map'),stage=document.getElementById('stage');
-var v={s:1,x:0,y:0},base=1;
+var v={s:1,x:0,y:0},base=1,viewSubs=[],pad={l:0,r:0,t:0,b:0};   // viewSubs: functions called after every pan / zoom (Atlas.onView)
 function fit(){var r=map.getBoundingClientRect();base=Math.max(r.width/W,r.height/H);stage.style.width=W+'px';stage.style.height=H+'px';v.s=1;var k=base;v.x=(r.width-W*k)/2;v.y=(r.height-H*k)/2;apply()}
 function apply(clamp){var r=map.getBoundingClientRect(),k=base*v.s;
- v.x=Math.min(0,Math.max(r.width-W*k,v.x));v.y=Math.min(0,Math.max(r.height-H*k,v.y));
+ v.x=Math.min(pad.l,Math.max(r.width-W*k-pad.r,v.x));v.y=Math.min(pad.t,Math.max(r.height-H*k-pad.b,v.y));
  stage.style.transform='translate('+v.x+'px,'+v.y+'px) scale('+k+')';stage.style.setProperty('--inv',1/k);
+ viewSubs.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});
  var m=(DLON*59.27*Math.cos(18.4*Math.PI/180)*1000)/W;var tgt=[100,200,500,1000,2000,5000,10000].reduce(function(a,b){return b*1/(m)*k<=140?b:a},100);
  document.getElementById('sb').style.width=(tgt/m*k)+'px';document.getElementById('sl').textContent=(tgt>=1000?tgt/1000+' km':tgt+' m')}
 function zoomAt(cx,cy,f){var r=map.getBoundingClientRect(),k0=base*v.s,s2=Math.min(12,Math.max(1,v.s*f));if(s2===v.s)return;var k1=base*s2;
  var px=(cx-v.x)/k0,py=(cy-v.y)/k0;v.s=s2;v.x=cx-px*k1;v.y=cy-py*k1;apply()}
 function focus(x,y,s){var r=map.getBoundingClientRect();stage.classList.add('ease');v.s=Math.max(v.s,s);var k=base*v.s;v.x=r.width/2-x*k;v.y=r.height/2-y*k;apply();setTimeout(function(){stage.classList.remove('ease')},520)}
+/* focusAt: like focus, but the page point ends up at screen point (sx,sy) of the map box instead of its centre (used to keep a pin clear of a card) */
+function focusAt(x,y,s,sx,sy){var r=map.getBoundingClientRect();stage.classList.add('ease');v.s=Math.max(v.s,s);var k=base*v.s;v.x=sx-x*k;v.y=sy-y*k;apply();setTimeout(function(){stage.classList.remove('ease')},520)}
+function setPad(l,r,t,b){pad={l:l||0,r:r||0,t:t||0,b:b||0};stage.classList.add('ease');apply();setTimeout(function(){stage.classList.remove('ease')},520)}   // extra pan range, so a point near the map edge can still be brought clear of a card
+function view(){var r=map.getBoundingClientRect(),k=base*v.s;return {k:k,x:v.x,y:v.y,w:r.width,h:r.height,left:r.left,top:r.top}}
 map.addEventListener('wheel',function(e){e.preventDefault();var r=map.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.25:0.8)},{passive:false});
 var ptrs={},last=null,pd=0,clickDown=null,core={busy:function(){return false}};
 map.addEventListener('pointerdown',function(e){if(e.target.closest('.tools,.inset,.ui'))return;map.setPointerCapture(e.pointerId);ptrs[e.pointerId]=[e.clientX,e.clientY];map.classList.add('drag');var a=Object.keys(ptrs);if(a.length===2){var p=ptrs[a[0]],q=ptrs[a[1]];pd=Math.hypot(p[0]-q[0],p[1]-q[1])}});
@@ -125,7 +130,7 @@ fit();
 // what atlas-shell.js needs to build window.Atlas (see docs/ARCHITECTURE.md)
 var MS=window.JEZERO_MISSION||{base:{x:W-24,y:H/2},stops:[]};   // data/mission-data.js: base camp and the 5 stops (page px)
 core.W=W;core.H=H;core.ll=ll;core.xy=function(lon,lat){return [(lon-LON0)/DLON*W,(LAT1-lat)/DLAT*H]};
-core.el=el;core.setInfo=setInfo;core.focus=focus;core.layers=LAYERDEFS;core.map=map;core.stage=stage;core.fit=fit;
+core.el=el;core.setInfo=setInfo;core.focus=focus;core.focusAt=focusAt;core.view=view;core.setPad=setPad;core.onView=function(f){if(typeof f==='function')viewSubs.push(f)};core.layers=LAYERDEFS;core.map=map;core.stage=stage;core.fit=fit;
 core.mapData={base:{id:'base',name:MS.base.name,x:MS.base.x,y:MS.base.y},stops:MS.stops.map(function(s){return {id:s.id,n:s.n,name:s.name,x:s.x,y:s.y}})};
 core.landing=[MS.base.x,MS.base.y];   // page px of base camp (it replaces the old landing site and lies inside the map)
 window.AtlasMapCore=core;

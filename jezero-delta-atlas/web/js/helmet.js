@@ -148,33 +148,49 @@
   }
 
   /* ---------- next task ---------- */
-  function missionTasks() { var M = window.JEZERO_MISSION; return M && M.tasks ? M.tasks : []; }
+  /* tasks of the objective the crew chose (JdaObjective: 1, 2 or 'both'); all tasks while nothing is chosen */
+  function objChoice() {
+    var JO = window.JdaObjective, c = null;
+    try { c = JO && JO.get ? JO.get(crewId || undefined) : null; } catch (e) { c = null; }
+    if (c == null && task && (task.objective === 1 || task.objective === 2 || task.objective === 'both')) c = task.objective;
+    return c;
+  }
+  function missionTasks() {
+    var M = window.JEZERO_MISSION, all = M && M.tasks ? M.tasks : [], c = objChoice();
+    return c === 1 || c === 2 ? all.filter(function (t) { return Number(t.objective) === c; }) : all;
+  }
   function stopName(id) {
     var M = window.JEZERO_MISSION, st = M && M.stops ? M.stops.filter(function (x) { return x.id === id; })[0] : null;
     return st ? (st.n ? 'Stop ' + st.n + ': ' : '') + st.name : '';
   }
+  /* tasks finished: what the run reports (progress.doneIds, every objective) plus what the tablet marked done (its manual checks win) */
   function doneIds() {
-    var set = {}, ms = task && Array.isArray(task.missions) ? task.missions : null;
-    if (ms) ms.forEach(function (x) { if (x && x.done) set[x.id] = 1; });
+    var set = {}, m = lastWorld, w = m && m.progress && Array.isArray(m.progress.doneIds) ? m.progress.doneIds : null;
+    if (w) w.forEach(function (id) { if (typeof id === 'string') set[id] = 1; });
+    if (task && Array.isArray(task.doneIds)) { set = {}; task.doneIds.forEach(function (id) { if (typeof id === 'string') set[id] = 1; }); }   // the tablet's merged list (manual overrides included)
+    else if (task && Array.isArray(task.missions)) task.missions.forEach(function (x) { if (x && x.done) set[x.id] = 1; else if (x && x.done === false) delete set[x.id]; });
     return set;
   }
-  /* next undone task of the ordered list; a world record naming a task (taskId) sets the starting point */
+  /* next task of the chosen list that is not done; no positional guessing */
   function nextTask(m) {
-    var list = missionTasks(), done = task && Array.isArray(task.missions) ? doneIds() : null, i = 0, n;
+    var list = missionTasks(), i = 0, n;
     if (!list.length) {
       n = task && task.next && typeof task.next === 'object' ? task.next : null;
       return n ? { title: str(n.title, 120), where: str(n.stopName, 80), startISO: n.startISO || null } : null;
     }
-    if (m && m.taskId) { for (var k = 0; k < list.length; k++) if (list[k].id === m.taskId) { i = k; break; } }
-    else if (m && m.stopId) { for (var j = 0; j < list.length; j++) if (list[j].stopId === m.stopId) { i = j; break; } }
-    else if (m && !done && m.progress && isFinite(Number(m.progress.done))) i = Math.max(0, Math.min(list.length, Math.floor(Number(m.progress.done))));   // no tablet data and no task in the record (e.g. after a fallback): continue after the tasks the run finished
-    for (; i < list.length; i++) if (!done || !done[list[i].id]) break;
-    if (i >= list.length) return { done: true };
-    if (!(m && (m.taskId || m.stopId)) && !done && task && task.next && task.next.taskId) {
-      for (var q = 0; q < list.length; q++) if (list[q].id === task.next.taskId) { i = q; break; }
+    var ord = m && m.route && Array.isArray(m.route.order) ? m.route.order : null;   // the run may visit the stops in another order
+    if (ord) list = list.map(function (t, k) { return { t: t, k: k, o: ord.indexOf(t.stopId) < 0 ? 99 : ord.indexOf(t.stopId) }; }).sort(function (a, b) { return a.o - b.o || a.k - b.k; }).map(function (x) { return x.t; });
+    var hasIds = (m && m.progress && Array.isArray(m.progress.doneIds)) || (task && (Array.isArray(task.doneIds) || Array.isArray(task.missions))), done = doneIds();
+    if (!hasIds && m && m.progress && isFinite(Number(m.progress.done))) {   // an older world record without doneIds: fall back to the first N tasks in order
+      var cnt = Math.max(0, Math.floor(Number(m.progress.done))); for (var q = 0; q < list.length && q < cnt; q++) done[list[q].id] = 1;
     }
-    var t = list[i], n2 = task && task.next && task.next.taskId === t.id ? task.next : null;
-    return { title: str(t.title, 120), where: stopName(t.stopId), startISO: n2 && n2.startISO ? n2.startISO : null };
+    for (; i < list.length; i++) if (!done[list[i].id]) break;
+    if (i >= list.length) return { done: true };
+    var cur = m && (m.taskId || m.stopId) ? list.filter(function (x) { return !done[x.id] && (m.taskId ? x.id === m.taskId : x.stopId === m.stopId); })[0] : null;
+    if (cur) i = list.indexOf(cur);
+    var t = list[i], n2 = task && task.next && task.next.taskId === t.id ? task.next : null, ndone = 0;
+    list.forEach(function (x) { if (done[x.id]) ndone++; });
+    return { title: str(t.title, 120), where: stopName(t.stopId), startISO: n2 && n2.startISO ? n2.startISO : null, no: ndone, of: list.length };
   }
   function watchTasks(id) {
     if (!id || id === taskFor || !window.JdaLink || !JdaLink.onState) return;
@@ -186,7 +202,7 @@
     var nt = nextTask(lastWorld), title, when = '';
     if (nt && nt.done) title = 'All tasks complete';
     else if (nt) {
-      title = nt.title; when = nt.where;
+      title = nt.title; when = nt.where + (nt.of ? (nt.where ? ' - ' : '') + nt.no + ' of ' + nt.of + ' done' : '');
       var d = nt.startISO ? new Date(nt.startISO) : null, nw = now();
       if (d && !isNaN(d) && nw) {
         var mins = Math.round((d - nw) / 60000);
@@ -246,6 +262,7 @@
       if (window.JdaLink && JdaLink.on) JdaLink.on(onMsg);
     } catch (e) {}
     try { if (window.JdaWorld && JdaWorld.on) JdaWorld.on(render); } catch (e) {}
+    try { if (window.JdaObjective && JdaObjective.on) JdaObjective.on(function () { renderTask(); }); } catch (e) {}
     setInterval(render, 1000);
     window.addEventListener('resize', function () { minimap(lastWorld); });
     render();
