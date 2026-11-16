@@ -1,4 +1,4 @@
-/* Planner tab: your own to-do list, mission objectives (read-only), automatic schedule, reminders, simulated link to Earth.
+/* Planner tab: your own to-do list, mission objectives (read-only), automatic schedule, reminders, reports to Earth (sent through JdaLink as {type:'report'} when a room is joined, queued otherwise).
    Owned by the planner feature (contract: docs/ARCHITECTURE.md). Numbers: web/data/schedule-config.js, explained in docs/SCHEDULE.md.
    Exposes Atlas.todos and Atlas.schedule. Pure scheduling logic lives in schedule-engine.js. */
 (function () {
@@ -88,7 +88,7 @@
   }
   function healthItem() {
     var b = nextHealthBlock(); if (!b) return null;
-    return { id: 'health-next', title: 'Health check', description: 'Scheduled health check (simulated sensors).', deadline: b.start, importance: 5, estMin: Math.round((ms(b.end) - ms(b.start)) / MIN), done: false, missionId: null, kind: 'health', blockId: b.id };
+    return { id: 'health-next', title: 'Health check', description: 'Scheduled health check.', deadline: b.start, importance: 5, estMin: Math.round((ms(b.end) - ms(b.start)) / MIN), done: false, missionId: null, kind: 'health', blockId: b.id };
   }
   function missionItems() {
     return objectives().map(function (m) {
@@ -334,7 +334,7 @@
 
   function sendReport() {
     var n = Atlas.now(), lines = [];
-    lines.push('SIMULATED REPORT FOR EARTH MISSION CONTROL (nothing was transmitted)');
+    lines.push('REPORT FOR EARTH MISSION CONTROL');
     lines.push('Mission time: ' + n.toISOString());
     lines.push('');
     lines.push('Crew member has missed ' + S.misses + ' scheduled block' + (S.misses > 1 ? 's' : '') + ' (limit before reporting: ' + CFG.escalateAfterMisses + '):');
@@ -345,14 +345,30 @@
     if (S.unsched.length) { lines.push('Could not be scheduled:'); S.unsched.slice(0, 6).forEach(function (u) { lines.push(' - ' + u.title + ': ' + u.reason); }); }
     var hl = Atlas.health && Atlas.health.last && Atlas.health.last();
     lines.push('');
-    lines.push(hl ? 'Last health check (simulated): ' + hl.time + ', heart rate ' + hl.heartRate + ' bpm, SpO2 ' + hl.spo2 + '%, fatigue ' + hl.fatigue + '/10.' : 'No health check on record yet.');
-    var entry = { id: 'r' + n.getTime(), at: n.toISOString(), misses: S.misses, subject: 'Schedule adherence report: ' + S.misses + ' missed blocks', body: lines.join('\n'), simulated: true };
+    lines.push(hl ? 'Last health check: ' + hl.time + ', heart rate ' + hl.heartRate + ' bpm, SpO2 ' + hl.spo2 + '%, fatigue ' + hl.fatigue + '/10.' : 'No health check on record yet.');
+    var entry = { id: 'r' + n.getTime(), at: n.toISOString(), misses: S.misses, subject: 'Schedule adherence report: ' + S.misses + ' missed blocks', body: lines.join('\n'), sent: false };
     outbox.unshift(entry); outbox = outbox.slice(0, 30); Atlas.store.set('planner.outbox', outbox);
     S.misses = 0; S.missedLog = []; saveS();
     Atlas.bus.emit('earth:report', entry);
-    Atlas.toast('Report added to the simulated Earth outbox (nothing really leaves your computer).', 'danger');
+    var sentNow = flushOutbox();
+    Atlas.toast(sentNow ? 'Report sent to Earth.' : 'Report queued until a room is joined.', 'danger');
     ui.refreshBadges(); ui.refreshLists();
   }
+  /* Really sends queued reports through JdaLink (message {type:'report', subject, body, misses, at, reportId}); returns how many went out. */
+  function flushOutbox() {
+    var L = window.JdaLink, n = 0;
+    if (!L || !L.room || typeof L.send !== 'function') return 0;
+    outbox.slice().reverse().forEach(function (r) {
+      if (r.sent) return;
+      try {
+        L.send({ type: 'report', to: 'earth', reportId: r.id, subject: String(r.subject).slice(0, 120), body: String(r.body).slice(0, 4000), misses: r.misses, at: r.at });
+        r.sent = true; r.sentAt = new Date().toISOString(); n++;
+      } catch (e) { /* stays queued */ }
+    });
+    if (n) { Atlas.store.set('planner.outbox', outbox); if (ui.ready) { ui.refreshBadges(); ui.refreshLists(); } }
+    return n;
+  }
+  setInterval(flushOutbox, 3000);
 
   /* ---------------- UI ---------------- */
   var ui = { ready: false, refreshLists: function () {}, refreshBadges: function () {} };
@@ -376,8 +392,8 @@
         h('li', { text: 'Sleep: ' + CFG.sleep.hours + ' h from ' + hmStr(CFG.sleep.startMin) + ' (sleep.hours, sleep.start)' }),
         h('li', { text: 'Recreation: ' + CFG.recreation.minutes + ' min at ' + hmStr(CFG.recreation.startMin) + ' (recreation.minutes, recreation.start)' }),
         h('li', { text: 'Meals: ' + mealsTxt + ' (meals)' }),
-        h('li', { text: 'Health check: ' + (CFG.health.enabled ? 'from ' + hmStr(CFG.health.startMin) + ', every ' + CFG.health.intervalHours + ' h, ' + CFG.health.minutes + ' min' : 'off') + ' (health.start, health.intervalHours)' }),
-        h('li', { text: 'Reminders: missed after ' + CFG.graceMinutes + ' min; report to Earth after ' + CFG.escalateAfterMisses + ' misses (graceMinutes, escalateAfterMisses)' })
+        h('li', { text: 'Health check: ' + (CFG.health.enabled ? 'from ' + hmStr(CFG.health.startMin) + ', every ' + CFG.health.intervalHours + ' h, ' + CFG.health.minutes + ' min' : 'off') }),
+        h('li', { text: 'Reminders: missed after ' + CFG.graceMinutes + ' min; report to Earth after ' + CFG.escalateAfterMisses + ' misses' })
       ])
     ]);
     var nav = h('div', { class: 'pl-nav', attrs: { role: 'group', 'aria-label': 'Planner views' } });
@@ -532,14 +548,14 @@
     function renderSched() {
       while (schedBox.firstChild) schedBox.removeChild(schedBox.firstChild);
       var n = nowMs();
-      speedSel = h('select', { id: 'pl-speed', attrs: { 'aria-label': 'Demo clock speed, for testing reminders' }, onchange: function () { Atlas.clock.setSpeed(Number(speedSel.value)); check(); } },
-        [1, 60, 600, 3600].map(function (v) { return h('option', { value: String(v), text: v === 1 ? 'real time' : v + 'x faster' }); }));
+      speedSel = h('select', { id: 'pl-speed', attrs: { 'aria-label': 'Mission clock speed' }, disabled: !!(Atlas.clock.live && Atlas.clock.live()), onchange: function () { Atlas.clock.setSpeed(Number(speedSel.value)); check(); } },
+        (function () { var cur = Number(Atlas.clock.speed) || 1, list = [1, 60, 600, 3600]; if (list.indexOf(cur) < 0) list.push(cur); return list.sort(function (a, b) { return a - b; }); })().map(function (v) { return h('option', { value: String(v), text: v === 1 ? 'real time' : v + 'x faster' }); }));
       speedSel.value = String(Atlas.clock.speed || 1);
       schedBox.appendChild(h('div', { class: 'pl-toolbar' }, [
         h('button', { type: 'button', class: 'pl-primary', text: 'Rebuild', attrs: { 'aria-label': 'Rebuild the schedule now' }, onclick: function () { check(); scheduleApi.rebuild(); Atlas.toast('Schedule rebuilt.', 'info'); } }),
-        h('label', { class: 'pl-speed' }, ['Demo clock: ', speedSel])
+        h('label', { class: 'pl-speed' }, ['Mission clock: ', speedSel])
       ]));
-      schedBox.appendChild(h('p', { class: 'pl-note', text: 'Simulated clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
+      schedBox.appendChild(h('p', { class: 'pl-note', text: 'Mission clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
       var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k }, [Atlas.icon(TYPE_ICON[k], 12), ' ' + TYPE_LABEL[k]]); }));
       schedBox.appendChild(legend);
       if (S.unsched.length) {
@@ -566,12 +582,12 @@
     /* ---- Earth link ---- */
     function renderEarth() {
       while (earthBox.firstChild) earthBox.removeChild(earthBox.firstChild);
-      earthBox.appendChild(h('div', { class: 'pl-earthbanner', attrs: { role: 'note' }, text: 'Simulated link to Earth: nothing actually leaves your computer.' }));
-      earthBox.appendChild(h('p', { class: 'pl-note', text: 'A report is added to this outbox after ' + CFG.escalateAfterMisses + ' missed blocks (now: ' + S.misses + ' of ' + CFG.escalateAfterMisses + '). It is stored only in this browser.' }));
+      earthBox.appendChild(h('div', { class: 'pl-earthbanner', attrs: { role: 'note' }, text: (window.JdaLink && window.JdaLink.room ? 'Connected to room ' + window.JdaLink.room.code + ': reports go to Earth mission control.' : 'No room joined: reports are queued until a room is joined.') }));
+      earthBox.appendChild(h('p', { class: 'pl-note', text: 'A report is sent to Earth after ' + CFG.escalateAfterMisses + ' missed blocks (now: ' + S.misses + ' of ' + CFG.escalateAfterMisses + ').' }));
       if (!outbox.length) earthBox.appendChild(h('p', { class: 'pl-empty', text: 'Outbox is empty. Follow the schedule and it stays that way.' }));
       outbox.forEach(function (r) {
         earthBox.appendChild(h('details', { class: 'pl-report' }, [
-          h('summary', {}, [r.subject, h('span', { class: 'pl-sub', text: ' · ' + new Date(r.at).toLocaleString() + ' · queued (simulated)' })]),
+          h('summary', {}, [r.subject, h('span', { class: 'pl-sub', text: ' · ' + new Date(r.at).toLocaleString() + (r.sent ? ' · sent to Earth' : ' · queued until a room is joined') })]),
           h('pre', { text: r.body })
         ]));
       });

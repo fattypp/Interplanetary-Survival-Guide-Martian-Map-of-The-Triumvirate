@@ -30,6 +30,111 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
 .alert button:hover{background:rgba(94,200,216,.12)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.banner{animation:none}}
+.cols{max-width:1100px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 28px;align-items:start}
+.cols+*{margin:0}
+#banner{max-width:1100px;margin:16px auto 0;width:calc(100% - 32px)}
+.cbadge{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font:700 11px/18px var(--font);text-align:center;letter-spacing:0;vertical-align:middle}
+.cbadge[hidden]{display:none}
+@media(max-width:820px){.cols{grid-template-columns:minmax(0,1fr)}}
+
+.wide{grid-column:1/-1;order:3}
+.reports{display:grid;gap:8px}
+.report{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.report.fresh{border-left:6px solid var(--accent)}
+.report summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline}
+.rsub{font-weight:700}
+.rmeta{font:13px var(--mono);color:var(--mute)}
+.rbody{margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 var(--mono)}
+.report summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:640px){.eh{padding-top:46px}}
+
+</style>
+<style>
+/* link-ui.css: room join dialog and status chip (js/link-ui.js). Self-contained dark panel that works on light and dark pages. */
+.lu-root{--lu-bg:#141a21;--lu-panel:#1b232d;--lu-line:#34424f;--lu-fg:#e8eef4;--lu-mute:#9aa8b6;--lu-accent:#5ec8d8;--lu-ok:#46b37a;--lu-bad:#ff7b80;--lu-font:system-ui,-apple-system,'Segoe UI',sans-serif;--lu-mono:ui-monospace,Menlo,Consolas,monospace;font-family:var(--lu-font)}
+.lu-root *{box-sizing:border-box}
+.lu-root [hidden]{display:none!important}
+
+.lu-back{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,9,12,.78)}
+.lu-dlg{width:min(420px,100%);max-height:100%;overflow:auto;background:var(--lu-panel);color:var(--lu-fg);border:1px solid var(--lu-line);border-radius:14px;padding:22px 22px 18px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+.lu-dlg h2{margin:0 0 6px;font-size:20px;line-height:1.25}
+.lu-dlg p{margin:0 0 14px;color:var(--lu-mute);font-size:14px;line-height:1.45}
+.lu-lbl{display:block;margin:14px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--lu-mute)}
+.lu-input{width:100%;height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--lu-line);background:var(--lu-bg);color:var(--lu-fg);font:600 18px var(--lu-mono);letter-spacing:.2em;text-transform:uppercase}
+.lu-input.lu-text{font:15px var(--lu-font);letter-spacing:0;text-transform:none}
+.lu-input::placeholder{color:#5f6e7c;letter-spacing:.1em}
+.lu-row{display:flex;gap:8px;flex-wrap:wrap}
+.lu-fs{border:0;margin:14px 0 0;padding:0;min-width:0}
+.lu-fs legend{padding:0;margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--lu-mute)}
+.lu-opt{position:relative}
+.lu-opt input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.lu-opt span{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--lu-line);color:var(--lu-fg);font-size:14px}
+.lu-opt input:checked+span{border-color:var(--lu-accent);background:rgba(94,200,216,.16);color:#fff;font-weight:600}
+.lu-opt input:focus-visible+span{outline:2px solid var(--lu-accent);outline-offset:2px}
+.lu-err{min-height:20px;margin:10px 0 0;font-size:13px;color:var(--lu-bad)}
+.lu-act{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.lu-btn{height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--lu-accent);background:transparent;color:var(--lu-accent);font:600 14px var(--lu-font);cursor:pointer}
+.lu-btn:hover{background:rgba(94,200,216,.14)}
+.lu-btn.lu-primary{background:var(--lu-accent);color:#08141a}
+.lu-btn.lu-primary:hover{background:#7fd6e3}
+.lu-btn.lu-quiet{border-color:var(--lu-line);color:var(--lu-fg)}
+.lu-root :focus-visible{outline:2px solid var(--lu-accent);outline-offset:2px}
+
+.lu-chip{position:fixed;z-index:99990;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:calc(100vw - 16px);font:12px var(--lu-mono);color:var(--lu-fg);pointer-events:none}
+.lu-chip>*{pointer-events:auto}
+.lu-chip[data-pos="top-right"]{right:8px;top:8px}
+.lu-chip[data-pos="top-left"]{left:8px;top:8px;align-items:flex-start}
+.lu-chip[data-pos="bottom-right"]{right:8px;bottom:8px;flex-direction:column-reverse}
+.lu-chip[data-pos="bottom-left"]{left:8px;bottom:8px;align-items:flex-start;flex-direction:column-reverse}
+.lu-chip[data-pos="inline"]{position:static;display:inline-flex;align-items:flex-start}
+.lu-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;background:rgba(20,26,33,.88);color:var(--lu-fg);border:1px solid var(--lu-line);font:11px var(--lu-mono);cursor:pointer;white-space:nowrap}
+.lu-pill:hover{border-color:var(--lu-accent)}
+.lu-panel{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:var(--lu-panel);border:1px solid var(--lu-line);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.lu-st{font-size:11px}
+.lu-code{font-weight:700;letter-spacing:.14em;color:#fff}
+.lu-dot{width:7px;height:7px;border-radius:50%;background:var(--lu-ok);flex:none}
+.lu-chip[data-status="local"] .lu-dot{background:#e0a23c}
+.lu-mute{color:var(--lu-mute)}
+.lu-cbtn{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--lu-line);background:transparent;color:var(--lu-fg);font:12px var(--lu-font);cursor:pointer}
+.lu-cbtn:hover{border-color:var(--lu-accent);color:var(--lu-accent)}
+.lu-live{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:600px){.lu-w{display:none}}
+@media(max-width:480px){.lu-dlg{padding:18px 16px 14px}}
+
+</style>
+<style>
+/* chat-ui.css: JdaChat component. Uses the page theme variables with dark fallbacks. */
+.jc{--jc-bg:var(--bg,#0f1318);--jc-panel:var(--panel,#192029);--jc-line:var(--line,#2c3744);--jc-fg:var(--fg,#e6edf3);--jc-mute:var(--mute,#93a1b0);--jc-acc:var(--accent,#5ec8d8);--jc-bad:var(--danger,#e5484d);--jc-ok:var(--ok,#46b37a);
+  display:flex;flex-direction:column;gap:8px;min-width:0;color:var(--jc-fg);font:400 14px/1.4 var(--font-b,var(--font,system-ui,sans-serif))}
+.jc *{box-sizing:border-box}
+.jc-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.jc-bar{display:flex;flex-wrap:wrap;gap:6px}
+.jc-conv{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--jc-line);border-radius:999px;background:transparent;color:var(--jc-fg);cursor:pointer;font:700 12px var(--font-d,var(--font,system-ui,sans-serif));letter-spacing:.04em}
+.jc-conv:hover{background:color-mix(in srgb,var(--jc-acc) 16%,transparent)}
+.jc-conv.on{background:var(--jc-fg);color:var(--jc-bg);border-color:var(--jc-fg)}
+.jc-dot{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--jc-mute);flex:none}
+.jc-dot.up{background:var(--jc-ok);border-color:var(--jc-ok)}
+.jc-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--jc-bad);color:#fff;font:700 11px/18px var(--font-b,system-ui,sans-serif);text-align:center}
+.jc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.jc-title{margin:0;font:700 13px var(--font-d,var(--font,system-ui,sans-serif));letter-spacing:.06em}
+.jc-state{font-size:12px;color:var(--jc-mute)}
+.jc-log{height:240px;min-height:120px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid var(--jc-line);border-radius:10px;background:color-mix(in srgb,var(--jc-bg) 60%,transparent)}
+.jc-empty{margin:auto;font-size:12px;color:var(--jc-mute);text-align:center}
+.jc-msg{max-width:88%;padding:6px 10px;border-radius:12px;border:1px solid var(--jc-line)}
+.jc-msg.me{align-self:flex-end;background:color-mix(in srgb,var(--jc-acc) 22%,transparent)}
+.jc-msg.them{align-self:flex-start;background:color-mix(in srgb,var(--jc-fg) 8%,transparent)}
+.jc-meta{font-size:11px;color:var(--jc-mute);margin-bottom:2px}
+.jc-auto{margin-left:6px;padding:0 6px;border:1px dashed var(--jc-mute);border-radius:999px}
+.jc-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.jc-row{display:flex;gap:8px;align-items:flex-end}
+.jc-input{flex:1;min-width:0;min-height:38px;max-height:96px;padding:8px 10px;resize:none;border:1px solid var(--jc-line);border-radius:10px;background:var(--jc-panel);color:var(--jc-fg);font:inherit}
+.jc-input:disabled{opacity:.55}
+.jc-send{min-height:38px;padding:0 16px;border:1px solid var(--jc-acc);border-radius:999px;background:var(--jc-acc);color:#06222a;cursor:pointer;font:700 12px var(--font-d,var(--font,system-ui,sans-serif));letter-spacing:.06em}
+.jc-send:disabled{opacity:.45;cursor:not-allowed}
+.jc-count{text-align:right;font-size:11px;color:var(--jc-mute)}
+.jc button:focus-visible,.jc textarea:focus-visible,.jc-log:focus-visible{outline:2px solid var(--jc-acc);outline-offset:2px}
+@media (max-width:640px){.jc-log{height:200px}.jc-input{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.jc *{transition:none!important}}
 
 </style>
 </head>
@@ -37,15 +142,25 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <header class="eh">
   <div>
     <h1>Earth Mission Control</h1>
-    <p class="sub">Interplanetary Survival Guide · Jezero Delta · <strong>simulation, no real signals</strong></p>
+    <p class="sub">Interplanetary Survival Guide · Jezero Delta · Mission control</p>
   </div>
-  <div class="conn" id="conn" role="status"></div>
 </header>
-<main>
-  <section id="banner" class="banner" role="alert" hidden></section>
-  <h2 class="sec">Incoming alerts</h2>
-  <p id="empty" class="empty">No alerts. Waiting for the Mars base page to send one (open it in another tab, press SOS).</p>
-  <ul id="alerts" class="alerts" aria-live="polite"></ul>
+<section id="banner" class="banner" role="alert" hidden></section>
+<main class="cols">
+  <section aria-labelledby="h-alerts">
+    <h2 class="sec" id="h-alerts">Incoming alerts</h2>
+    <p id="empty" class="empty">No alerts. Waiting for a crew member to press SOS.</p>
+    <ul id="alerts" class="alerts" aria-live="polite"></ul>
+  </section>
+  <section aria-labelledby="h-reports" class="wide">
+    <h2 class="sec" id="h-reports">Reports <span id="reports-badge" class="cbadge" hidden></span></h2>
+    <p id="reports-empty" class="empty">No reports yet. Crew reports sent from the planner appear here.</p>
+    <div id="reports" class="reports"></div>
+  </section>
+  <section aria-labelledby="h-chat">
+    <h2 class="sec" id="h-chat">Crew chat <span id="chat-badge" class="cbadge" hidden></span></h2>
+    <div id="chat"></div>
+  </section>
 </main>
 <script>
 /* Optional online link between the Mars base page and the Earth control page.
@@ -54,60 +169,902 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
 </script>
 <script>
-/* link.js: message link between the Mars base page and the Earth control page. Exposes window.JdaLink.
-   Mode "same-browser": BroadcastChannel + localStorage, works between tabs of one browser.
-   Mode "online": the same messages are also POSTed to / polled from a Supabase table (see docs/LINK.md).
-   Messages are plain JSON, {id, t, type, ...}. Everything received is treated as untrusted data. */
+/* link.js: JdaLink v2, message / state / presence link between pages, isolated by ROOM CODE. Exposes window.JdaLink.
+   Transports (see docs/LINK.md): relay (same-origin /api, server/relay.py, works across devices on one network),
+   online (Supabase, only if web/data/link-config.js is filled in), local (BroadcastChannel + localStorage, same browser).
+   Everything received is untrusted data and is validated. Messages never cross rooms. */
 (function () {
   'use strict';
-  var KEY = 'jda.link.msg', LOG = 'jda.link.log', POLL_MS = 3000;
+  var CODE_RE = /^[A-HJ-NP-Z2-9]{5}$/, LEGACY = 'LOCAL', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 100;
+  var ROLES = ['crew', 'earth', 'control', 'helmet', 'tablet', 'legacy'];
   var cfg = window.JDA_LINK || {};
+  var cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);   // this page load
+  var subs = [], statusSubs = [], presSubs = [], stateSubs = {};
+  var room = null, status = 'local', S = null, implicit = false, pendingOut = { msgs: [], state: {} };   // pendingOut: what an implicit (LOCAL) room sent, replayed into the first explicit room   // S = per-join session (timers, seen, log, state, presence)
+
+  /* ---------- helpers ---------- */
+  function slug(s, n) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, n || 24); }
+  function cleanName(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24); }
+  function normCode(c) { return String(c == null ? '' : c).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function validCode(c) { return CODE_RE.test(c) || c === LEGACY; }
+  function newCode() {
+    var out = '', a = new Uint8Array(5);
+    try { crypto.getRandomValues(a); } catch (e) { for (var i = 0; i < 5; i++) a[i] = Math.floor(Math.random() * 256); }
+    for (var j = 0; j < 5; j++) out += ALPHA.charAt(a[j] % ALPHA.length);
+    return out;
+  }
+  function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function size(o) { try { return JSON.stringify(o).length; } catch (e) { return Infinity; } }
+  function isObj(o) { return o && typeof o === 'object' && !Array.isArray(o); }
+  function safeKey(k) { return typeof k === 'string' && /^[A-Za-z0-9:_.-]{1,64}$/.test(k) && k !== '__proto__'; }
+  function warn() { if (window.console) console.warn.apply(console, ['JdaLink'].concat([].slice.call(arguments))); }
+  function call(fn, a, b) { try { fn(a, b); } catch (e) { if (window.console) console.error('JdaLink handler failed', e); } }
+
+  function cleanFrom(f) {
+    if (!isObj(f)) return null;
+    var role = typeof f.role === 'string' && ROLES.indexOf(f.role) >= 0 ? f.role : '';
+    if (!role) return null;
+    return { role: role, id: slug(f.id, 32), name: cleanName(f.name), cid: typeof f.cid === 'string' ? f.cid.slice(0, 40) : '' };
+  }
+  /* validate an incoming message for the current room; returns a clean copy or null */
+  function validMsg(m, code) {
+    if (!isObj(m) || size(m) > MAX_MSG) return null;
+    if (typeof m.id !== 'string' || !m.id || m.id.length > 64 || typeof m.type !== 'string' || !/^[A-Za-z0-9_.-]{1,32}$/.test(m.type)) return null;
+    if (m.room !== code) return null;
+    var from = cleanFrom(m.from);
+    if (!from) return null;
+    var c = clone(m);
+    c.from = from;
+    delete c.seq; delete c.replay;
+    if (typeof c.t !== 'string' || isNaN(Date.parse(c.t))) return null;
+    if (c.type === 'chat') {
+      if (typeof c.text !== 'string') return null;
+      c.text = c.text.slice(0, 500);
+    }
+    return c;
+  }
+  function validEntry(e) {
+    if (!isObj(e) || !('value' in e) || size(e.value) > MAX_STATE) return null;
+    var from = cleanFrom(e.from) || { role: 'legacy', id: '', name: '', cid: '' };
+    return { value: clone({ v: e.value }).v, t: isFinite(Number(e.t)) ? Number(e.t) : Date.now(), from: from, ver: isFinite(Number(e.ver)) ? Number(e.ver) : 0 };
+  }
+
+  /* ---------- session ---------- */
+  function newSession(code) {
+    return { code: code, seen: {}, seenQ: [], log: [], state: {}, relayVer: {}, pres: {}, timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
+  }
+  function markSeen(id) { S.seen[id] = 1; S.seenQ.push(id); if (S.seenQ.length > 3000) delete S.seen[S.seenQ.shift()]; }
+  function setStatus(s) { if (s === status) return; status = s; statusSubs.slice().forEach(function (fn) { call(fn, s); }); }
+  function pushLog(m) { S.log.push(m); if (S.log.length > LOG_N) S.log.shift(); }
+
+  /* incoming message from any transport; `replay` marks backlog fetched at join */
+  function deliver(raw, replay) {
+    if (!S || S.closed) return;
+    var m = validMsg(raw, S.code);
+    if (!m || S.seen[m.id]) return;
+    markSeen(m.id);
+    pushLog(m);
+    if (m.from.cid && m.from.cid === cid) return;   // never echo to the sender
+    var out = m;
+    if (replay) { out = clone(m); out.replay = true; }
+    subs.slice().forEach(function (fn) { call(fn, out); });
+  }
+  function applyState(key, raw, viaRelay) {
+    if (!S || S.closed || !safeKey(key)) return;
+    var e = validEntry(raw);
+    if (!e) return;
+    var cur = S.state[key];
+    if (viaRelay) { if (e.ver && e.ver <= (S.relayVer[key] || 0)) return; S.relayVer[key] = e.ver; }
+    else if (cur && e.t <= cur.t) return;
+    var changed = !cur || cur.t !== e.t || cur.from.cid !== e.from.cid;
+    S.state[key] = e;
+    if (changed && e.from.cid !== cid) fireState(key);
+  }
+  function fireState(key) {
+    var e = S.state[key];
+    (stateSubs[key] || []).slice().forEach(function (fn) { call(fn, clone({ v: e.value }).v, { t: e.t, from: e.from }); });
+  }
+
+  /* ---------- local transport (BroadcastChannel + localStorage, namespaced by room) ---------- */
+  var P = 'jda.link.';
+  function k(code, what) { return P + code + '.' + what; }
+  function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function lsSet(key, v) { try { localStorage.setItem(key, v); return true; } catch (e) { return false; } }
+  function readLocalLog(code) {
+    try { var a = JSON.parse(lsGet(k(code, 'log')) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function startLocal() {
+    var code = S.code, ses = S;
+    readLocalLog(code).forEach(function (m) { var v = validMsg(m, code); if (v && !ses.seen[v.id]) { markSeen(v.id); pushLog(v); } });
+    try {
+      var pre = k(code, 'state.');
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf(pre) === 0) { try { applyState(key.slice(pre.length), JSON.parse(localStorage.getItem(key)), false); } catch (e) { /* ignore */ } }
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      if (window.BroadcastChannel) {
+        ses.bc = new BroadcastChannel('jda-link:' + code);
+        ses.bc.onmessage = function (ev) { if (ev.data && ev.data.k === 'msg') deliver(ev.data.m); else if (ev.data && ev.data.k === 'state') applyState(ev.data.key, ev.data.e, false); };
+      }
+    } catch (e) { ses.bc = null; }
+    function onStorage(e) {
+      if (!e.key || !e.newValue) return;
+      try {
+        if (e.key === k(code, 'msg')) deliver(JSON.parse(e.newValue));
+        else if (e.key.indexOf(k(code, 'state.')) === 0) applyState(e.key.slice(k(code, 'state.').length), JSON.parse(e.newValue), false);
+      } catch (err) { /* ignore corrupt */ }
+    }
+    window.addEventListener('storage', onStorage);
+    ses.listeners.push(function () { window.removeEventListener('storage', onStorage); });
+  }
+  function localPresence() {
+    var out = {}, pre = k(S.code, 'pres.'), now = Date.now();
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf(pre) !== 0) continue;
+        try {
+          var p = JSON.parse(localStorage.getItem(key));
+          if (!p || now - p.lastSeen > 60000) { localStorage.removeItem(key); continue; }
+          var f = cleanFrom(p);
+          if (f) out[key.slice(pre.length)] = { role: f.role, id: f.id, name: f.name, lastSeen: Math.min(Number(p.lastSeen) || 0, now) };
+        } catch (e) { localStorage.removeItem(key); }
+      }
+    } catch (e) { /* ignore */ }
+    return out;
+  }
+
+  /* ---------- relay transport ---------- */
+  function api(path, opt) {
+    opt = opt || {};
+    var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : 0;
+    return fetch('/api' + path, { method: opt.method || 'GET', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, body: opt.body ? JSON.stringify(opt.body) : undefined, cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+  }
+  function probeRelay() {
+    if (!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
+    return api('/ping').then(function (j) { return !!(j && j.ok); }, function () { return false; });
+  }
+  function relayOk() { var ses = S; if (ses && ses.relayFails) { ses.relayFails = 0; setStatus('relay'); } }
+  function relayFail(e) { var ses = S; if (!ses) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  function startRelay() {
+    var ses = S, base = '/rooms/' + ses.code;
+    ses.relay = true; setStatus('relay');
+    function loop() {
+      if (ses.closed) return;
+      Promise.all([api(base + '/msgs?since=' + ses.since), api(base + '/state?since=' + ses.stateVer)]).then(function (r) {
+        if (ses.closed) return;
+        var first = !ses.synced;
+        if (r[0].reset) ses.since = 0;
+        (r[0].msgs || []).forEach(function (m) { deliver(m, first); });
+        if (isFinite(r[0].next)) ses.since = r[0].next;
+        var items = r[1].items || {};
+        Object.keys(items).forEach(function (key) { applyState(key, items[key], true); });
+        if (isFinite(r[1].ver)) ses.stateVer = r[1].ver;
+        ses.synced = true;
+        relayOk();
+      }).catch(relayFail).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, POLL_MS)); });
+    }
+    loop();
+  }
+
+  /* ---------- online transport (Supabase, see docs/LINK.md) ---------- */
   var online = !!(cfg.url && cfg.key);
-  var subs = [], seen = {}, bc = null;
+  function remoteUrl(q) { return String(cfg.url).replace(/\/+$/, '') + '/rest/v1/' + encodeURIComponent(cfg.table || 'link_messages') + (q || ''); }
+  function remoteHeaders(extra) { var h = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }; for (var x in extra) h[x] = extra[x]; return h; }
+  function remoteGet(q) { return fetch(remoteUrl(q), { headers: remoteHeaders() }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); }
+  function remoteUpsert(row) {
+    return fetch(remoteUrl('?on_conflict=id'), { method: 'POST', headers: remoteHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(row) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); });
+  }
+  function startOnline() {
+    var ses = S, rc = encodeURIComponent('eq.' + ses.code), first = true;
+    ses.online = true;
+    function poll() {
+      if (ses.closed) return;
+      var since = new Date(Date.now() - 20000).toISOString();
+      Promise.all([
+        remoteGet('?select=payload&room=' + rc + '&kind=eq.msg&order=created_at.desc&limit=50'),
+        remoteGet('?select=payload&room=' + rc + '&kind=eq.state'),
+        remoteGet('?select=payload&room=' + rc + '&kind=eq.pres&updated_at=gte.' + encodeURIComponent(since))
+      ]).then(function (r) {
+        if (ses.closed) return;
+        r[0].reverse().forEach(function (row) { deliver(row.payload, first); });
+        r[1].forEach(function (row) { if (row.payload && safeKey(row.payload.key)) applyState(row.payload.key, row.payload.entry, false); });
+        r[2].forEach(function (row) { var p = row.payload; if (isObj(p) && typeof p.cid === 'string' && p.cid !== cid) setPresence(p.cid, p); });
+        first = false;
+        if (!ses.relay && status !== 'online') setStatus('online');
+      }).catch(function (e) { warn('online poll failed', e && e.message); })
+        .then(function () { if (!ses.closed) ses.timers.push(setTimeout(poll, 2500)); });
+    }
+    poll();
+  }
 
-  function deliver(m) {
-    if (!m || typeof m !== 'object' || typeof m.id !== 'string' || typeof m.type !== 'string' || seen[m.id]) return;
-    seen[m.id] = 1;
-    subs.slice().forEach(function (fn) { try { fn(m); } catch (e) { if (window.console) console.error('JdaLink handler failed', e); } });
+  /* ---------- presence ---------- */
+  function selfInfo() { return { cid: cid, role: room.role, id: room.id, name: room.name }; }
+  function setPresence(c, p) {
+    var f = cleanFrom(p);
+    if (!S || !f) return;
+    S.pres[c] = { role: f.role, id: f.id, name: f.name, lastSeen: isFinite(Number(p.lastSeen)) ? Math.min(Number(p.lastSeen), Date.now()) : Date.now() };
   }
-  function readLog() {
-    try { var a = JSON.parse(localStorage.getItem(LOG) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  function presenceList() {
+    var now = Date.now(), out = [], all = {}, x;
+    for (x in S.pres) all[x] = S.pres[x];
+    var lp = localPresence();
+    for (x in lp) { if (!all[x] || all[x].lastSeen < lp[x].lastSeen) all[x] = lp[x]; }
+    all[cid] = { role: room.role, id: room.id, name: room.name, lastSeen: now };
+    for (x in all) {
+      var p = all[x];
+      if (now - p.lastSeen < ONLINE_MS) out.push({ role: p.role, id: p.id, name: p.name, lastSeen: p.lastSeen });
+    }
+    out.sort(function (a, b) { return a.role < b.role ? -1 : a.role > b.role ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+    return out;
   }
-  function appendLog(m) {
-    try { var a = readLog(); a.push(m); localStorage.setItem(LOG, JSON.stringify(a.slice(-100))); } catch (e) { /* ignore */ }
+  function firePresence() { if (!S || !room) return; var l = presenceList(); presSubs.slice().forEach(function (fn) { call(fn, l); }); }
+  function heartbeat() {
+    var ses = S;
+    if (!ses || ses.closed) return;
+    var me = selfInfo();
+    lsSet(k(ses.code, 'pres.' + cid), JSON.stringify({ role: me.role, id: me.id, name: me.name, lastSeen: Date.now() }));
+    var jobs = [];
+    if (ses.relay) jobs.push(api('/rooms/' + ses.code + '/presence', { method: 'POST', body: me }).then(function (r) {
+      var now = Date.now();
+      (r.list || []).forEach(function (p) {
+        if (isObj(p) && typeof p.cid === 'string' && isFinite(Number(p.age))) { var f = cleanFrom(p); if (f) ses.pres[p.cid] = { role: f.role, id: f.id, name: f.name, lastSeen: now - Number(p.age) }; }
+      });
+      for (var c in ses.pres) if (now - ses.pres[c].lastSeen > 60000) delete ses.pres[c];
+    }).catch(function () { /* the poll loop reports relay failures */ }));
+    if (ses.online) { var o = selfInfo(); o.lastSeen = Date.now(); jobs.push(remoteUpsert({ id: 'pres:' + ses.code + ':' + cid, room: ses.code, kind: 'pres', payload: o, updated_at: new Date().toISOString() }).catch(function () { })); }
+    Promise.all(jobs).then(firePresence);
   }
-
-  try { if (window.BroadcastChannel) { bc = new BroadcastChannel('jda-link'); bc.onmessage = function (e) { deliver(e.data); }; } } catch (e) { bc = null; }
-  window.addEventListener('storage', function (e) {
-    if (e.key !== KEY || !e.newValue) return;
-    try { deliver(JSON.parse(e.newValue)); } catch (err) { /* ignore corrupt */ }
+  window.addEventListener('pagehide', function () {
+    if (!S || !room) return;
+    try { localStorage.removeItem(k(S.code, 'pres.' + cid)); } catch (e) { /* ignore */ }
+    try { if (S.relay && navigator.sendBeacon) navigator.sendBeacon('/api/rooms/' + S.code + '/presence', new Blob([JSON.stringify({ cid: cid, role: room.role, id: room.id, name: room.name, leave: true })], { type: 'application/json' })); } catch (e) { /* ignore */ }
   });
 
-  function remoteUrl(q) { return cfg.url.replace(/\/+$/, '') + '/rest/v1/' + encodeURIComponent(cfg.table || 'link_messages') + (q || ''); }
-  function remoteHeaders() { return { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }; }
-  function poll() {
-    fetch(remoteUrl('?select=payload&order=created_at.desc&limit=30'), { headers: remoteHeaders() })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (rows) { rows.reverse().forEach(function (row) { appendLog(row.payload); deliver(row.payload); }); })
-      .catch(function (e) { if (window.console) console.warn('JdaLink online poll failed', e); });
+  /* ---------- public API ---------- */
+  function teardown() {
+    if (!S) return;
+    S.closed = true;
+    S.timers.forEach(function (t) { clearTimeout(t); clearInterval(t); });
+    S.listeners.forEach(function (f) { f(); });
+    try { if (S.bc) S.bc.close(); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(k(S.code, 'pres.' + cid)); } catch (e) { /* ignore */ }
   }
-  if (online) { poll(); setInterval(poll, POLL_MS); }
-
-  window.JdaLink = {
-    mode: online ? 'online' : 'same-browser',
-    on: function (fn) { subs.push(fn); },
-    history: readLog,
-    send: function (msg) {
-      var m = Object.assign({}, msg, { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), t: new Date().toISOString() });
-      seen[m.id] = 1;
-      appendLog(m);
-      try { if (bc) bc.postMessage(m); } catch (e) { /* ignore */ }
-      try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) { /* ignore */ }
-      if (online) fetch(remoteUrl(), { method: 'POST', headers: remoteHeaders(), body: JSON.stringify({ id: m.id, payload: m }) })
-        .catch(function (e) { if (window.console) console.warn('JdaLink online send failed', e); });
-      return m;
+  function join(code, who) {
+    who = who || {};
+    var c = normCode(code);
+    if (!c) c = newCode();
+    if (!validCode(c)) throw new Error('JdaLink.join: invalid room code (5 characters, A-Z without I or O, and 2-9)');
+    var role = ROLES.indexOf(who.role) >= 0 ? who.role : 'crew';
+    teardown();
+    var carry = implicit ? pendingOut : null;
+    implicit = (c === LEGACY && who.role === 'legacy');
+    if (!implicit || !carry) pendingOut = { msgs: [], state: {} };
+    room = { code: c, role: role, id: slug(who.id, 32) || (role === 'crew' ? '' : role), name: cleanName(who.name) || (who.id ? cleanName(who.id) : '') };
+    S = newSession(c);
+    setStatus('local');
+    startLocal();
+    var ses = S;
+    ses.timers.push(setInterval(heartbeat, HEARTBEAT));
+    ses.timers.push(setInterval(firePresence, 2000));
+    heartbeat();
+    function flushCarry() {   // publish what was sent before the page joined a real room, once the transport is known
+      if (!carry || implicit || ses.closed) return;
+      var now = Date.now();
+      carry.msgs.filter(function (x) { return now - x.at < 120000; }).forEach(function (x) { try { send(x.msg); } catch (e) { /* ignore */ } });
+      Object.keys(carry.state).forEach(function (key) { try { setState(key, carry.state[key]); } catch (e) { /* ignore */ } });
+      pendingOut = { msgs: [], state: {} };
     }
+    if (c !== LEGACY) {   // the legacy default room never leaves this browser
+      probeRelay().then(function (ok) {
+        if (ses.closed) return;
+        if (ok) startRelay();
+        if (online) startOnline();
+        heartbeat();
+        flushCarry();
+      });
+    }
+    return { code: c };
+  }
+  function ensure() { if (!room) join(LEGACY, { role: 'legacy', id: 'legacy', name: '' }); }
+
+  function send(msg) {
+    ensure();
+    if (!isObj(msg) || typeof msg.type !== 'string') throw new Error('JdaLink.send: message needs a string type');
+    var ses = S, m = {};
+    Object.keys(msg).forEach(function (x) { if (x !== '__proto__') m[x] = msg[x]; });
+    if (implicit) { try { pendingOut.msgs.push({ at: Date.now(), msg: clone(msg) }); if (pendingOut.msgs.length > 20) pendingOut.msgs.shift(); } catch (e) { /* ignore */ } }
+    // a caller-supplied string `from` is a display name: keep it as fromName, `from` itself is always the sender envelope
+    if (typeof m.from === 'string' && !m.fromName) m.fromName = cleanName(m.from);
+    if (typeof m.fromName === 'string') m.fromName = cleanName(m.fromName);
+    else if (room.name && m.type === 'chat') m.fromName = room.name;
+    m.id = newId(); m.t = new Date().toISOString(); m.room = ses.code;
+    m.from = { role: room.role, id: room.id, name: room.name, cid: cid };
+    if (m.type === 'chat' && typeof m.text === 'string') m.text = m.text.slice(0, 500);
+    try { m = clone(m); } catch (e) { throw new Error('JdaLink.send: message is not JSON'); }
+    if (!validMsg(m, ses.code)) { warn('message rejected (too large or invalid)'); return null; }
+    markSeen(m.id); pushLog(m);
+    lsSet(k(ses.code, 'log'), JSON.stringify(ses.log.slice(-LOG_N)));
+    try { if (ses.bc) ses.bc.postMessage({ k: 'msg', m: m }); } catch (e) { /* ignore */ }
+    lsSet(k(ses.code, 'msg'), JSON.stringify(m));
+    if (ses.relay) api('/rooms/' + ses.code + '/msg', { method: 'POST', body: m }).catch(function (e) { warn('relay send failed', e && e.message); relayFail(e); });
+    if (ses.online) remoteUpsert({ id: m.id, room: ses.code, kind: 'msg', payload: m }).catch(function (e) { warn('online send failed', e && e.message); });
+    return m;
+  }
+  function setState(key, value) {
+    ensure();
+    if (!safeKey(key)) throw new Error('JdaLink.setState: bad key');
+    if (size(value) > MAX_STATE) { warn('state too large'); return false; }
+    if (implicit) { try { pendingOut.state[key] = clone({ v: value }).v; } catch (e) { /* ignore */ } }
+    var ses = S, e = { value: clone({ v: value }).v, t: Date.now(), from: { role: room.role, id: room.id, name: room.name, cid: cid }, ver: 0 };
+    ses.state[key] = e;
+    var wire = { value: e.value, t: e.t, from: e.from };
+    lsSet(k(ses.code, 'state.' + key), JSON.stringify(wire));
+    try { if (ses.bc) ses.bc.postMessage({ k: 'state', key: key, e: wire }); } catch (x) { /* ignore */ }
+    if (ses.relay) api('/rooms/' + ses.code + '/state/' + encodeURIComponent(key), { method: 'PUT', body: wire }).catch(function (x) { relayFail(x); });
+    if (ses.online) remoteUpsert({ id: 'state:' + ses.code + ':' + key, room: ses.code, kind: 'state', payload: { key: key, entry: wire }, updated_at: new Date().toISOString() }).catch(function () { });
+    return true;
+  }
+  function getState(key) {
+    ensure();
+    var e = S.state[key];
+    return e ? { value: clone({ v: e.value }).v, t: e.t, from: e.from } : null;
+  }
+  function onState(key, fn) {
+    ensure();
+    if (!safeKey(key) || typeof fn !== 'function') return function () { };
+    (stateSubs[key] = stateSubs[key] || []).push(fn);
+    var e = S.state[key];
+    if (e) setTimeout(function () { var cur = S && S.state[key]; if (cur) call(fn, clone({ v: cur.value }).v, { t: cur.t, from: cur.from }); }, 0);
+    return function () { var a = stateSubs[key] || [], i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); };
+  }
+  function off(list, fn) { return function () { var i = list.indexOf(fn); if (i >= 0) list.splice(i, 1); }; }
+
+  var api2 = {
+    join: join,
+    onStatus: function (fn) { if (typeof fn !== 'function') return function () { }; statusSubs.push(fn); setTimeout(function () { if (statusSubs.indexOf(fn) >= 0) call(fn, status); }, 0); return off(statusSubs, fn); },
+    on: function (fn) { ensure(); if (typeof fn !== 'function') return function () { }; subs.push(fn); return off(subs, fn); },
+    send: send,
+    history: function (n) { ensure(); n = n > 0 ? Math.min(n | 0, LOG_N) : LOG_N; return clone(S.log.slice(-n)); },
+    setState: setState, getState: getState, onState: onState,
+    presence: function () { ensure(); return presenceList(); },
+    onPresence: function (fn) { presSubs.push(fn); return off(presSubs, fn); },
+    newCode: newCode, normCode: normCode, isValidCode: function (c) { return CODE_RE.test(normCode(c)); },
+    clientId: cid
   };
+  Object.defineProperty(api2, 'room', { get: function () { return room ? { code: room.code, role: room.role, id: room.id, name: room.name, implicit: implicit } : null; }, enumerable: true });
+  Object.defineProperty(api2, 'status', { get: function () { return status; }, enumerable: true });
+  Object.defineProperty(api2, 'mode', { get: function () { return status === 'online' ? 'online' : 'same-browser'; }, enumerable: true });   // legacy
+  window.JdaLink = api2;
+})();
+
+</script>
+<script>
+/* link-ui.js: room join dialog + status chip shared by all pages. Needs js/link.js and css/link-ui.css.
+   JdaLinkUI.mount({role, ask:['code','crew'|'name'], id?, name?, position?, onJoin?}) -> {ready: Promise, change()}
+   The last room and crew are remembered in localStorage (key jda.linkui.last, independent of the Atlas store);
+   #room=CODE in the URL wins over the remembered room. All text is written with textContent. */
+(function () {
+  'use strict';
+  var LAST = 'jda.linkui.last';
+  var CREW = [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }];
+  var uid = 0;
+
+  function el(tag, cls, text, attrs) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function load() { try { var o = JSON.parse(localStorage.getItem(LAST) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function save(o) { try { localStorage.setItem(LAST, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function hashCode() {
+    var m = /[#&]room=([^&]*)/.exec(location.hash || '');
+    if (!m) return '';
+    var c = window.JdaLink.normCode(decodeURIComponent(m[1]));
+    return window.JdaLink.isValidCode(c) ? c : '';
+  }
+  function linkFor(code) {
+    return location.origin + location.pathname + location.search + '#room=' + code;
+  }
+  function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24); }
+  function focusables(root) { return [].slice.call(root.querySelectorAll('button,input,[tabindex]:not([tabindex="-1"])')).filter(function (n) { return !n.disabled && n.offsetParent !== null; }); }
+
+  function mount(opts) {
+    opts = opts || {};
+    var L = window.JdaLink;
+    if (!L) throw new Error('JdaLinkUI needs js/link.js');
+    var role = opts.role || 'crew';
+    var ask = Array.isArray(opts.ask) ? opts.ask : ['code'];
+    var wantCrew = ask.indexOf('crew') >= 0, wantName = ask.indexOf('name') >= 0;
+    var root = el('div', 'lu-root');
+    var live = el('div', 'lu-live', '', { role: 'status', 'aria-live': 'polite' });
+    root.appendChild(live);
+    var chip = null, dlg = null, back = null, opener = null, resolveReady;
+    var ready = new Promise(function (r) { resolveReady = r; });
+    var offs = [];
+
+    function who(saved) {
+      if (wantCrew) return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      if (wantName) return { role: role, id: opts.id || role, name: saved.name || opts.name || '' };
+      return { role: role, id: opts.id || role, name: opts.name || '' };
+    }
+    function joinNow(code, info) {
+      var r = L.join(code, info);
+      var rec = load();
+      rec.code = r.code;
+      if (wantCrew) { rec.crewId = info.id; rec.crewName = info.name; }
+      if (wantName) rec.name = info.name;
+      save(rec);
+      try { history.replaceState(null, '', location.pathname + location.search + '#room=' + r.code); } catch (e) { /* ignore */ }
+      showChip();
+      if (typeof opts.onJoin === 'function') { try { opts.onJoin({ code: r.code, role: role, id: info.id, name: info.name }); } catch (e) { if (window.console) console.error(e); } }
+      resolveReady(L.room);
+      return r;
+    }
+
+    /* ----- status chip: a small pill, expands on click/focus into transport, copy link, change room ----- */
+    var chipCode, chipN, chipSt, copyBtn, pill, panel, tick = null;
+    function joined() { var r = L.room; return !!(r && !r.implicit && r.code !== 'LOCAL' && r.role !== 'legacy'); }
+    function statusText(s) { return s === 'relay' ? 'relay' : s === 'online' ? 'online' : 'this browser only'; }
+    function refreshChip() {
+      if (!chip || !L.room) return;
+      var s = L.status, n = L.presence().length;
+      chipCode.textContent = L.room.code;
+      chipN.textContent = ''; chipN.appendChild(document.createTextNode(String(n))); chipN.appendChild(el('span', 'lu-w', ' online'));
+      chipSt.textContent = 'Link: ' + statusText(s);
+      chip.setAttribute('data-status', s);
+      pill.setAttribute('aria-label', 'Room ' + L.room.code + ', ' + n + ' online, link ' + statusText(s) + '. Show room options');
+    }
+    function expand(on) {
+      if (!chip) return;
+      panel.hidden = !on;
+      pill.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (on) refreshChip();
+    }
+    function showChip() {
+      if (!chip) {
+        chip = el('div', 'lu-chip', null, { 'data-pos': opts.position || 'top-right', role: 'group', 'aria-label': 'Room link' });
+        pill = el('button', 'lu-pill', null, { type: 'button', 'aria-expanded': 'false' });
+        pill.appendChild(el('span', 'lu-dot', null, { 'aria-hidden': 'true' }));
+        chipCode = el('span', 'lu-code'); pill.appendChild(chipCode);
+        pill.appendChild(el('span', 'lu-mute', '\u00b7', { 'aria-hidden': 'true' }));
+        chipN = el('span', 'lu-mute'); pill.appendChild(chipN);
+        pill.addEventListener('click', function () { expand(panel.hidden); });
+        chip.appendChild(pill);
+        panel = el('div', 'lu-panel', null, { hidden: 'hidden' });
+        chipSt = el('div', 'lu-mute lu-st'); panel.appendChild(chipSt);
+        var row = el('div', 'lu-row');
+        copyBtn = el('button', 'lu-cbtn', 'Copy link', { type: 'button', 'aria-label': 'Copy link to this room' });
+        copyBtn.addEventListener('click', copyLink);
+        row.appendChild(copyBtn);
+        var chg = el('button', 'lu-cbtn', 'Change room', { type: 'button' });
+        chg.addEventListener('click', function () { expand(false); openDialog(pill); });
+        row.appendChild(chg);
+        panel.appendChild(row);
+        chip.appendChild(panel);
+        chip.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { e.stopPropagation(); expand(false); pill.focus(); } });
+        document.addEventListener('mousedown', function (e) { if (panel && !panel.hidden && !chip.contains(e.target)) expand(false); });
+        root.appendChild(chip);
+        offs.push(L.onStatus(refreshChip), L.onPresence(refreshChip));
+        tick = setInterval(refreshChip, 3000);
+      }
+      refreshChip();
+    }
+    function copyLink() {
+      var url = linkFor(L.room.code);
+      function done(ok) {
+        copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+        live.textContent = ok ? 'Room link copied' : 'Could not copy, the link is ' + url;
+        setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1800);
+      }
+      function fallback() {
+        var ta = el('textarea', null, url, { 'aria-hidden': 'true', tabindex: '-1' });
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta); ta.select();
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* ignore */ }
+        document.body.removeChild(ta); done(ok);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { done(true); }, fallback);
+      else fallback();
+    }
+
+    /* ----- dialog ----- */
+    function closeDialog() {
+      if (!back) return;
+      document.removeEventListener('keydown', onKey, true);
+      root.removeChild(back); back = dlg = null;
+      if (opener && opener.focus) opener.focus();
+    }
+    function onKey(e) {
+      if (!dlg) return;
+      if (e.key === 'Escape' && joined()) { e.preventDefault(); closeDialog(); return; }   // first-run dialog stays open
+      if (e.key !== 'Tab') return;
+      var f = focusables(dlg);
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !dlg.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (document.activeElement === last || !dlg.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
+    }
+    function openDialog(from) {
+      if (dlg) return;
+      opener = from || null;
+      var saved = load(), n = ++uid, firstRun = !joined();
+      var cur = joined() ? L.room : null;
+      var codeVal = hashCode() || (cur && cur.code) || saved.code || '';
+      back = el('div', 'lu-back');
+      dlg = el('div', 'lu-dlg', null, { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'lu-t' + n, 'aria-describedby': 'lu-d' + n });
+      dlg.appendChild(el('h2', null, firstRun ? 'Join a room' : 'Change room', { id: 'lu-t' + n }));
+      dlg.appendChild(el('p', null, 'Everyone who enters the same room code sees the same messages and mission data. Other codes see nothing of it.', { id: 'lu-d' + n }));
+      var form = el('form', null, null, { novalidate: 'novalidate' });
+      dlg.appendChild(form);
+
+      form.appendChild(el('label', 'lu-lbl', 'Room code', { for: 'lu-code' + n }));
+      var code = el('input', 'lu-input', null, { id: 'lu-code' + n, type: 'text', maxlength: '5', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'K7M2P', 'aria-describedby': 'lu-e' + n });
+      code.value = codeVal;
+      code.addEventListener('input', function () { var p = code.selectionStart; code.value = L.normCode(code.value).slice(0, 5); try { code.setSelectionRange(p, p); } catch (e) { /* ignore */ } });
+      form.appendChild(code);
+
+      var crewOther = null, crewRadios = [], nameIn = null;
+      if (wantCrew) {
+        var fs = el('fieldset', 'lu-fs'); fs.appendChild(el('legend', null, 'Crew member'));
+        var row = el('div', 'lu-row'); fs.appendChild(row);
+        var opts2 = CREW.concat([{ id: '', name: 'Other' }]);
+        var sel = saved.crewId || '';
+        var isCustom = !!sel && !CREW.some(function (c) { return c.id === sel; });
+        opts2.forEach(function (c, i) {
+          var lab = el('label', 'lu-opt'), r = el('input', null, null, { type: 'radio', name: 'lu-crew' + n, value: c.id || '__other' });
+          r.checked = c.id ? c.id === sel : isCustom;
+          if (!sel && i === 0) r.checked = true;
+          lab.appendChild(r); lab.appendChild(el('span', null, c.name));
+          row.appendChild(lab); crewRadios.push(r);
+          r.addEventListener('change', syncOther);
+        });
+        form.appendChild(fs);
+        form.appendChild(el('label', 'lu-lbl', 'Your name', { for: 'lu-other' + n, id: 'lu-otherl' + n }));
+        crewOther = el('input', 'lu-input lu-text', null, { id: 'lu-other' + n, type: 'text', maxlength: '24', autocomplete: 'off', placeholder: 'Name for the crew list' });
+        if (isCustom) crewOther.value = saved.crewName || '';
+        form.appendChild(crewOther);
+      } else if (wantName) {
+        form.appendChild(el('label', 'lu-lbl', 'Your name', { for: 'lu-name' + n }));
+        nameIn = el('input', 'lu-input lu-text', null, { id: 'lu-name' + n, type: 'text', maxlength: '24', autocomplete: 'off', placeholder: opts.name || 'Name' });
+        nameIn.value = saved.name || opts.name || '';
+        form.appendChild(nameIn);
+      }
+      function syncOther() {
+        if (!crewOther) return;
+        var other = crewRadios.some(function (r) { return r.checked && r.value === '__other'; });
+        crewOther.disabled = !other;
+        crewOther.parentNode.querySelector('#lu-otherl' + n).hidden = !other;
+        crewOther.hidden = !other;
+      }
+      var err = el('p', 'lu-err', '', { id: 'lu-e' + n, role: 'alert' });
+      form.appendChild(err);
+      var act = el('div', 'lu-act');
+      var joinBtn = el('button', 'lu-btn lu-primary', 'Join room', { type: 'submit' });
+      var newBtn = el('button', 'lu-btn', 'Create new room', { type: 'button' });
+      act.appendChild(joinBtn); act.appendChild(newBtn);
+      if (!firstRun) { var cancel = el('button', 'lu-btn lu-quiet', 'Cancel', { type: 'button' }); cancel.addEventListener('click', closeDialog); act.appendChild(cancel); }
+      form.appendChild(act);
+      syncOther();
+
+      function identity() {
+        if (wantCrew) {
+          var r = crewRadios.filter(function (x) { return x.checked; })[0];
+          if (!r) return { error: 'Choose who you are.' };
+          if (r.value !== '__other') { var c = CREW.filter(function (x) { return x.id === r.value; })[0]; return { role: role, id: c.id, name: c.name }; }
+          var nm = crewOther.value.trim().slice(0, 24), sl = slug(nm);
+          if (!sl) return { error: 'Enter your name.' };
+          return { role: role, id: sl, name: nm };
+        }
+        if (wantName) { var v = nameIn.value.trim().slice(0, 24); return { role: role, id: opts.id || role, name: v || opts.name || '' }; }
+        return { role: role, id: opts.id || role, name: opts.name || '' };
+      }
+      function go(create) {
+        err.textContent = '';
+        var info = identity();
+        if (info.error) { err.textContent = info.error; return; }
+        var c = create ? '' : code.value;
+        if (!create && !L.isValidCode(c)) { err.textContent = 'A room code has 5 characters, letters (not I or O) and digits 2 to 9. Check it or create a new room.'; code.focus(); return; }
+        closeDialog();
+        joinNow(c, info);
+      }
+      form.addEventListener('submit', function (e) { e.preventDefault(); go(false); });
+      newBtn.addEventListener('click', function () { go(true); });
+
+      back.appendChild(dlg);
+      root.appendChild(back);
+      document.addEventListener('keydown', onKey, true);
+      (code.value ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
+    }
+
+    /* ----- start ----- */
+    document.body.appendChild(root);
+    var saved = load(), hc = hashCode(), code = hc || saved.code || '';
+    var info = who(saved);
+    var identityKnown = !wantCrew || !!info.id;
+    if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
+    else openDialog(null);
+
+    function onHash() {
+      var c = hashCode();
+      if (!c || (L.room && L.room.code === c && joined())) return;
+      var sv = load(), inf = who(sv);
+      if (!wantCrew || inf.id) { if (dlg) closeDialog(); joinNow(c, inf); }
+      else if (dlg) { var ci = dlg.querySelector('.lu-input'); if (ci) ci.value = c; }
+      else openDialog(null);
+    }
+    window.addEventListener('hashchange', onHash);
+    offs.push(function () { window.removeEventListener('hashchange', onHash); if (tick) clearInterval(tick); });
+    return { ready: ready, change: function () { openDialog(null); }, destroy: function () { offs.forEach(function (f) { f(); }); if (root.parentNode) root.parentNode.removeChild(root); } };
+  }
+
+  window.JdaLinkUI = { mount: mount };
+})();
+
+</script>
+<script>
+/* chat-ui.js: reusable person-to-person chat. window.JdaChat.mount(container, opts) -> api.
+   Messages travel through JdaLink (docs/MULTIPAGE.md): {type:'chat', to:'all'|<crewId>|'earth', text, fromName}.
+   There are NO automatic replies here: every message shown was typed by a person (or comes from the host page via api.addLocal).
+   PRIVACY NOTE: a direct message ('to' = one person) is NOT private. Every message goes through the room-wide link (relay log, local
+   storage, online table), so anyone who has the room code, or reads the relay log, can read it. The UI only shows a message to its
+   sender and recipient. Do not put secrets in chat.
+   All text is written with textContent; everything received is untrusted. */
+(function () {
+  'use strict';
+  var MAX = 500, KEEP = 300;
+  var seq = 0;
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function clock(iso) { var d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function clean(s, n) { return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\r\n?/g, '\n').slice(0, n); }
+  function slug(s) { return String(s == null ? '' : s).slice(0, 40); }
+
+  function mount(container, opts) {
+    opts = opts || {};
+    var link = opts.link || window.JdaLink || null;
+    var meId = slug(opts.meId || (link && link.room && link.room.id) || 'me');
+    var meName = clean(opts.meName || (link && link.room && link.room.name) || 'Crew member', 24).replace(/\s+/g, ' ').trim() || 'Crew member';
+    var allowEarth = opts.allowEarth !== false;
+    var meIsEarth = meId === 'earth';
+    var uid = 'jc' + (++seq);
+
+    var msgs = [];          // {id, conv, mine, fromName, fromId, text, t, local, auto}
+    var byId = {};          // dedupe
+    var convs = {};         // conv id -> {id, name, unread}
+    var order = [];
+    var active = opts.initial || 'all';
+    var unreadFns = [], sendFns = [], offLink = null, offStatus = null, timer = null, destroyed = false;
+
+    /* ---------- DOM ---------- */
+    var root = el('section', 'jc');
+    root.setAttribute('aria-label', 'Chat');
+    var bar = el('div', 'jc-bar'); bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Conversations');
+    var head = el('div', 'jc-head');
+    var title = el('h3', 'jc-title'); title.id = uid + '-t';
+    var state = el('span', 'jc-state');
+    head.appendChild(title); head.appendChild(state);
+    var log = el('div', 'jc-log'); log.setAttribute('role', 'log'); log.setAttribute('aria-live', 'polite'); log.setAttribute('aria-relevant', 'additions'); log.tabIndex = 0;
+    var form = el('form', 'jc-form');
+    var label = el('label', 'jc-sr', 'Message'); label.htmlFor = uid + '-in';
+    var input = el('textarea', 'jc-input'); input.id = uid + '-in'; input.rows = 1; input.maxLength = MAX; input.autocomplete = 'off';
+    var send = el('button', 'jc-send', 'Send'); send.type = 'submit';
+    var row = el('div', 'jc-row'); row.appendChild(input); row.appendChild(send);
+    var count = el('span', 'jc-count'); count.setAttribute('aria-hidden', 'true');
+    form.appendChild(label); form.appendChild(row); form.appendChild(count);
+    root.appendChild(bar); root.appendChild(head); root.appendChild(log); root.appendChild(form);
+    container.appendChild(root);
+
+    /* ---------- conversations ---------- */
+    function peerList() {
+      var p = typeof opts.peers === 'function' ? opts.peers() : opts.peers;
+      return Array.isArray(p) ? p : [];
+    }
+    function ensure(id, name) {
+      id = slug(id); if (!id) return null;
+      var c = convs[id];
+      if (!c) { c = convs[id] = { id: id, name: clean(name || id, 24), unread: 0 }; order.push(id); }
+      else if (name && (c.name === c.id || c.name === 'Crew member')) c.name = clean(name, 24);
+      return c;
+    }
+    function syncConvs() {
+      ensure('all', 'All crew');
+      if (allowEarth && !meIsEarth) ensure('earth', 'Earth control');
+      peerList().forEach(function (p) { if (p && p.id && p.role !== 'legacy' && slug(p.id) !== meId) ensure(p.id, p.name); });
+      if (meIsEarth && convs.earth) { delete convs.earth; order.splice(order.indexOf('earth'), 1); }
+      order = order.filter(function (id) { return convs[id]; });
+    }
+    function online(id) {
+      try {
+        var pr = link && link.room && link.presence ? link.presence() : [];
+        return pr.some(function (p) { return p && (id === 'earth' ? p.role === 'earth' : p.id === id); });
+      } catch (e) { return false; }
+    }
+    function roomOk() { return !!(link && link.room && link.send); }
+
+    function renderBar() {
+      syncConvs();
+      bar.textContent = '';
+      order.forEach(function (id) {
+        var c = convs[id];
+        var b = el('button', 'jc-conv' + (id === active ? ' on' : ''));
+        b.type = 'button'; b.setAttribute('aria-pressed', id === active ? 'true' : 'false');
+        var dot = el('span', 'jc-dot' + (id === 'all' || online(id) ? ' up' : '')); dot.setAttribute('aria-hidden', 'true');
+        b.appendChild(dot);
+        b.appendChild(el('span', 'jc-cn', c.name));
+        if (c.unread) b.appendChild(el('span', 'jc-badge', c.unread > 9 ? '9+' : String(c.unread)));
+        b.setAttribute('aria-label', 'Chat with ' + c.name + (id !== 'all' && online(id) ? ', online' : '') + (c.unread ? ', ' + c.unread + ' unread' : ''));
+        b.addEventListener('click', function () { select(id); input.focus(); });
+        bar.appendChild(b);
+      });
+    }
+    function renderHead() {
+      var c = convs[active];
+      title.textContent = c ? (active === 'all' ? 'All crew' : 'Chat with ' + c.name) : 'Chat';
+      if (!roomOk()) state.textContent = 'Not connected to a room';
+      else state.textContent = active === 'all' ? 'Everyone in room ' + link.room.code : (online(active) ? 'Online' : 'Not online right now, they will see this when they return');
+      log.setAttribute('aria-label', 'Messages: ' + (c ? c.name : 'chat'));
+      input.setAttribute('aria-label', 'Message to ' + (c ? c.name : 'chat'));
+    }
+    function updateForm() {
+      var ok = roomOk();
+      input.disabled = !ok; input.placeholder = ok ? 'Type a message, Enter to send' : 'Join a room to chat';
+      send.disabled = !ok || !clean(input.value, MAX).trim();
+      count.textContent = input.value.length + '/' + MAX;
+    }
+
+    /* ---------- messages ---------- */
+    function visible() { return !document.hidden && container.offsetParent !== null && root.offsetParent !== null; }
+    function renderMsg(m) {
+      var d = el('div', 'jc-msg ' + (m.mine ? 'me' : 'them') + (m.auto ? ' auto' : ''));
+      var meta = el('div', 'jc-meta', (m.mine ? 'You' : m.fromName) + (active === 'all' && !m.mine ? '' : '') + ' · ' + clock(m.t));
+      if (m.auto) meta.appendChild(el('span', 'jc-auto', 'automatic reply, nobody else is online'));
+      d.appendChild(meta);
+      d.appendChild(el('p', 'jc-text', m.text));
+      return d;
+    }
+    function renderLog() {
+      log.textContent = '';
+      var list = msgs.filter(function (m) { return m.conv === active; });
+      if (!list.length) log.appendChild(el('p', 'jc-empty', roomOk() ? 'No messages yet.' : 'Join a room to chat with the crew and Earth control.'));
+      list.forEach(function (m) { log.appendChild(renderMsg(m)); });
+      log.scrollTop = log.scrollHeight;
+    }
+    function totals() { var o = {}, n = 0; order.forEach(function (id) { if (convs[id].unread) { o[id] = convs[id].unread; n += convs[id].unread; } }); return { total: n, by: o }; }
+    function fireUnread() { var t = totals(); unreadFns.slice().forEach(function (fn) { try { fn(t.total, t.by); } catch (e) { /* host bug */ } }); }
+
+    // Which conversation does a chat message belong to for me? null = not for me.
+    function isMine(from) {
+      if (!from || typeof from !== 'object') return false;
+      return meIsEarth ? from.role === 'earth' : (from.role !== 'earth' && slug(from.id) === meId);
+    }
+    function convOf(m) {
+      var to = slug(m.to), from = m.from && typeof m.from === 'object' ? m.from : {};
+      if (isMine(from)) return to || 'all';
+      if (to === 'all') return 'all';
+      if (to === meId || (meIsEarth && to === 'earth')) return from.role === 'earth' ? 'earth' : slug(from.id);
+      return null;
+    }
+    function add(rec, fresh) {
+      if (byId[rec.id]) return false;
+      byId[rec.id] = rec;
+      ensure(rec.conv, rec.conv === 'earth' ? 'Earth control' : (rec.mine ? null : rec.fromName));
+      msgs.push(rec);
+      if (msgs.length > KEEP) { var old = msgs.shift(); delete byId[old.id]; }
+      var cv = convs[rec.conv];
+      if (fresh && !rec.mine && cv && (rec.conv !== active || !visible())) { cv.unread++; renderBar(); fireUnread(); }
+      else if (rec.conv !== active || !convs[rec.conv]) renderBar();
+      if (rec.conv === active) {
+        var e = log.querySelector('.jc-empty'); if (e) log.removeChild(e);
+        var stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 40 || rec.mine;
+        log.appendChild(renderMsg(rec));
+        if (stick) log.scrollTop = log.scrollHeight;
+      }
+      return true;
+    }
+    function fromLink(m, fresh) {
+      if (!m || m.type !== 'chat' || typeof m.id !== 'string' || typeof m.text !== 'string') return;
+      var conv = convOf(m); if (!conv) return;
+      var from = m.from && typeof m.from === 'object' ? m.from : {};
+      var mine = isMine(from);
+      add({ id: m.id, conv: conv, mine: mine, fromId: slug(from.id || from.role), t: typeof m.t === 'string' ? m.t : new Date().toISOString(),
+        fromName: clean(m.fromName || from.name || from.id || 'Crew member', 24).replace(/\s+/g, ' ').trim() || 'Crew member',
+        text: clean(m.text, MAX) }, fresh);
+    }
+
+    function select(id) {
+      syncConvs();
+      if (!convs[id]) return false;
+      active = id; convs[id].unread = 0;
+      renderBar(); renderHead(); renderLog(); fireUnread();
+      return true;
+    }
+
+    function submit() {
+      var text = clean(input.value, MAX).trim();
+      if (!text || !roomOk()) { updateForm(); return false; }
+      var to = active;
+      var out = { type: 'chat', to: to, text: text, fromName: meName }, sent = null;
+      try { sent = link.send(out); } catch (e) { sent = null; }
+      var id = sent && typeof sent.id === 'string' ? sent.id : 'loc' + Date.now().toString(36) + (++seq);
+      add({ id: id, conv: to, mine: true, fromId: meId, fromName: meName, text: text, t: (sent && sent.t) || new Date().toISOString() }, false);
+      input.value = ''; autosize(); updateForm();
+      sendFns.slice().forEach(function (fn) { try { fn({ to: to, text: text, id: id }); } catch (e) { /* host bug */ } });
+      return true;
+    }
+    function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 96) + 'px'; }
+
+    form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
+    input.addEventListener('input', function () { autosize(); updateForm(); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
+    });
+
+    /* ---------- wiring to the link ---------- */
+    var loadedFor = null;
+    function roomKey() { return link && link.room ? link.room.code + '|' + link.room.role + '|' + link.room.id : null; }
+    function loadHistory() {
+      loadedFor = roomKey();
+      if (!loadedFor || !link || !link.history) return;
+      var h = [];
+      try { h = link.history(KEEP) || []; } catch (e) { h = []; }
+      h.slice().sort(function (a, b) { return String(a && a.t).localeCompare(String(b && b.t)); }).forEach(function (m) { fromLink(m, false); });
+    }
+    if (link && link.on) {
+      var off = link.on(function (m) { if (!destroyed) fromLink(m, true); });
+      offLink = typeof off === 'function' ? off : null;
+    }
+    syncConvs();
+    loadHistory();
+    renderBar(); renderHead(); renderLog(); updateForm();
+    // peers appear and disappear (presence); refresh the bar and header every few seconds
+    var tk = 0;
+    timer = setInterval(function () {
+      if (destroyed) return;
+      if (roomKey() !== loadedFor) {          // joined (or switched) a room after mount: start from that room's history
+        msgs.length = 0; byId = {}; convs = {}; order = []; active = 'all'; syncConvs();
+        loadHistory(); renderBar(); renderHead(); renderLog(); updateForm(); fireUnread(); return;
+      }
+      if (++tk % 3) return;
+      renderBar(); renderHead(); updateForm();
+      if (convs[active] && convs[active].unread && visible()) { convs[active].unread = 0; renderBar(); fireUnread(); }
+    }, 1000);
+    document.addEventListener('visibilitychange', onVis);
+    function onVis() { if (!document.hidden && visible() && convs[active] && convs[active].unread) { convs[active].unread = 0; renderBar(); fireUnread(); } }
+
+    return {
+      el: root,
+      select: select,
+      active: function () { return active; },
+      unread: function () { return totals().total; },
+      onUnread: function (fn) { if (typeof fn === 'function') unreadFns.push(fn); },
+      onSend: function (fn) { if (typeof fn === 'function') sendFns.push(fn); },
+      refresh: function () { renderBar(); renderHead(); updateForm(); },
+      focus: function () { input.focus(); },
+      markRead: function () { if (convs[active] && convs[active].unread) { convs[active].unread = 0; renderBar(); fireUnread(); } },
+      // Host-supplied line (not sent through the link). Used by a host for an explicitly labelled automatic reply.
+      addLocal: function (o) {
+        if (!o || !o.conv || typeof o.text !== 'string') return false;
+        return add({ id: 'loc' + Date.now().toString(36) + (++seq), conv: slug(o.conv), mine: false, fromId: slug(o.conv), fromName: clean(o.fromName || o.conv, 24),
+          text: clean(o.text, MAX), t: new Date().toISOString(), auto: !!o.auto }, true);
+      },
+      destroy: function () {
+        destroyed = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVis);
+        if (offLink) offLink(); if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  window.JdaChat = { mount: mount, MAX: MAX };
 })();
 
 </script>
@@ -119,9 +1076,13 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var alerts = {};   // sos id -> {id, from, lat, lon, t, ackAt}
   var order = [];
   var list = document.getElementById('alerts'), empty = document.getElementById('empty'),
-      banner = document.getElementById('banner'), conn = document.getElementById('conn');
-  conn.textContent = window.JdaLink.mode === 'online' ? '● online link' : '● same-browser link';
+      banner = document.getElementById('banner');
+  if (window.JdaLinkUI) window.JdaLinkUI.mount({ role: 'earth', ask: ['code'] });
 
+  function sender(m) {   // v2 puts {role,id,name} in m.from; older senders used a plain string
+    var f = m.from;
+    return name(m.name || m.fromName || (typeof f === 'string' ? f : f && (f.name || f.id)));
+  }
   function name(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 24) || 'Crew member'; }
   function num(v) { v = Number(v); return isFinite(v) ? v : null; }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -135,7 +1096,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       var h = el('h3'); h.appendChild(el('span', 'status', a.ackAt ? '■ ACKNOWLEDGED' : '▲ ACTIVE'));
       h.appendChild(document.createTextNode(a.from + ' pressed SOS'));
       li.appendChild(h);
-      li.appendChild(el('div', 'meta', 'received ' + when(a.t) + (a.lat !== null ? ' · position (simulated) ' + a.lat.toFixed(4) + '°N, ' + a.lon.toFixed(4) + '°E' : '')));
+      li.appendChild(el('div', 'meta', 'received ' + when(a.t) + (a.lat !== null ? ' · position ' + a.lat.toFixed(4) + '°N, ' + a.lon.toFixed(4) + '°E' : '')));
       if (!a.ackAt) {
         var b = el('button', '', 'Acknowledge'); b.type = 'button';
         b.addEventListener('click', function () { a.ackAt = new Date().toISOString(); window.JdaLink.send({ type: 'ack', sosId: id, by: 'Earth control' }); render(); });
@@ -148,25 +1109,94 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     if (active.length) {
       var a = alerts[active[active.length - 1]];
       banner.textContent = '▲ ' + a.from + ' pressed SOS';
-      banner.appendChild(el('small', '', active.length > 1 ? active.length + ' active alerts' : 'Simulated alert from the Mars base page'));
+      banner.appendChild(el('small', '', active.length > 1 ? active.length + ' active alerts' : 'Alert from the Mars base'));
       document.title = '▲ SOS: ' + a.from + ' · Earth Mission Control';
     } else document.title = 'Earth Mission Control';
   }
 
+  /* ---------- reports from the planner (type 'report'): plain text only ---------- */
+  var reports = {}, rOrder = [], rUnread = 0, rList = document.getElementById('reports'), rEmpty = document.getElementById('reports-empty'),
+      rBadge = document.getElementById('reports-badge'), loading = true;
+  function addReport(m) {
+    if (m.to && m.to !== 'earth') return;
+    var key = typeof m.reportId === 'string' && m.reportId ? m.reportId.slice(0, 60) : m.id;
+    if (!key || reports[key]) return;
+    var f = m.from && typeof m.from === 'object' ? m.from : {};
+    reports[key] = { key: key, from: name(m.from && f.name || m.fromName || (typeof m.from === 'string' ? m.from : '') || f.id),
+      t: m.at || m.t, subject: String(m.subject == null ? '' : m.subject).replace(/\s+/g, ' ').trim().slice(0, 120) || '(no subject)',
+      body: String(m.body == null ? '' : m.body).replace(/\r\n?/g, '\n').slice(0, 4000), misses: num(m.misses), seen: false };
+    rOrder.push(key);
+    if (!loading) { rUnread++; renderReports(); }
+  }
+  function renderReports() {
+    rEmpty.hidden = rOrder.length > 0;
+    rList.textContent = '';
+    rOrder.slice().sort(function (a, b) { return String(reports[b].t).localeCompare(String(reports[a].t)); }).forEach(function (k) {
+      var r = reports[k], d = el('details', 'report' + (r.seen ? '' : ' fresh'));
+      var s = el('summary'); s.appendChild(el('span', 'rsub', r.subject));
+      s.appendChild(el('span', 'rmeta', r.from + ' · ' + when(r.t) + (r.misses ? ' · ' + r.misses + ' missed' : '')));
+      d.appendChild(s); d.appendChild(el('pre', 'rbody', r.body || '(empty report)'));
+      d.open = !!r.open;
+      d.addEventListener('toggle', function () { r.open = d.open; if (d.open && !r.seen) { r.seen = true; d.classList.remove('fresh'); rUnread = Math.max(0, rUnread - 1); badge(); } });
+      rList.appendChild(d);
+    });
+    badge();
+  }
+  function badge() { rBadge.hidden = !rUnread; rBadge.textContent = rUnread > 9 ? '9+' : String(rUnread); }
+
   function handle(m) {
     if (m.type === 'sos') {
       if (alerts[m.id]) return;
-      alerts[m.id] = { id: m.id, from: name(m.from), lat: num(m.lat), lon: num(m.lon), t: m.t, ackAt: null };
+      alerts[m.id] = { id: m.id, from: sender(m), lat: num(m.lat), lon: num(m.lon), t: m.t, ackAt: null };
       order.push(m.id);
+    } else if (m.type === 'report') { addReport(m); return;
     } else if (m.type === 'ack' && alerts[m.sosId]) {
       alerts[m.sosId].ackAt = m.t;
     } else return;
     render();
   }
 
-  window.JdaLink.history().forEach(handle);   // alerts sent before this page was opened
+  var loadedFor = null;
+  function roomKey() { var r = window.JdaLink.room; return r ? r.code : null; }
+  function loadHistory() {
+    loadedFor = roomKey();
+    if (!loadedFor) return;
+    loading = true; reports = {}; rOrder = []; rUnread = 0;
+    (window.JdaLink.history(200) || []).forEach(handle);   // alerts and reports sent before this page was opened
+    loading = false; rUnread = rOrder.length; renderReports();
+  }
   window.JdaLink.on(handle);
+  loadHistory();
+  setInterval(function () {   // room joined or changed after load: drop alerts of the old room, read the new one's history
+    if (roomKey() === loadedFor) return;
+    alerts = {}; order = []; loadHistory(); render();
+  }, 1000);
   render();
+
+  // chat with the crew (JdaChat, person to person; no automatic replies)
+  var chatBox = document.getElementById('chat');
+  function crewPeers() {
+    var out = [];
+    function add(id, nm) { id = String(id || ''); if (id && id !== 'earth' && id !== 'legacy' && !out.some(function (q) { return q.id === id; })) out.push({ id: id, name: nm || id }); }
+    try { if (!window.JdaLink.room) return out;
+      var w = window.JdaLink.getState && window.JdaLink.getState('world');   // crew known from the shared world, even when offline
+      if (w && w.value && w.value.crew) Object.keys(w.value.crew).forEach(function (k) { var r = w.value.crew[k]; if (r) add(r.id || k, r.name); });
+      (window.JdaLink.history(200) || []).forEach(function (m) {            // anyone seen in the room's history
+        var f = m && m.from; if (f && typeof f === 'object' && f.role !== 'earth' && f.role !== 'control' && f.role !== 'legacy') add(f.id, f.name);
+      });
+      (window.JdaLink.presence() || []).forEach(function (p) {
+      if (p && p.id && p.role !== 'earth' && p.role !== 'control' && p.role !== 'legacy' && !out.some(function (q) { return q.id === p.id; })) out.push({ id: p.id, name: p.name || p.id });
+    }); } catch (e) { /* no presence yet */ }
+    return out;
+  }
+  if (window.JdaChat && chatBox) {
+    var chat = window.JdaChat.mount(chatBox, { link: window.JdaLink, meId: 'earth', meName: 'Earth control', peers: crewPeers, allowEarth: false });
+    var chatBadge = document.getElementById('chat-badge'), base = document.title;
+    chat.onUnread(function (total) {
+      chatBadge.hidden = !total; chatBadge.textContent = total > 9 ? '9+' : String(total);
+      if (!total && !/SOS/.test(document.title)) document.title = 'Earth Mission Control';
+    });
+  }
 })();
 
 </script>

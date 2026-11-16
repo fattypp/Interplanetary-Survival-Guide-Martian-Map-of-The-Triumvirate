@@ -229,7 +229,7 @@
   var start = Atlas.me && isFinite(Atlas.me.x) ? { x: Atlas.me.x, y: Atlas.me.y } : { x: Atlas.W - 24, y: Atlas.H / 2 };
   ctx.home = { x: start.x, y: start.y };
 
-  var members = makeMembers(ctx);
+  var members = makeMembers(ctx), walkers = members;   // walkers: internal fallback crew, used only when JdaWorld has no data
   (function restore() {
     var saved = Atlas.store.get('team.state', null);
     if (!saved || saved.v !== 2 || !Array.isArray(saved.members)) return;
@@ -264,7 +264,7 @@
     members: function () {
       return members.map(function (m) {
         return { id: m.id, name: m.name, x: m.x, y: m.y, oxygenPct: m.tel.oxygenPct, batteryPct: m.tel.batteryPct, heartRate: m.tel.heartRate,
-          lastUpdate: m.tel.t, status: m.mode === 'return' ? 'returning to base' : 'on traverse', simulated: true };
+          lastUpdate: m.tel.t, status: m.mode === 'return' ? 'returning to base' : 'on traverse', simulated: !worldOn };
       });
     },
     open: function (id) { return openChat(id); }
@@ -273,32 +273,35 @@
   /* ---------- map layer ---------- */
   var layerG = Atlas.el('g', { id: 'layer-team', class: 'team-layer' });
   var markers = {};
-  members.forEach(function (m) {
+  function ensureMarker(m) {
+    if (markers[m.id]) return;
     var gg = Atlas.el('g', { class: 'team-mk', tabindex: '0', role: 'button' }, layerG);
     var k = Atlas.el('g', { class: 'k' }, gg);
     Atlas.el('circle', { r: 17, fill: 'transparent' }, k);
     Atlas.el('polygon', { points: '0,-11 10,0 0,11 -10,0', class: 'team-shape' }, k);
     Atlas.el('circle', { r: 2.6, fill: '#fff' }, k);
     var lab = Atlas.el('text', { x: 15, y: 5, class: 'team-lab' }, k);
-    lab.textContent = m.name + ' (sim)';
+    lab.textContent = m.name; gg._lab = lab;
     gg.addEventListener('click', function (e) { if (Atlas.pick && Atlas.pick.busy && Atlas.pick.busy()) return; e.stopPropagation(); selectMember(m.id, false); });
     gg.addEventListener('keydown', function (e) {
       if (Atlas.pick && Atlas.pick.busy && Atlas.pick.busy()) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectMember(m.id, false); }
     });
     markers[m.id] = gg;
-  });
+  }
+  members.forEach(ensureMarker);
   function placeMarkers() {
     members.forEach(function (m) {
-      var g = markers[m.id];
+      var g = markers[m.id]; if (!g) return;
+      if (g._lab && g._lab.textContent !== m.name) g._lab.textContent = m.name;
       g.setAttribute('transform', 'translate(' + m.x.toFixed(1) + ' ' + m.y.toFixed(1) + ')');
       var rel = relTo(m), fl = flags(vit(m));
-      g.setAttribute('aria-label', m.name + ', simulated crew-mate' + (rel ? ', ' + fmtDist(rel.m) + ' ' + rel.dir + ' of you' : '') +
+      g.setAttribute('aria-label', m.name + ', crew member' + (rel ? ', ' + fmtDist(rel.m) + ' ' + rel.dir + ' of you' : '') +
         (fl.length ? ', ' + fl.map(function (f) { return f.text; }).join(', ') : '') + '. Press Enter to show details.');
       g.setAttribute('class', 'team-mk' + (fl.length ? ' alert' : '') + (selected === m.id ? ' sel' : ''));
     });
   }
-  Atlas.registerLayer({ id: 'team', label: 'Team (simulated)', group: 'Crew', color: '#2fd0a0', node: layerG, on: true, count: members.length });
+  Atlas.registerLayer({ id: 'team', label: 'Team', group: 'Crew', color: '#2fd0a0', node: layerG, on: true, count: members.length });
 
   function vit(m) { return { oxygenPct: m.tel.oxygenPct, batteryPct: m.tel.batteryPct, heartRate: m.tel.heartRate }; }
 
@@ -307,6 +310,7 @@
   var unread = Atlas.store.get('team.unread', {});
   if (!unread || typeof unread !== 'object') unread = {};
   var lastFlagKeys = {};
+  var extraUnread = 0;   // unread real messages in conversations that are not a teammate card (All crew, Earth control)
 
   function panelEl() { return root && root.closest ? root.closest('.tabpanel') : null; }
   function tabVisible() { var p = panelEl(); return !!p && !p.hidden; }
@@ -325,11 +329,11 @@
     c.meta = h('p', { class: 'tm-meta' });
     c.badge = h('span', { class: 'tm-badge', hidden: true });
     c.focusBtn = h('button', { type: 'button', class: 'tm-focus', attrs: { 'aria-label': 'Show ' + m.name + ' on the map' }, onclick: function () { selectMember(m.id, false); } }, [
-      h('span', { class: 'tm-name', text: m.name }), h('span', { class: 'tm-sim', text: 'simulated crew' }), c.status
+      h('span', { class: 'tm-name', text: m.name }), c.status
     ]);
     c.chatBtn = h('button', { type: 'button', class: 'tm-chatbtn', attrs: { 'aria-label': 'Chat with ' + m.name } }, [h('span', { attrs: { 'aria-hidden': 'true' } }, [Atlas.icon('chat', 14)]), ' Chat', c.badge]);
     c.chatBtn.addEventListener('click', function () { openChat(m.id); });
-    c.el = h('article', { class: 'tm-card', attrs: { 'data-id': m.id, 'aria-label': m.name + ' (simulated crew-mate)' } },
+    c.el = h('article', { class: 'tm-card', attrs: { 'data-id': m.id, 'aria-label': m.name + ', crew member' } },
       [c.focusBtn, c.o2.row, c.bat.row, c.hr.row, c.meta, h('div', { class: 'tm-actions' }, c.chatBtn)]);
     return c;
   }
@@ -350,7 +354,7 @@
     setMeter(c.o2, v.oxygenPct, v.oxygenPct.toFixed(0) + ' %', by.oxygen);
     setMeter(c.bat, v.batteryPct, v.batteryPct.toFixed(0) + ' %', by.battery);
     setMeter(c.hr, (v.heartRate - 40) / 1.4, v.heartRate + ' bpm', by.heart);
-    c.status.textContent = m.mode === 'return' ? '↩ returning to base' : (m.moving ? '→ on traverse' : '• working');
+    c.status.textContent = m.mode === 'return' ? '↩ returning to base' : (m.moving ? '→ on traverse' : '• at base');
     var rel = relTo(m);
     c.meta.textContent = 'Updated ' + hms(new Date(m.tel.t)) + ' · ' + (rel ? fmtDist(rel.m) + ' ' + rel.dir + ' (' + Math.round(rel.deg) + '°) from you' : 'distance unknown (your position is not available)');
     var n = unread[m.id] || 0;
@@ -361,13 +365,13 @@
     var key = fl.map(function (f) { return f.key + f.level; }).join(',');
     if (key !== lastFlagKeys[m.id]) {
       var fresh = fl.filter(function (f) { return (lastFlagKeys[m.id] || '').indexOf(f.key + f.level) < 0; });
-      if (fresh.length && lastFlagKeys[m.id] !== undefined && liveEl) liveEl.textContent = m.name + ' (simulated): ' + fresh.map(function (f) { return f.text; }).join(', ') + '.';
+      if (fresh.length && lastFlagKeys[m.id] !== undefined && liveEl) liveEl.textContent = m.name + ': ' + fresh.map(function (f) { return f.text; }).join(', ') + '.';
       lastFlagKeys[m.id] = key;
     }
   }
   function renderAll() { members.forEach(renderCard); placeMarkers(); updateDockBadge(); }
 
-  function totalUnread() { return members.reduce(function (s, m) { return s + (unread[m.id] || 0); }, 0); }
+  function totalUnread() { return members.reduce(function (s, m) { return s + (unread[m.id] || 0); }, 0) + extraUnread; }
   // Only used for the unread badge (and the openTab fallback). The label changes with unread, so match by prefix.
   function dockBtn() { return document.querySelector('.dock-tab[aria-label^="Team tab"]'); }
   function updateDockBadge() {
@@ -404,74 +408,98 @@
     selectMember.t = setTimeout(function () { if (selected === id) { selected = null; renderAll(); } }, 4000);
   }
 
-  /* ---------- chat ---------- */
-  function renderMsg(msg, m) {
-    var mine = msg.from === 'me';
-    var who = mine ? 'You' : m.name;
-    var when = hm(new Date(msg.t));
-    var meta = h('div', { class: 'tm-mmeta' }, [who + ' · ' + when, !mine && msg.sim ? h('span', { class: 'tm-simtag', text: 'simulated reply' }) : null]);
-    return h('div', { class: 'tm-msg ' + (mine ? 'me' : 'them') }, [meta, h('p', { class: 'tm-mtext', text: msg.text })]);   // text only ever via textContent
+  /* ---------- chat: one real chat (JdaChat over a JdaLink room) ----------
+     Messages are person to person. This tab never answers on anybody's behalf: there are no automatic replies.
+     (replyFor() stays in Part 1 as pure logic with its tests, but the UI does not call it.) Without a joined room
+     the chat box only explains that a room is needed. */
+  var realChat = null, realHost = null, realCode = null, roomBtn = null, noRoomNote = null;
+  function roomJoined() { return !!(window.JdaLink && window.JdaLink.room && window.JdaChat); }
+  function realPeers() {
+    var me = window.JdaLink.room.id, list = members.filter(function (m) { return m.id !== me; }).map(function (m) { return { id: m.id, name: m.name }; });
+    try {
+      (window.JdaLink.presence() || []).forEach(function (p) {
+        if (p && p.id && p.role !== 'earth' && p.role !== 'control' && p.role !== 'legacy' && p.id !== me && !list.some(function (q) { return q.id === p.id; })) list.push({ id: p.id, name: p.name || p.id });
+      });
+    } catch (e) { /* no presence yet */ }
+    return list;
   }
-  function renderLog() {
-    var m = byId(chatId); if (!m) return;
-    while (logEl.firstChild) logEl.removeChild(logEl.firstChild);
-    var list = loadChat(Atlas.store, chatId);
-    if (!list.length) logEl.appendChild(h('p', { class: 'tm-empty', text: 'No messages yet. Replies from ' + m.name + ' are simulated.' }));
-    list.forEach(function (msg) { logEl.appendChild(renderMsg(msg, m)); });
-    logEl.scrollTop = logEl.scrollHeight;
+  function syncReal() {
+    if (roomBtn) roomBtn.hidden = !roomJoined();
+    if (!roomJoined()) return;
+    var room = window.JdaLink.room;
+    if (realChat && realCode === room.code + '|' + room.id) return;
+    if (realChat) { realChat.destroy(); realChat = null; }
+    realCode = room.code + '|' + room.id;
+    if (!realHost) realHost = h('div', { class: 'tm-real' });
+    realChat = window.JdaChat.mount(realHost, { link: window.JdaLink, meId: room.id, meName: room.name, peers: realPeers, allowEarth: true, initial: chatId || 'all' });
+    realChat.onUnread(function (total, by) {
+      var sum = 0;
+      members.forEach(function (m) { var n = by[m.id] || 0; sum += n; if ((unread[m.id] || 0) !== n) setUnread(m.id, n); });
+      extraUnread = Math.max(0, total - sum); updateDockBadge();
+    });
+    if (root) mountReal();
+  }
+  function mountReal() { if (realHost && chatBox && realHost.parentNode !== chatBox) chatBox.insertBefore(realHost, noRoomNote); if (noRoomNote) noRoomNote.hidden = !!realChat; }
+  function showChatBox(title) {
+    showTab(); syncReal();
+    chatBox.hidden = false; chatTitle.textContent = title; mountReal();
+    try { chatBox.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
   }
   function openChat(id) {
-    var m = byId(id); if (!m || !root) { if (m && !root) { showTab(); return openChat(id); } return false; }
-    chatId = id; showTab();
-    chatBox.hidden = false;
-    chatTitle.textContent = 'Chat with ' + m.name + ' (simulated)';
-    logEl.setAttribute('aria-label', 'Messages with ' + m.name);
-    inputEl.setAttribute('aria-label', 'Message to ' + m.name);
-    renderLog();
+    var m = byId(id); if (!m) return false;
+    if (!root) { showTab(); if (!root) return false; }
+    chatId = id; showChatBox('Chat with ' + m.name);
+    if (realChat) { realChat.select(id); realChat.markRead(); realChat.focus(); }
     if (unread[id]) setUnread(id, 0);
     Object.keys(cards).forEach(function (k) { cards[k].chatBtn.setAttribute('aria-expanded', k === id ? 'true' : 'false'); });
-    try { chatBox.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
-    inputEl.focus();
     return true;
+  }
+  function openRoomChat() {   // group / Earth conversations (not tied to a teammate card)
+    if (!root) { showTab(); if (!root) return; }
+    chatId = null; showChatBox('Room chat');
+    if (realChat) { realChat.select('all'); realChat.markRead(); realChat.focus(); }
+    Object.keys(cards).forEach(function (k) { cards[k].chatBtn.setAttribute('aria-expanded', 'false'); });
   }
   function closeChat() {
     var prev = chatId; chatId = null; chatBox.hidden = true;
     Object.keys(cards).forEach(function (k) { cards[k].chatBtn.setAttribute('aria-expanded', 'false'); });
     if (prev && cards[prev]) cards[prev].chatBtn.focus();
   }
-  function appendMsg(id, msg) {
-    var list = loadChat(Atlas.store, id); list.push(msg); saveChat(Atlas.store, id, list);
-    if (chatId === id) {
-      var m = byId(id), empty = logEl.querySelector('.tm-empty');
-      if (empty) logEl.removeChild(empty);
-      logEl.appendChild(renderMsg(msg, m)); logEl.scrollTop = logEl.scrollHeight;
+
+  /* ---------- crew list: the shared world (JdaWorld) when it has data, else the internal walkers ---------- */
+  var worldOn = false, wMembers = {};
+  function worldApi() { var W = window.JdaWorld; try { return W && W.world && W.world() && W.crew ? W : null; } catch (e) { return null; } }
+  function numOr(v, d) { v = Number(v); return isFinite(v) ? v : d; }
+  function reconcile(list) {
+    var same = list.length === members.length && list.every(function (m, i) { return members[i] === m; });
+    if (same) return;
+    members = list;
+    var keep = {}; list.forEach(function (m) { keep[m.id] = 1; });
+    Object.keys(markers).forEach(function (k) { if (!keep[k]) { if (markers[k].parentNode) markers[k].parentNode.removeChild(markers[k]); delete markers[k]; } });
+    list.forEach(ensureMarker);
+    if (root) {
+      Object.keys(cards).forEach(function (k) { if (!keep[k]) { if (cards[k].el.parentNode) cards[k].el.parentNode.removeChild(cards[k].el); delete cards[k]; } });
+      list.forEach(function (m) { if (!cards[m.id]) cards[m.id] = buildCard(m); listEl.appendChild(cards[m.id].el); });
+      if (chatId && !keep[chatId]) closeChat();
     }
+    renderAll();
   }
-  function sendMessage() {
-    var text = cleanText(inputEl.value);
-    if (!text || !chatId) { updateSend(); return false; }
-    var id = chatId, m = byId(id);
-    appendMsg(id, { t: Atlas.now().toISOString(), from: 'me', text: text, sim: false });
-    inputEl.value = ''; updateSend();
-    var delay = 1500 + rand(m) * 2500;   // real milliseconds, "typing" time
-    setTimeout(function () { simulatedReply(id, text); }, delay);
-    return true;
-  }
-  function simulatedReply(id, text) {
-    var m = byId(id); if (!m) return;
-    var rel = relTo(m);
-    var reply = replyFor(text, { name: m.name, oxygenPct: m.tel.oxygenPct, batteryPct: m.tel.batteryPct, heartRate: m.tel.heartRate,
-      mode: m.mode, distanceM: rel ? rel.m : null, dir: rel ? rel.dir : '' }, function () { return rand(m); });
-    appendMsg(id, { t: Atlas.now().toISOString(), from: id, text: reply, sim: true });
-    if (!(chatId === id && tabVisible())) {
-      setUnread(id, (unread[id] || 0) + 1);
-      Atlas.toast(m.name + ' (simulated): ' + reply.slice(0, 80), 'info');
-    }
-  }
-  function updateSend() {
-    var n = inputEl.value.length;
-    sendBtn.disabled = !cleanText(inputEl.value);
-    countEl.textContent = n + '/' + MAX_LEN;
+  function syncWorld() {
+    var W = worldApi();
+    if (!W) { worldOn = false; reconcile(walkers); return; }
+    worldOn = true;
+    var me = W.id(), when = W.time(), list = [];
+    W.crew().forEach(function (r) {
+      if (!r || !r.id || r.id === me) return;
+      var m = wMembers[r.id] || (wMembers[r.id] = { id: String(r.id), name: String(r.id), x: ctx.home.x, y: ctx.home.y });
+      m.name = String(r.name || r.id).replace(/\s+/g, ' ').trim().slice(0, 24) || m.id;
+      m.x = numOr(r.x, m.x); m.y = numOr(r.y, m.y);
+      m.mode = r.mode === 'returning' ? 'return' : 'explore'; m.moving = r.mode === 'walking' || r.mode === 'returning';
+      m.tel = { t: when.toISOString(), oxygenPct: Math.round(clamp(numOr(r.o2Pct, 0), 0, 100) * 10) / 10,
+        batteryPct: Math.round(clamp(numOr(r.batPct, 0), 0, 100) * 10) / 10, heartRate: Math.round(clamp(numOr(r.hr, 70), HR_MIN, HR_MAX)) };
+      list.push(m);
+    });
+    reconcile(list);
   }
 
   function render(container) {
@@ -480,25 +508,16 @@
     listEl = h('div', { class: 'tm-list' });
     members.forEach(function (m) { cards[m.id] = buildCard(m); listEl.appendChild(cards[m.id].el); });
     chatTitle = h('h3', { class: 'tm-ctitle', id: 'tm-ctitle' });
-    logEl = h('div', { class: 'tm-log', tabindex: '0', attrs: { role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' } });
-    inputEl = h('input', { type: 'text', id: 'tm-input', class: 'tm-input', maxlength: String(MAX_LEN), autocomplete: 'off' });
-    countEl = h('span', { class: 'tm-count', attrs: { 'aria-hidden': 'true' } });
-    sendBtn = h('button', { type: 'submit', class: 'tm-send', text: 'Send' });
-    var form = h('form', { class: 'tm-form' }, [
-      h('label', { class: 'tm-sr', attrs: { for: 'tm-input' }, text: 'Message' }),
-      h('div', { class: 'tm-inrow' }, [inputEl, sendBtn]), countEl
-    ]);
-    form.addEventListener('submit', function (e) { e.preventDefault(); sendMessage(); });
-    inputEl.addEventListener('input', updateSend);
+    noRoomNote = h('p', { class: 'tm-note', text: 'Join a room (room code) to chat with your crew and Earth control.' });
     chatBox = h('section', { class: 'tm-chat', hidden: true, attrs: { 'aria-labelledby': 'tm-ctitle' } }, [
       h('div', { class: 'tm-chead' }, [chatTitle, h('button', { type: 'button', class: 'tm-cx', attrs: { 'aria-label': 'Close chat' }, onclick: closeChat }, [Atlas.icon('close', 12)])]),
-      h('p', { class: 'tm-note', text: 'Simulated crew: replies are canned and made up by this app, not sent by a person.' }),
-      logEl, form
+      noRoomNote
     ]);
+    mountReal();
     chatBox.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); closeChat(); } });
-    root.appendChild(h('p', { class: 'tm-note', text: 'Simulated crew. There is no real team feed: positions, suit values and replies are generated. They walk at about 1 m/s and head back to base (your start point) when low on oxygen or battery. Values refresh about every 10 s.' }));
-    root.appendChild(liveEl); root.appendChild(listEl); root.appendChild(chatBox);
-    updateSend();
+    root.appendChild(h('p', { class: 'tm-note', text: 'Your teammates: position and suit values, updated about every second. Use Chat to talk to them.' }));
+    roomBtn = h('button', { type: 'button', class: 'tm-chatbtn tm-roombtn', hidden: !roomJoined(), text: 'Room chat: all crew, Earth control', onclick: openRoomChat });
+    root.appendChild(liveEl); root.appendChild(roomBtn); root.appendChild(listEl); root.appendChild(chatBox);
     renderAll();
   }
 
@@ -507,6 +526,9 @@
   /* ---------- simulation loop (driven by Atlas.clock) ---------- */
   var lastSim = Atlas.now().getTime(), ticks = 0;
   function tick() {
+    syncReal();
+    syncWorld();
+    if (worldOn) { lastSim = Atlas.now().getTime(); if (root) members.forEach(renderCard); placeMarkers(); return; }
     var nowD = Atlas.now(), now = nowD.getTime();
     var dt = (now - lastSim) / 1000; lastSim = now;
     if (!(dt > 0)) return;
@@ -516,7 +538,7 @@
       stepVitals(m, dt, ctx);
       if (m.resupplied) {
         if (m.tel) { /* shown at next packet */ }
-        Atlas.toast(m.name + ' (simulated) is back at base and resupplied', 'info');
+        Atlas.toast(m.name + ' is back at base and resupplied', 'info');
       }
       if (now >= m.nextTel) { snapshot(m, nowD); m.nextTel = now + 10000; }
     });
@@ -525,7 +547,7 @@
     if (++ticks % 5 === 0) save();
   }
   function save() {
-    Atlas.store.set('team.state', { v: 2, members: members.map(function (m) { return { id: m.id, x: m.x, y: m.y, o2: m.o2, bat: m.bat, hr: m.hr, rs: m.rs, heading: m.heading, mode: m.mode }; }) });
+    Atlas.store.set('team.state', { v: 2, members: walkers.map(function (m) { return { id: m.id, x: m.x, y: m.y, o2: m.o2, bat: m.bat, hr: m.hr, rs: m.rs, heading: m.heading, mode: m.mode }; }) });
   }
   setInterval(tick, 1000);
   window.addEventListener('beforeunload', save);
@@ -533,6 +555,7 @@
   Atlas.bus.on('me:moved', function () { if (meT) return; meT = setTimeout(function () { meT = null; if (root) members.forEach(renderCard); placeMarkers(); }, 1000); });
   Atlas.bus.on('tab:toggled', function (e) {
     if (e && e.id === 'team' && e.open && chatId && unread[chatId]) setUnread(chatId, 0);
+    if (e && e.id === 'team' && e.open && realChat) realChat.markRead();
     if (e && e.id === 'team') updateDockBadge();
   });
   placeMarkers();

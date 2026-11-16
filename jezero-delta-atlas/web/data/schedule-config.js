@@ -59,12 +59,12 @@ window.JEZERO_SCHEDULE_CONFIG = {
   urgentBoost: 2,          // ...this many extra importance points when ranking (0 to 4)
 
   /* ---- reminders and adaptation (the monitor) ---- */
-  checkEverySeconds: 30,           // how often (simulated seconds) the monitor looks at the schedule
+  checkEverySeconds: 30,           // how often (mission seconds) the monitor looks at the schedule
   remindAtStart: true,             // a small notice when a block starts
   reminderAfterEndMinutes: [0, 5], // escalating reminders this many minutes after a block should have ended without being ticked "done"
   graceMinutes: 10,                // minutes after the block end after which it counts as MISSED and the schedule is adapted
   staleAfterHours: 12,             // a saved schedule older than this is silently rebuilt on load (no misses counted)
 
-  /* ---- escalation (simulated link to Earth) ---- */
-  escalateAfterMisses: 3           // missed blocks before a report is put in the Earth outbox (1 to 20). Nothing is really sent.
+  /* ---- escalation (report to Earth) ---- */
+  escalateAfterMisses: 3           // missed blocks before a report is sent to Earth (1 to 20); queued until a room is joined.
 };

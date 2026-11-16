@@ -4,6 +4,33 @@
   'use strict';
   var A = window.Atlas, D = window.JEZERO_MISSION;
   if (!A || !D) { if (window.console) console.error('mission.js needs atlas-shell.js and data/mission-data.js'); return; }
+  /* ---------- mission clock: follows the shared world while an authority (control page) is live ----------
+     In a room, Atlas.now() is the world time (interpolated between updates at the world's clock speed); without one the page
+     keeps its own clock, and Atlas.clock.setSpeed works as before. Atlas.clock.live() tells which one is active. */
+  (function () {
+    var clk = A.clock; if (!clk || typeof clk.now !== 'function') return;
+    var origNow = clk.now, origSet = clk.setSpeed, base = null, realBase = 0, spd = 1, wasLive = false;
+    function live() { var W = window.JdaWorld; return !!(W && W.source === 'authority' && base !== null); }
+    window.JdaWorld && window.JdaWorld.on(function (w) {
+      if (window.JdaWorld.source !== 'authority' || !w || !isFinite(Date.parse(w.t))) return;
+      base = Date.parse(w.t); realBase = Date.now(); spd = Number(w.clockSpeed) > 0 ? Number(w.clockSpeed) : 1;
+      clk.speed = spd;
+    });
+    function worldDate() { return new Date(base + (Date.now() - realBase) * spd); }
+    function now() {
+      if (live()) { wasLive = true; return worldDate(); }
+      if (wasLive) {   // authority gone: carry on locally from the last world time and speed
+        wasLive = false;
+        var d = worldDate();
+        clk.now = function () { return d; }; origSet(spd); clk.now = now;   // origSet anchors at clock.now()
+      }
+      return origNow();
+    }
+    clk.live = live;
+    clk.now = now; A.now = now;
+    clk.setSpeed = function (n) { if (live()) return; origSet(n); };
+  })();
+
   var h = A.h, SRC = 'docs/mission-guide.md';
   var MAX_TITLE = 80, MAX_DESC = 500, MAX_CUSTOM = 200;
   var NS = 'http://www.w3.org/2000/svg';

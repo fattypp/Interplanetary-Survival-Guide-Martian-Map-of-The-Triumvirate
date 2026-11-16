@@ -1,0 +1,50 @@
+/* link-ui.css: room join dialog and status chip (js/link-ui.js). Self-contained dark panel that works on light and dark pages. */
+.lu-root{--lu-bg:#141a21;--lu-panel:#1b232d;--lu-line:#34424f;--lu-fg:#e8eef4;--lu-mute:#9aa8b6;--lu-accent:#5ec8d8;--lu-ok:#46b37a;--lu-bad:#ff7b80;--lu-font:system-ui,-apple-system,'Segoe UI',sans-serif;--lu-mono:ui-monospace,Menlo,Consolas,monospace;font-family:var(--lu-font)}
+.lu-root *{box-sizing:border-box}
+.lu-root [hidden]{display:none!important}
+
+.lu-back{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,9,12,.78)}
+.lu-dlg{width:min(420px,100%);max-height:100%;overflow:auto;background:var(--lu-panel);color:var(--lu-fg);border:1px solid var(--lu-line);border-radius:14px;padding:22px 22px 18px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+.lu-dlg h2{margin:0 0 6px;font-size:20px;line-height:1.25}
+.lu-dlg p{margin:0 0 14px;color:var(--lu-mute);font-size:14px;line-height:1.45}
+.lu-lbl{display:block;margin:14px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--lu-mute)}
+.lu-input{width:100%;height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--lu-line);background:var(--lu-bg);color:var(--lu-fg);font:600 18px var(--lu-mono);letter-spacing:.2em;text-transform:uppercase}
+.lu-input.lu-text{font:15px var(--lu-font);letter-spacing:0;text-transform:none}
+.lu-input::placeholder{color:#5f6e7c;letter-spacing:.1em}
+.lu-row{display:flex;gap:8px;flex-wrap:wrap}
+.lu-fs{border:0;margin:14px 0 0;padding:0;min-width:0}
+.lu-fs legend{padding:0;margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--lu-mute)}
+.lu-opt{position:relative}
+.lu-opt input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.lu-opt span{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--lu-line);color:var(--lu-fg);font-size:14px}
+.lu-opt input:checked+span{border-color:var(--lu-accent);background:rgba(94,200,216,.16);color:#fff;font-weight:600}
+.lu-opt input:focus-visible+span{outline:2px solid var(--lu-accent);outline-offset:2px}
+.lu-err{min-height:20px;margin:10px 0 0;font-size:13px;color:var(--lu-bad)}
+.lu-act{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.lu-btn{height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--lu-accent);background:transparent;color:var(--lu-accent);font:600 14px var(--lu-font);cursor:pointer}
+.lu-btn:hover{background:rgba(94,200,216,.14)}
+.lu-btn.lu-primary{background:var(--lu-accent);color:#08141a}
+.lu-btn.lu-primary:hover{background:#7fd6e3}
+.lu-btn.lu-quiet{border-color:var(--lu-line);color:var(--lu-fg)}
+.lu-root :focus-visible{outline:2px solid var(--lu-accent);outline-offset:2px}
+
+.lu-chip{position:fixed;z-index:99990;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:calc(100vw - 16px);font:12px var(--lu-mono);color:var(--lu-fg);pointer-events:none}
+.lu-chip>*{pointer-events:auto}
+.lu-chip[data-pos="top-right"]{right:8px;top:8px}
+.lu-chip[data-pos="top-left"]{left:8px;top:8px;align-items:flex-start}
+.lu-chip[data-pos="bottom-right"]{right:8px;bottom:8px;flex-direction:column-reverse}
+.lu-chip[data-pos="bottom-left"]{left:8px;bottom:8px;align-items:flex-start;flex-direction:column-reverse}
+.lu-chip[data-pos="inline"]{position:static;display:inline-flex;align-items:flex-start}
+.lu-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;background:rgba(20,26,33,.88);color:var(--lu-fg);border:1px solid var(--lu-line);font:11px var(--lu-mono);cursor:pointer;white-space:nowrap}
+.lu-pill:hover{border-color:var(--lu-accent)}
+.lu-panel{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:var(--lu-panel);border:1px solid var(--lu-line);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.lu-st{font-size:11px}
+.lu-code{font-weight:700;letter-spacing:.14em;color:#fff}
+.lu-dot{width:7px;height:7px;border-radius:50%;background:var(--lu-ok);flex:none}
+.lu-chip[data-status="local"] .lu-dot{background:#e0a23c}
+.lu-mute{color:var(--lu-mute)}
+.lu-cbtn{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--lu-line);background:transparent;color:var(--lu-fg);font:12px var(--lu-font);cursor:pointer}
+.lu-cbtn:hover{border-color:var(--lu-accent);color:var(--lu-accent)}
+.lu-live{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:600px){.lu-w{display:none}}
+@media(max-width:480px){.lu-dlg{padding:18px 16px 14px}}

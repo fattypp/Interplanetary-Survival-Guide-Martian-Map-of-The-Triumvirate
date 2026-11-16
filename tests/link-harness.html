@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JdaLink harness</title>
+<link rel="stylesheet" href="../jezero-delta-atlas/web/css/link-ui.css">
+<style>body{font:14px system-ui;background:#0f1318;color:#e6edf3;padding:16px}pre{white-space:pre-wrap}</style></head>
+<body><h1>JdaLink harness</h1><p>Manual two-tab check page: join the same room in two tabs, then use window.JdaLink from the console. Loads link.js, link-ui.js; add ?test=1 to run link.test.js, ?pre=1 to send/setState before mount (implicit room check).</p><pre id="log"></pre>
+<script src="../jezero-delta-atlas/web/data/link-config.js"></script>
+<script src="../jezero-delta-atlas/web/js/link.js"></script>
+<script src="../jezero-delta-atlas/web/js/link-ui.js"></script>
+<script>
+var log = document.getElementById('log');
+function add(s) { log.textContent += s + '\n'; }
+if (/[?&]test=1/.test(location.search)) {
+  var s = document.createElement('script'); s.src = 'link.test.js'; document.body.appendChild(s);
+  s.onload = function () { window.__linkTestDone.then(function (r) { add('RESULT ' + JSON.stringify(r)); }); };
+} else {
+  if (/[?&]pre=1/.test(location.search)) { JdaLink.on(function () { }); JdaLink.send({ type: 'chat', text: 'sent before mount' }); JdaLink.setState('early', { a: 1 }); }
+  JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'], onJoin: function (r) {
+    add('joined ' + r.code + ' as ' + r.id);
+    JdaLink.on(function (m) { add('msg ' + JSON.stringify(m)); });
+    JdaLink.onState('world', function (v, meta) { add('state world ' + JSON.stringify(v) + ' from ' + meta.from.id); });
+  } });
+}
+</script></body></html>

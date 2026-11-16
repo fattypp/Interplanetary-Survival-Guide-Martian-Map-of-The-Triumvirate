@@ -56,3 +56,14 @@
 .team-mk:focus-visible .team-lab{fill:#ffe9a0}
 @media (max-width:640px){.tm-log{height:150px}.tm-input{font-size:16px}}
 .tm-cx{display:inline-flex;align-items:center;justify-content:center}
+/* real chat (JdaChat) inside the team chat box */
+.tm-chat.real>.tm-note,.tm-chat.real>.tm-log,.tm-chat.real>.tm-form{display:none}
+.tm-roombtn{margin:0 0 10px}
+.tm-roombtn[hidden]{display:none}
+.tm-real{margin-top:4px}
+/* room status chip (link-ui) on the atlas: its panel opens beside the pill so it never covers the zoom tools; on phones the pill sits in the free second dock row */
+body .lu-chip[data-pos="top-right"] .lu-panel{position:absolute;right:calc(100% + 6px);top:0;width:210px}
+@media(max-width:640px){
+  body .lu-chip[data-pos="top-right"]{right:auto;left:8px;top:56px}
+  body .lu-chip[data-pos="top-right"] .lu-panel{right:auto;left:calc(100% + 6px)}
+}

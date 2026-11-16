@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Astronaut Helmet</title>
+<link rel="stylesheet" href="../css/helmet.css">
+<link rel="stylesheet" href="../css/link-ui.css">
+</head>
+<body>
+<main class="helmet" id="helmet" aria-label="Helmet display">
+  <div class="scene" id="scene" role="img" aria-label="View of the Martian surface through the helmet visor"></div>
+  <div class="fog" id="fog" aria-hidden="true"></div>
+  <div class="glass" aria-hidden="true"></div>
+  <div class="scan" aria-hidden="true"></div>
+
+  <section class="hud" aria-label="Heads-up display">
+    <div class="tl">
+      <div class="map" id="map" role="img" aria-label="Minimap">
+        <div class="map-img" id="mapImg"></div>
+        <div class="map-grid" aria-hidden="true"></div>
+        <div class="dot" id="dot"><i id="dotArrow"></i></div>
+        <span class="tag">MAP</span>
+      </div>
+      <dl class="reads">
+        <div><dt>TEMPERATURE</dt><dd id="temp">--</dd></div>
+        <div><dt>RADIATION</dt><dd id="rad">--</dd></div>
+      </dl>
+    </div>
+
+    <div class="tc"><span class="lbl">LMST</span> <time id="clock">--:--</time></div>
+
+    <div class="tr" role="group" aria-label="Life support">
+      <div class="bar" id="o2" role="meter" aria-label="Oxygen" aria-valuemin="0" aria-valuemax="100">
+        <div class="fill" id="o2Fill"></div><span class="blabel">OXYGEN</span><span class="pct" id="o2Pct">--</span>
+      </div>
+      <div class="bar" id="bat" role="meter" aria-label="Battery" aria-valuemin="0" aria-valuemax="100">
+        <div class="fill" id="batFill"></div><span class="blabel">BATTERY</span><span class="pct" id="batPct">--</span>
+      </div>
+    </div>
+
+    <div class="bl"><span class="lbl">COORDINATES</span> <span id="coords">--</span></div>
+    <div class="br"><span class="lbl">NEXT TASK</span><strong id="taskTitle">No task scheduled</strong><span id="taskWhen"></span></div>
+  </section>
+
+  <div class="alerts" id="alerts" aria-live="assertive" role="alert"></div>
+  <div class="toasts" id="toasts" aria-live="polite" role="status"></div>
+  <div class="frame" aria-hidden="true"></div>
+</main>
+<script src="../data/link-config.js"></script>
+<script src="../data/mission-data.js"></script>
+<script src="../data/science-layers-data.js"></script>
+<script src="../js/link.js"></script>
+<script src="../js/link-ui.js"></script>
+<script src="../js/sim-core.js"></script>
+<script src="../js/world-client.js"></script>
+<script src="../js/helmet.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
-/* Suit feature: simulated suit telemetry, radiation alerts, astronaut position (Atlas.me), personal stats, health check.
-   Contract: docs/ARCHITECTURE.md. EVERYTHING here is a labelled simulation: there is no real suit, radiation or vitals feed.
+/* Suit feature: suit telemetry, radiation alerts, astronaut position (Atlas.me), personal stats, health check.
+   Contract: docs/ARCHITECTURE.md. In a room, position and suit values come from the shared world (JdaWorld, driven by the control page);
+   the internal model below is only the fallback when no authority is live. Values are generated data (docs say so), flagged simulated:true in code.
    Structure: (1) SuitModel = pure functions (also exported for Node / browser tests), (2) UI + wiring, only when window.Atlas exists. */
 (function (root) {
   'use strict';
@@ -269,9 +270,35 @@
   var lastAlertReal = { radiation: 0, oxygen: 0, battery: 0 };
   var lastSim = Atlas.now().getTime();   // no catch-up for time while the page was closed
   var moveMode = false;
-  var tpArmed = false;           // 'Jump (demo)' armed: the next map click teleports instead of walking
-  var ui = null;                 // refs of the suit tab once rendered
+    var ui = null;                 // refs of the suit tab once rendered
   var pui = null;                // refs of the personal tab
+
+  /* ---- shared world: in a room the authority (control page) drives position and suit values ---- */
+  function worldRec() {
+    var W_ = root.JdaWorld;
+    if (!W_ || W_.source !== 'authority') return null;
+    var r = null;
+    try { r = W_.me(); } catch (e) { r = null; }
+    return r && isFinite(Number(r.x)) && isFinite(Number(r.y)) ? r : null;
+  }
+  var rec = null;                // current world record of this crew member, or null (fallback model)
+  var origLl = Atlas.ll;
+  // the map clamps an off-map position to its edge, but SOS and the position read-out must carry the true world coordinates
+  Atlas.ll = function (x, y) {
+    if (rec && x === Atlas.me.x && y === Atlas.me.y && isFinite(Number(rec.lat)) && isFinite(Number(rec.lon))) return [Number(rec.lon), Number(rec.lat)];
+    return origLl(x, y);
+  };
+  function applyWorld(r) {
+    var nx = clamp(Number(r.x), 0, W), ny = clamp(Number(r.y), 0, H);
+    var moved = nx !== Atlas.me.x || ny !== Atlas.me.y;
+    Atlas.me.x = nx; Atlas.me.y = ny;
+    S.oxygenPct = clamp(num(r.o2Pct, S.oxygenPct), 0, 100);
+    S.batteryPct = clamp(num(r.batPct, S.batteryPct), 0, 100);
+    S.doseMSv = Math.max(0, num(r.doseMsv, S.doseMSv));
+    radNow = isFinite(Number(r.radUsvH)) ? Math.max(0, Number(r.radUsvH)) : null;
+    return moved;
+  }
+  function worldActivity(r) { return r.mode === 'walking' || r.mode === 'returning' ? 'walking' : null; }
 
   function radiation() { return Atlas.radiation && typeof Atlas.radiation.at === 'function' ? Atlas.radiation : null; }
   function limits() { var r = radiation(); return r && r.limits ? r.limits : null; }
@@ -309,9 +336,9 @@
     var sev = kind === 'radiation' ? (t && v >= t.danger ? 'ABOVE' : 'close to') : (level === 'danger' ? 'critical' : 'low');
     if (kind === 'radiation') {
       var u = (radiation() && radiation().unit) || 'µSv/h';
-      return 'Radiation ' + sev + ' suit resistance: ' + v.toFixed(1) + ' ' + u + (t ? ' (limit ' + t.danger + ')' : '') + ' (simulated)';
+      return 'Radiation ' + sev + ' suit resistance: ' + v.toFixed(1) + ' ' + u + (t ? ' (limit ' + t.danger + ')' : '');
     }
-    return (kind === 'oxygen' ? 'Oxygen ' : 'Battery ') + sev + ': ' + Math.round(v) + '% (simulated)';
+    return (kind === 'oxygen' ? 'Oxygen ' : 'Battery ') + sev + ': ' + Math.round(v) + '%';
   }
   function evalAlerts(nowMs) {
     var vals = { radiation: radNow, oxygen: S.oxygenPct, battery: S.batteryPct };
@@ -328,17 +355,31 @@
         Atlas.bus.emit('suit:alert', { level: lvl === 'danger' ? 'danger' : 'caution', text: text, kind: k });
         Atlas.toast(text, lvl === 'danger' ? 'danger' : 'warn');
       } else if (lvl === 'nominal' && prev !== 'nominal') {
-        Atlas.toast((k === 'radiation' ? 'Radiation' : k === 'oxygen' ? 'Oxygen' : 'Battery') + ' back to normal (simulated)', 'info');
+        Atlas.toast((k === 'radiation' ? 'Radiation' : k === 'oxygen' ? 'Oxygen' : 'Battery') + ' back to normal', 'info');
         lastAlert[k] = -Infinity;
       }
     });
   }
 
-  /* ---- simulation tick ---- */
+  /* ---- tick (world values, or the internal fallback model) ---- */
   function tick() {
     var nowMs = Atlas.now().getTime();
     var dtMs = nowMs - lastSim; lastSim = nowMs;
     if (!isFinite(dtMs) || dtMs < 0) dtMs = 0;
+    var wasLive = !!rec;
+    rec = worldRec();
+    if (rec) {
+      walk = null;
+      activity = worldActivity(rec) || (working ? 'working' : pickActivity(nowMs));
+      var mv = applyWorld(rec);
+      if (mv) { Atlas.bus.emit('me:moved', { x: Atlas.me.x, y: Atlas.me.y }); }
+      drawMe();
+      evalAlerts(nowMs);
+      store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
+      refreshSuit(nowMs); refreshPersonal(nowMs);
+      return;
+    }
+    if (wasLive) { radNow = sample(); }
     var dtH = Math.min(dtMs / 3600000, C.MAX_DT_H);
     activity = pickActivity(nowMs);
     var n = Math.max(1, Math.min(48, Math.ceil(dtH * 60 / C.SUBSTEP_MIN)));
@@ -356,7 +397,7 @@
     }
     if (doneWalk) activity = pickActivity(nowMs);
     if (moved) { Atlas.bus.emit('me:moved', { x: Atlas.me.x, y: Atlas.me.y }); drawMe(); }
-    if (doneWalk) { Atlas.toast('You arrived (simulated position)', 'info'); drawMe(); }
+    if (doneWalk) { Atlas.toast('You arrived', 'info'); drawMe(); }
     evalAlerts(nowMs);
     store.set('suit.state', S);
     store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
@@ -371,7 +412,7 @@
       condition: condition(levels),
       radiationNow: radNow, radiationTotalmSv: S.doseMSv,
       suitRadiationLimit: t ? t.danger : null,
-      activity: activity, simulated: true
+      activity: activity, simulated: true, source: rec ? 'world' : 'local'
     };
   }
 
@@ -393,8 +434,13 @@
     x = Number(x); y = Number(y);
     if (!isFinite(x) || !isFinite(y)) return false;
     x = clamp(x, 0, W); y = clamp(y, 0, H);
-    if ((opt && opt.teleport) || tpArmed) {
-      tpArmed = false;
+    if (rec) {   // the shared world moves the crew member: send the walk to the authority
+      var pr = planRoute(Atlas.me, [x, y]), pts = pr.pts.slice(0, 40).map(function (q) { var g = origLl(q[0], q[1]); return { lat: g[1], lon: g[0] }; });
+      var res = root.JdaWorld.command({ cmd: 'walk', to: pts[0], path: pts.slice(1) });
+      Atlas.toast(res && res.ok ? 'Walking to the target (' + pr.note + ')' : 'Could not send the walk command', res && res.ok ? 'info' : 'warn');
+      return !!(res && res.ok);
+    }
+    if (opt && opt.teleport) {
       walk = null; Atlas.me.x = x; Atlas.me.y = y;
       Atlas.bus.emit('me:moved', { x: x, y: y }); drawMe(); tick(); return true;
     }
@@ -404,14 +450,16 @@
     Atlas.toast('Walking to the target at ' + C.WALK_MPS + ' m/s of mission time (' + p.note + ')', 'info');
     return true;
   }
-  function stop() { walk = null; drawMe(); }
+  function stop() { walk = null; if (rec && root.JdaWorld) root.JdaWorld.command({ cmd: 'stop' }); drawMe(); }
 
   Atlas.suit = {
     state: suitState,
     moveTo: moveTo,
     stop: stop,
     setWorking: function (b) { working = !!b; store.set('suit.working', working); },
-    resupply: function () { S = freshState(S.seed); levels.oxygen = levels.battery = 'nominal'; store.set('suit.state', S); refreshSuit(Atlas.now().getTime()); },
+    resupply: function () {
+      if (rec) { root.JdaWorld.command({ cmd: 'set', field: 'o2Pct', value: 100 }); root.JdaWorld.command({ cmd: 'set', field: 'batPct', value: 100 }); levels.oxygen = levels.battery = 'nominal'; return; }
+      S = freshState(S.seed); levels.oxygen = levels.battery = 'nominal'; store.set('suit.state', S); refreshSuit(Atlas.now().getTime()); },
     model: SuitModel
   };
 
@@ -421,19 +469,25 @@
     sc.activity = activity; sc.oxygenPct = S.oxygenPct;
     return sc;
   }
+  /* model vitals, with the heart rate taken from the world record while the authority is live */
+  function vitalsNow(nowMs, ctx, salt) {
+    var v = vitals(nowMs, ctx, salt);
+    if (rec && isFinite(Number(rec.hr))) v.heartRate = Math.round(Number(rec.hr));
+    return v;
+  }
   function healthRun() {
     var nowMs = Atlas.now().getTime();
-    var v = vitals(nowMs, context(nowMs), history.length + 1);
+    var v = vitalsNow(nowMs, context(nowMs), history.length + 1);
     var f = flags(v);
     var rec = {
       time: new Date(nowMs).toISOString(), heartRate: v.heartRate, spo2: v.spo2, temperatureC: v.temperatureC,
       fatigue: v.fatigue, hydration: v.hydration, sleepHours: v.sleepHours,
-      notes: f.length ? f.join('; ') : 'All values within normal range (simulated)', abnormal: f
+      notes: f.length ? f.join('; ') : 'All values within normal range', abnormal: f
     };
     history.push(rec); history = history.slice(-20);
     store.set('health.history', history);
     Atlas.bus.emit('health:done', rec);
-    Atlas.toast('Health check done (simulated): ' + (f.length ? f.length + ' value(s) to watch' : 'all normal'), f.length ? 'warn' : 'info');
+    Atlas.toast('Health check done: ' + (f.length ? f.length + ' value(s) to watch' : 'all normal'), f.length ? 'warn' : 'info');
     refreshPersonal(nowMs);
     return rec;
   }
@@ -469,19 +523,18 @@
     el('circle', { r: 4, fill: '#fff' }, meMark);
     var t = el('text', { x: 15, y: 5, fill: '#fff', stroke: '#000', 'stroke-width': 3, 'paint-order': 'stroke', 'font-size': 14, 'font-weight': 700 }, meMark);
     t.textContent = 'You';
-    var ti = el('title', {}, meMark); ti.textContent = 'You (simulated position)';
+    var ti = el('title', {}, meMark); ti.textContent = 'You';
   }
   drawMe();
-  Atlas.registerLayer({ id: 'me', label: 'You (simulated position)', group: 'Simulation', color: '#1b6fe0', node: meG, on: true });
+  Atlas.registerLayer({ id: 'me', label: 'You', group: 'Crew', color: '#1b6fe0', node: meG, on: true });
   // the layer checkbox works: it hides only the marker (Atlas.me and the tab keep running)
   Atlas.bus.on('layer:changed', function (e) { if (e && e.id === 'me' && ui) refreshSuit(Atlas.now().getTime()); });
 
   /* "Move here" / "Jump": exclusive map pick through the shell (Atlas.pick), so it cannot fire together with the planner or mission picks */
   function startPick(teleport) {
-    var label = teleport ? 'jump there (simulated demo)' : 'walk there (simulated)';
+    var label = 'walk there';
     Atlas.pick({ owner: 'suit', label: label }, function (ev) {
       if (!ev) return;
-      if (teleport) tpArmed = true;
       moveTo(ev.x, ev.y);
       if (ui) refreshSuit(Atlas.now().getTime());
     });
@@ -519,7 +572,7 @@
     // radiation meter with the caution / danger thresholds marked
     var rFill = h('div', { class: 'su-fill' });
     var tC = h('div', { class: 'su-tick c' }), tD = h('div', { class: 'su-tick d' });
-    var rTrack = h('div', { class: 'su-track su-rtrack', attrs: { role: 'meter', 'aria-label': 'Radiation now (simulated)', 'aria-valuemin': 0, 'aria-valuenow': 0 } }, [rFill, tC, tD]);
+    var rTrack = h('div', { class: 'su-track su-rtrack', attrs: { role: 'meter', 'aria-label': 'Radiation now', 'aria-valuemin': 0, 'aria-valuenow': 0 } }, [rFill, tC, tD]);
     var rVal = h('span', { class: 'su-val' }), rIc = h('span', { class: 'su-ic', attrs: { 'aria-hidden': 'true' } });
     var rLegend = h('div', { class: 'su-legend' });
     var rad = h('div', { class: 'su-g' }, [h('div', { class: 'su-gh' }, [h('span', { class: 'su-lbl', text: 'Radiation now' }), h('span', { class: 'su-gv' }, [rIc, rVal])]), rTrack, rLegend]);
@@ -528,18 +581,16 @@
     var sDose = stat('Accumulated dose'), sRem = stat('Hours remaining'), sAct = stat('Activity'), sPos = stat('Position');
     var moveBtn = h('button', { type: 'button', class: 'su-btn primary', text: 'Move here (pick a point on the map)', attrs: { 'aria-pressed': 'false' }, onclick: function () { if (moveMode) Atlas.pick.cancel('suit'); else startPick(false); } });
     var stopBtn = h('button', { type: 'button', class: 'su-btn', text: 'Stop', onclick: function () { stop(); } });
-    var tpBtn = h('button', { type: 'button', class: 'su-btn', text: 'Jump to a point (demo)', attrs: { title: 'Teleports to the next point you click on the map instead of walking' },
-      onclick: function () { startPick(true); } });
     var workCb = h('input', { type: 'checkbox', checked: working, onchange: function () { Atlas.suit.setWorking(workCb.checked); tick(); } });
-    var resupply = h('button', { type: 'button', class: 'su-btn', text: 'Resupply oxygen and battery (simulated)', onclick: function () { Atlas.suit.resupply(); Atlas.toast('Suit resupplied (simulated)', 'info'); } });
-    var note = h('p', { class: 'su-note', text: 'Simulated telemetry: there is no real suit feed. Values follow the mission clock (speed x' + Atlas.clock.speed + ') and your activity.' });
+    var resupply = h('button', { type: 'button', class: 'su-btn', text: 'Resupply oxygen and battery', hidden: true, onclick: function () { Atlas.suit.resupply(); Atlas.toast('Resupply requested', 'info'); } });
+    var note = h('p', { class: 'su-note' });
     var walkInfo = h('p', { class: 'su-note su-walk' });
     var startNote = h('p', { class: 'su-note su-start' }), markerNote = h('p', { class: 'su-note su-marker' });
     box.appendChild(h('div', { class: 'su-wrap' }, [banner, cond, gO.row, gB.row, rad, stats,
       h('div', { class: 'su-row' }, [moveBtn, stopBtn]), h('div', { class: 'su-row' }, [h('label', { class: 'su-chk' }, [workCb, ' I am working (uses more oxygen and battery)'])]),
-      walkInfo, startNote, markerNote, h('div', { class: 'su-row' }, [tpBtn, resupply]), note]));
+      walkInfo, startNote, markerNote, h('div', { class: 'su-row' }, [resupply]), note]));
     ui = { banner: banner, cond: cond, gO: gO, gB: gB, rFill: rFill, rTrack: rTrack, tC: tC, tD: tD, rVal: rVal, rIc: rIc, rLegend: rLegend, rad: rad,
-      sDose: sDose, sRem: sRem, sAct: sAct, sPos: sPos, moveBtn: moveBtn, walkInfo: walkInfo, startNote: startNote, markerNote: markerNote, workCb: workCb, note: note };
+      sDose: sDose, sRem: sRem, sAct: sAct, sPos: sPos, moveBtn: moveBtn, walkInfo: walkInfo, startNote: startNote, markerNote: markerNote, workCb: workCb, note: note, resupply: resupply };
     refreshSuit(Atlas.now().getTime());
   }
 
@@ -559,7 +610,7 @@
     setGauge(ui.gB, S.batteryPct, levels.battery);
     var c = condition(levels);
     ui.cond.className = 'su-cond ' + (c === 'critical' ? 'bad' : c === 'caution' ? 'warn' : 'ok');
-    ui.cond.lastChild.textContent = 'Suit condition: ' + WORD[c] + ' (simulated)';
+    ui.cond.lastChild.textContent = 'Suit condition: ' + WORD[c];
     ui.cond.firstChild.textContent = ICON[c];
     var t = radThresholds(limits()), u = (radiation() && radiation().unit) || 'µSv/h';
     if (radNow === null || !t) {
@@ -578,16 +629,18 @@
       ui.rIc.textContent = ICON[lv];
       ui.rTrack.setAttribute('aria-valuemax', max.toFixed(1)); ui.rTrack.setAttribute('aria-valuenow', radNow.toFixed(1));
       ui.rTrack.setAttribute('aria-valuetext', ui.rVal.textContent);
-      ui.rLegend.textContent = 'Caution at ' + t.caution.toFixed(1) + ', suit resistance (danger) at ' + t.danger.toFixed(1) + ' ' + u + ' (simulated)';
+      ui.rLegend.textContent = 'Caution at ' + t.caution.toFixed(1) + ', suit resistance (danger) at ' + t.danger.toFixed(1) + ' ' + u;
     }
-    ui.sDose.textContent = S.doseMSv.toFixed(3) + ' mSv (simulated)';
+    ui.resupply.hidden = !rec;   // resupply is a real command to the shared world: only offered while one is live
+    ui.note.textContent = rec ? 'Values come from the shared mission state of your room.' : 'No shared mission state: values follow the mission clock (speed x' + Atlas.clock.speed + ') and your activity.';
+    ui.sDose.textContent = S.doseMSv.toFixed(3) + ' mSv';
     var rem = hoursRemaining(S, activity);
     ui.sRem.textContent = rem.hours < 0.05 ? 'Depleted (' + rem.limiting + ')' : rem.hours.toFixed(1) + ' h, limited by ' + rem.limiting + ' at "' + activity + '"';
     ui.sAct.textContent = activity + (walk ? ' (' + walk.note + ')' : '');
     var ll = Atlas.ll(Atlas.me.x, Atlas.me.y);
     ui.sPos.textContent = ll[1].toFixed(4) + '°N, ' + ll[0].toFixed(4) + '°E';
     // banner: persistent worst state
-    var worst = 'nominal', msg = 'All suit systems nominal (simulated).';
+    var worst = 'nominal', msg = 'All suit systems nominal.';
     ['radiation', 'oxygen', 'battery'].forEach(function (k) {
       if (RANK[levels[k]] > RANK[worst]) {
         worst = levels[k];
@@ -603,7 +656,7 @@
     var L = Atlas.landing;
     if (atStart && L && !L.onMap) {
       var km = Math.hypot(L.x - START.x, L.y - START.y) * MPP / 1000;
-      ui.startNote.textContent = 'Start position: nearest map edge to the landing site, which lies about ' + km.toFixed(1) + ' km east of this map (simulated).';
+      ui.startNote.textContent = 'Start position: nearest map edge to the landing site, which lies about ' + km.toFixed(1) + ' km east of this map.';
     } else ui.startNote.textContent = '';
     ui.markerNote.textContent = Atlas.layers.isOn('me') ? '' : 'Your marker is hidden on the map (layer "You" is off). Your position is still tracked.';
     if (walk) {
@@ -632,10 +685,10 @@
     var hist = h('ol', { class: 'pe-hist', attrs: { 'aria-label': 'Health check history' } });
     var runBtn = h('button', { type: 'button', class: 'su-btn primary', text: 'Run health check now', onclick: function () { healthRun(); } });
     box.appendChild(h('div', { class: 'su-wrap' }, [
-      h('h3', { class: 'su-h', text: 'Now (simulated)' }), grid, src,
+      h('h3', { class: 'su-h', text: 'Now' }), grid, src,
       h('h3', { class: 'su-h', text: 'Last health check' }), lastBody, h('div', { class: 'su-row' }, [runBtn]),
       h('h3', { class: 'su-h', text: 'Heart rate history' }), spark, hist,
-      h('p', { class: 'su-note', text: 'Simulated vitals: not medical data. ' + (Atlas.health.enabled ? 'The planner schedules a health check every ' + Atlas.health.intervalHours + ' h (planner config).' : 'Scheduled health checks are switched off in the planner config; use the button.') })
+      h('p', { class: 'su-note', text: (Atlas.health.enabled ? 'The planner schedules a health check every ' + Atlas.health.intervalHours + ' h (planner config).' : 'Scheduled health checks are switched off in the planner config; use the button.') })
     ]));
     pui = { vals: vals, src: src, lastBody: lastBody, spark: spark, hist: hist };
     refreshPersonal(Atlas.now().getTime());
@@ -664,7 +717,7 @@
 
   function refreshPersonal(nowMs) {
     if (!pui) return;
-    var ctx = context(nowMs), v = vitals(nowMs, ctx, 0), f = flags(v);
+    var ctx = context(nowMs), v = vitalsNow(nowMs, ctx, 0), f = flags(v);
     function put(k, text, bad, why) {
       var o = pui.vals[k]; o.v.textContent = text; o.f.textContent = bad ? '▲ ' + why : '● normal';
       o.c.classList.toggle('abn', !!bad);
@@ -675,13 +728,13 @@
     put('fat', v.fatigue.toFixed(1) + ' / 10', v.fatigue >= 7, 'high');
     put('hyd', v.hydration + ' %', v.hydration < 60, 'low');
     put('sleep', v.sleepHours.toFixed(1) + ' h', v.sleepHours < 6, 'short');
-    pui.src.textContent = 'Simulated vitals for activity "' + activity + '"; sleep and meals ' + (ctx.source === 'schedule' ? 'derived from your planner schedule.' : 'follow a plausible daily rhythm (no schedule yet).');
+    pui.src.textContent = 'Vitals for activity "' + activity + '"; sleep and meals ' + (ctx.source === 'schedule' ? 'derived from your planner schedule.' : 'follow a plausible daily rhythm (no schedule yet).');
     var last = Atlas.health.last(), b = pui.lastBody;
     while (b.firstChild) b.removeChild(b.firstChild);
     if (!last) b.appendChild(h('p', { class: 'su-note', text: 'No health check yet. Run one below.' }));
     else {
       var ago = SuitModel.fmtAgo(nowMs - Date.parse(last.time));
-      b.appendChild(h('div', { class: 'pe-lh' }, [h('strong', { text: ago }), h('span', { text: ' · ' + fmtTime(last.time) + ' local (simulated)' })]));
+      b.appendChild(h('div', { class: 'pe-lh' }, [h('strong', { text: ago }), h('span', { text: ' · ' + fmtTime(last.time) + ' local' })]));
       b.appendChild(h('ul', { class: 'pe-lv' }, [
         h('li', { text: 'Heart rate ' + last.heartRate + ' bpm' }), h('li', { text: 'SpO2 ' + last.spo2 + ' %' }),
         h('li', { text: 'Body temp ' + last.temperatureC + ' °C' }), h('li', { text: 'Fatigue ' + last.fatigue + ' / 10' }),

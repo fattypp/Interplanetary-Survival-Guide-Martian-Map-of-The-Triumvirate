@@ -154,13 +154,15 @@ def local_file(ref, kind):
     return p
 
 
-PAGES = {"index.html": DIST, "earth.html": DIST.parent / "earth-control.html"}
+PAGE_NAMES = {"index.html": "jezero-delta-atlas.html", "earth.html": "earth-control.html", "helmet.html": "astronaut-helmet.html",
+              "tablet.html": "astronaut-tablet.html", "control.html": "simulation-control.html"}
 
 
 def bundle(out=None):
-    """Build every single-file page. --out only redirects the main atlas page (for dry runs)."""
-    for page, dest in PAGES.items():
-        bundle_page(page, Path(out) if out and page == "index.html" else dest)
+    """Build a single-file dist page for every web/html/*.html. --out only redirects the main atlas page (for dry runs)."""
+    for src in sorted((WEB / "html").glob("*.html")):
+        dest = DIST.parent / PAGE_NAMES.get(src.name, src.name)
+        bundle_page(src.name, Path(out) if out and src.name == "index.html" else dest)
 
 
 def bundle_page(page, out):
@@ -177,7 +179,12 @@ def bundle_page(page, out):
     html = re.sub(r'<link\s+rel="stylesheet"\s+href="(\.\./[^"]+)"\s*/?>', css_sub, html)
     html = re.sub(r'<script\s+src="(\.\./[^"]+)"\s*>\s*</script>', js_sub, html)
     html = re.sub(r'src="\.\./images/([^"]+)"', lambda m: f'src="{data_uri(local_file("../images/" + m.group(1), "image"))}"', html)
-    left = re.findall(r'(?:href|src)="\.\./[^"]*"', html)
+    # images referenced from inlined CSS (url(../images/x)) or from inlined JS string literals ('../images/x')
+    def img_sub(m):
+        return m.group(1) + data_uri(local_file("../images/" + m.group(2), "image")) + m.group(3)
+    html = re.sub(r"(url\(\s*['\"]?)\.\./images/([^)'\"\s]+)(['\"]?\s*\))", img_sub, html)
+    html = re.sub(r"(['\"])\.\./images/([^'\"\s]+)(['\"])", img_sub, html)
+    left = re.findall(r'(?:href|src)="\.\./[^"]*"', html) + re.findall(r"\.\./images/[\w.-]+", html)
     if left:
         raise SystemExit(f"bundle failed: unresolved local references left in the page: {left}")
     out.parent.mkdir(parents=True, exist_ok=True)

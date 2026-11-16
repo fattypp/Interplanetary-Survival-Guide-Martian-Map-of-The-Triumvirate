@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="../css/layers-science.css">
 <link rel="stylesheet" href="../css/suit.css">
 <link rel="stylesheet" href="../css/team.css">
+<link rel="stylesheet" href="../css/link-ui.css">
+<link rel="stylesheet" href="../css/chat-ui.css">
 </head>
 <body>
 <h1 class="sr-only">Jezero Delta Atlas</h1>
@@ -41,6 +43,10 @@
 <script src="../js/atlas-map.js"></script>
 <script src="../data/link-config.js"></script>
 <script src="../js/link.js"></script>
+<script src="../js/link-ui.js"></script>
+<script src="../js/sim-core.js"></script>
+<script src="../js/world-client.js"></script>
+<script src="../js/chat-ui.js"></script>
 <script src="../js/atlas-shell.js"></script>
 <script src="../js/schedule-engine.js"></script>
 <script src="../js/mission.js"></script>
@@ -48,5 +54,6 @@
 <script src="../js/layers-science.js"></script>
 <script src="../js/suit.js"></script>
 <script src="../js/team.js"></script>
+<script>if (window.JdaLinkUI) JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'] });</script>
 </body>
 </html>
