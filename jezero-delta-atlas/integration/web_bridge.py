@@ -150,13 +150,21 @@ def local_file(ref, kind):
     """Resolve a '../css/x.css' style reference from web/html/index.html; fail loudly if it is missing."""
     p = (WEB / "html" / ref).resolve()
     if not p.is_file():
-        raise SystemExit(f"bundle failed: {kind} {ref!r} referenced in web/html/index.html does not exist ({p})")
+        raise SystemExit(f"bundle failed: {kind} {ref!r} referenced in a web/html page does not exist ({p})")
     return p
 
 
+PAGES = {"index.html": DIST, "earth.html": DIST.parent / "earth-control.html"}
+
+
 def bundle(out=None):
-    out = Path(out) if out else DIST
-    html = (WEB / "html" / "index.html").read_text(encoding="utf-8")
+    """Build every single-file page. --out only redirects the main atlas page (for dry runs)."""
+    for page, dest in PAGES.items():
+        bundle_page(page, Path(out) if out and page == "index.html" else dest)
+
+
+def bundle_page(page, out):
+    html = (WEB / "html" / page).read_text(encoding="utf-8")
 
     def css_sub(m):
         return "<style>\n" + local_file(m.group(1), "stylesheet").read_text(encoding="utf-8") + "\n</style>"

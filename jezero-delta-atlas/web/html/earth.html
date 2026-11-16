@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Earth Mission Control</title>
+<link rel="stylesheet" href="../css/earth.css">
+</head>
+<body>
+<header class="eh">
+  <div>
+    <h1>Earth Mission Control</h1>
+    <p class="sub">Interplanetary Survival Guide · Jezero Delta · <strong>simulation, no real signals</strong></p>
+  </div>
+  <div class="conn" id="conn" role="status"></div>
+</header>
+<main>
+  <section id="banner" class="banner" role="alert" hidden></section>
+  <h2 class="sec">Incoming alerts</h2>
+  <p id="empty" class="empty">No alerts. Waiting for the Mars base page to send one (open it in another tab, press SOS).</p>
+  <ul id="alerts" class="alerts" aria-live="polite"></ul>
+</main>
+<script src="../data/link-config.js"></script>
+<script src="../js/link.js"></script>
+<script src="../js/earth.js"></script>
+</body>
+</html>

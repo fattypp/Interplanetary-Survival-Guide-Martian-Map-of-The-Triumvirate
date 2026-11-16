@@ -343,13 +343,17 @@
   }
 
   /* ---------- SOS ---------- */
-  var sosBack, sosPrev;
+  var sosBack, sosPrev, sosSent = {};
   function sosPayload() {
     var ll = Atlas.ll(Atlas.me.x, Atlas.me.y);
     return { time: Atlas.now().toISOString(), x: Atlas.me.x, y: Atlas.me.y, lat: ll[1], lon: ll[0] };
   }
+  function callsign() {
+    var v = sosBack ? sosBack.querySelector('.sos-name').value.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
+    return v || 'Crew member';
+  }
   function focusables() {
-    return Array.prototype.slice.call(sosBack.querySelectorAll('button:not([disabled])'));
+    return Array.prototype.slice.call(sosBack.querySelectorAll('button:not([disabled]),input'));
   }
   function closeSos() {
     sosBack.hidden = true;
@@ -369,18 +373,22 @@
     var p = sosPayload();
     sosPrev = document.activeElement;
     sosBack.querySelector('.sos-pos').textContent = 'Your position (simulated): ' + p.lat.toFixed(4) + '°N, ' + p.lon.toFixed(4) + '°E';
+    sosBack.querySelector('.sos-name').value = String(store.get('me.callsign', '') || '');
     sosBack.hidden = false;
     document.addEventListener('keydown', sosKey, true);
     sosBack.querySelector('.sos-cancel').focus();   // safe default: Cancel
   }
   function sendSos() {
     var p = sosPayload();
+    p.from = callsign(); store.set('me.callsign', p.from);
     var log = store.get('sos.log', []); if (!Array.isArray(log)) log = [];
     log.push(p); store.set('sos.log', log.slice(-50));
     bus.emit('sos:send', p);
+    var sent = window.JdaLink ? window.JdaLink.send({ type: 'sos', from: p.from, lat: p.lat, lon: p.lon, simTime: p.time }) : null;
+    if (sent) { sosSent[sent.id] = 1; }
     sosPrev = sosBtn;
     closeSos();
-    Atlas.toast('SOS sent to Earth (simulated)', 'danger');
+    Atlas.toast('SOS sent to Earth control (simulated)', 'danger');
   }
   function buildSos() {
     sosBtn = h('button', { type: 'button', class: 'sos-btn', text: 'SOS', attrs: { 'aria-label': 'SOS emergency button, opens a confirmation', 'aria-haspopup': 'dialog' }, onclick: openSos });
@@ -389,6 +397,9 @@
         h('h2', { id: 'sos-t', text: 'Send SOS?' }),
         h('p', { id: 'sos-d', text: 'This sends an emergency call with your position to Earth. This is a simulation: nothing real is transmitted.' }),
         h('p', { class: 'sos-pos' }),
+        h('label', { class: 'sos-lbl', attrs: { for: 'sos-name' }, text: 'Your name or callsign' }),
+        h('input', { id: 'sos-name', class: 'sos-name', type: 'text', attrs: { maxlength: 24, list: 'sos-names', autocomplete: 'off', placeholder: 'Crew member' } }),
+        h('datalist', { id: 'sos-names' }, [h('option', { value: 'Jayesh' }), h('option', { value: 'Juhyeok' })]),
         h('div', { class: 'sos-act' }, [
           h('button', { type: 'button', class: 'sos-cancel', text: 'Cancel', onclick: closeSos }),
           h('button', { type: 'button', class: 'sos-go', text: 'Send SOS', onclick: sendSos })
@@ -398,6 +409,11 @@
     sosBack.addEventListener('mousedown', function (e) { if (e.target === sosBack) closeSos(); });
     document.body.appendChild(sosBack);
   }
+
+  // Earth control acknowledges an SOS this page sent
+  if (window.JdaLink) window.JdaLink.on(function (m) {
+    if (m.type === 'ack' && sosSent[m.sosId]) Atlas.toast('Earth control acknowledged your SOS (simulated)', 'info');
+  });
 
   /* ---------- mount ---------- */
   buildSos();

@@ -67,6 +67,9 @@
 .sos-dlg h2{margin:0 0 8px;font:700 22px var(--font-d);color:var(--danger);letter-spacing:.06em}
 .sos-dlg p{margin:0 0 6px;color:var(--fg)}
 .sos-dlg .sos-pos{font:400 16px var(--font-m);color:var(--mute);margin-bottom:18px}
+.sos-lbl{display:block;font:700 12px var(--font-d);letter-spacing:.08em;color:var(--mute);margin-bottom:4px}
+.sos-name{width:100%;height:42px;margin-bottom:18px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font:400 18px var(--font-m)}
+.sos-name:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sos-act{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .sos-act button{height:44px;padding:0 22px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;font:700 14px var(--font-d)}
 .sos-act .sos-go{background:var(--danger);border-color:var(--danger);color:#fff}

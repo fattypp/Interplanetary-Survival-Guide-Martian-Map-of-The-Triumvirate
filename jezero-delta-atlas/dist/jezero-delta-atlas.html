@@ -150,6 +150,9 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .sos-dlg h2{margin:0 0 8px;font:700 22px var(--font-d);color:var(--danger);letter-spacing:.06em}
 .sos-dlg p{margin:0 0 6px;color:var(--fg)}
 .sos-dlg .sos-pos{font:400 16px var(--font-m);color:var(--mute);margin-bottom:18px}
+.sos-lbl{display:block;font:700 12px var(--font-d);letter-spacing:.08em;color:var(--mute);margin-bottom:4px}
+.sos-name{width:100%;height:42px;margin-bottom:18px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font:400 18px var(--font-m)}
+.sos-name:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sos-act{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .sos-act button{height:44px;padding:0 22px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;font:700 14px var(--font-d)}
 .sos-act .sos-go{background:var(--danger);border-color:var(--danger);color:#fff}
@@ -1496,6 +1499,70 @@ window.AtlasMapCore=core;
 
 </script>
 <script>
+/* Optional online link between the Mars base page and the Earth control page.
+   Leave empty to use the same-browser link (two tabs of one browser). See docs/LINK.md. */
+window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
+
+</script>
+<script>
+/* link.js: message link between the Mars base page and the Earth control page. Exposes window.JdaLink.
+   Mode "same-browser": BroadcastChannel + localStorage, works between tabs of one browser.
+   Mode "online": the same messages are also POSTed to / polled from a Supabase table (see docs/LINK.md).
+   Messages are plain JSON, {id, t, type, ...}. Everything received is treated as untrusted data. */
+(function () {
+  'use strict';
+  var KEY = 'jda.link.msg', LOG = 'jda.link.log', POLL_MS = 3000;
+  var cfg = window.JDA_LINK || {};
+  var online = !!(cfg.url && cfg.key);
+  var subs = [], seen = {}, bc = null;
+
+  function deliver(m) {
+    if (!m || typeof m !== 'object' || typeof m.id !== 'string' || typeof m.type !== 'string' || seen[m.id]) return;
+    seen[m.id] = 1;
+    subs.slice().forEach(function (fn) { try { fn(m); } catch (e) { if (window.console) console.error('JdaLink handler failed', e); } });
+  }
+  function readLog() {
+    try { var a = JSON.parse(localStorage.getItem(LOG) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function appendLog(m) {
+    try { var a = readLog(); a.push(m); localStorage.setItem(LOG, JSON.stringify(a.slice(-100))); } catch (e) { /* ignore */ }
+  }
+
+  try { if (window.BroadcastChannel) { bc = new BroadcastChannel('jda-link'); bc.onmessage = function (e) { deliver(e.data); }; } } catch (e) { bc = null; }
+  window.addEventListener('storage', function (e) {
+    if (e.key !== KEY || !e.newValue) return;
+    try { deliver(JSON.parse(e.newValue)); } catch (err) { /* ignore corrupt */ }
+  });
+
+  function remoteUrl(q) { return cfg.url.replace(/\/+$/, '') + '/rest/v1/' + encodeURIComponent(cfg.table || 'link_messages') + (q || ''); }
+  function remoteHeaders() { return { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }; }
+  function poll() {
+    fetch(remoteUrl('?select=payload&order=created_at.desc&limit=30'), { headers: remoteHeaders() })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (rows) { rows.reverse().forEach(function (row) { appendLog(row.payload); deliver(row.payload); }); })
+      .catch(function (e) { if (window.console) console.warn('JdaLink online poll failed', e); });
+  }
+  if (online) { poll(); setInterval(poll, POLL_MS); }
+
+  window.JdaLink = {
+    mode: online ? 'online' : 'same-browser',
+    on: function (fn) { subs.push(fn); },
+    history: readLog,
+    send: function (msg) {
+      var m = Object.assign({}, msg, { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), t: new Date().toISOString() });
+      seen[m.id] = 1;
+      appendLog(m);
+      try { if (bc) bc.postMessage(m); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) { /* ignore */ }
+      if (online) fetch(remoteUrl(), { method: 'POST', headers: remoteHeaders(), body: JSON.stringify({ id: m.id, payload: m }) })
+        .catch(function (e) { if (window.console) console.warn('JdaLink online send failed', e); });
+      return m;
+    }
+  };
+})();
+
+</script>
+<script>
 /* Atlas shell: builds window.Atlas (contract in docs/ARCHITECTURE.md).
    Loaded after atlas-map.js (window.AtlasMapCore) and before every feature script.
    Provides: core helpers, store, bus, clock, toast, tabs + dock, layer selector, SOS button and dialog. */
@@ -1841,13 +1908,17 @@ window.AtlasMapCore=core;
   }
 
   /* ---------- SOS ---------- */
-  var sosBack, sosPrev;
+  var sosBack, sosPrev, sosSent = {};
   function sosPayload() {
     var ll = Atlas.ll(Atlas.me.x, Atlas.me.y);
     return { time: Atlas.now().toISOString(), x: Atlas.me.x, y: Atlas.me.y, lat: ll[1], lon: ll[0] };
   }
+  function callsign() {
+    var v = sosBack ? sosBack.querySelector('.sos-name').value.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
+    return v || 'Crew member';
+  }
   function focusables() {
-    return Array.prototype.slice.call(sosBack.querySelectorAll('button:not([disabled])'));
+    return Array.prototype.slice.call(sosBack.querySelectorAll('button:not([disabled]),input'));
   }
   function closeSos() {
     sosBack.hidden = true;
@@ -1867,18 +1938,22 @@ window.AtlasMapCore=core;
     var p = sosPayload();
     sosPrev = document.activeElement;
     sosBack.querySelector('.sos-pos').textContent = 'Your position (simulated): ' + p.lat.toFixed(4) + '°N, ' + p.lon.toFixed(4) + '°E';
+    sosBack.querySelector('.sos-name').value = String(store.get('me.callsign', '') || '');
     sosBack.hidden = false;
     document.addEventListener('keydown', sosKey, true);
     sosBack.querySelector('.sos-cancel').focus();   // safe default: Cancel
   }
   function sendSos() {
     var p = sosPayload();
+    p.from = callsign(); store.set('me.callsign', p.from);
     var log = store.get('sos.log', []); if (!Array.isArray(log)) log = [];
     log.push(p); store.set('sos.log', log.slice(-50));
     bus.emit('sos:send', p);
+    var sent = window.JdaLink ? window.JdaLink.send({ type: 'sos', from: p.from, lat: p.lat, lon: p.lon, simTime: p.time }) : null;
+    if (sent) { sosSent[sent.id] = 1; }
     sosPrev = sosBtn;
     closeSos();
-    Atlas.toast('SOS sent to Earth (simulated)', 'danger');
+    Atlas.toast('SOS sent to Earth control (simulated)', 'danger');
   }
   function buildSos() {
     sosBtn = h('button', { type: 'button', class: 'sos-btn', text: 'SOS', attrs: { 'aria-label': 'SOS emergency button, opens a confirmation', 'aria-haspopup': 'dialog' }, onclick: openSos });
@@ -1887,6 +1962,9 @@ window.AtlasMapCore=core;
         h('h2', { id: 'sos-t', text: 'Send SOS?' }),
         h('p', { id: 'sos-d', text: 'This sends an emergency call with your position to Earth. This is a simulation: nothing real is transmitted.' }),
         h('p', { class: 'sos-pos' }),
+        h('label', { class: 'sos-lbl', attrs: { for: 'sos-name' }, text: 'Your name or callsign' }),
+        h('input', { id: 'sos-name', class: 'sos-name', type: 'text', attrs: { maxlength: 24, list: 'sos-names', autocomplete: 'off', placeholder: 'Crew member' } }),
+        h('datalist', { id: 'sos-names' }, [h('option', { value: 'Jayesh' }), h('option', { value: 'Juhyeok' })]),
         h('div', { class: 'sos-act' }, [
           h('button', { type: 'button', class: 'sos-cancel', text: 'Cancel', onclick: closeSos }),
           h('button', { type: 'button', class: 'sos-go', text: 'Send SOS', onclick: sendSos })
@@ -1896,6 +1974,11 @@ window.AtlasMapCore=core;
     sosBack.addEventListener('mousedown', function (e) { if (e.target === sosBack) closeSos(); });
     document.body.appendChild(sosBack);
   }
+
+  // Earth control acknowledges an SOS this page sent
+  if (window.JdaLink) window.JdaLink.on(function (m) {
+    if (m.type === 'ack' && sosSent[m.sosId]) Atlas.toast('Earth control acknowledged your SOS (simulated)', 'info');
+  });
 
   /* ---------- mount ---------- */
   buildSos();
