@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Astronaut Tablet</title>
+<link rel="stylesheet" href="../css/tablet.css">
+<link rel="stylesheet" href="../css/link-ui.css">
+<link rel="stylesheet" href="../css/chat-ui.css">
+</head>
+<body>
+<main class="stage">
+  <div class="tablet" id="tablet">
+    <button type="button" class="side side-l" id="btn-mission" aria-label="Mission panel: press to open or close, hold to peek" aria-controls="pop" aria-expanded="false" title="Mission panel (press, or hold to peek)"><span class="side-cap" aria-hidden="true">MISSION</span></button>
+    <button type="button" class="side side-r" id="btn-sos" aria-label="SOS emergency call: opens a confirmation" aria-haspopup="dialog" title="SOS"><span class="side-cap" aria-hidden="true">SOS</span></button>
+
+    <div class="screen" id="screen">
+      <div class="map" id="map" tabindex="0" role="application" aria-label="Mars map with the five stops. Drag to pan, scroll or pinch to zoom, arrow keys pan, plus and minus zoom.">
+        <canvas id="cv" aria-hidden="true"></canvas>
+        <div class="pins" id="pins"></div>
+      </div>
+
+      <div class="tl" id="tl">
+      <button type="button" class="mbox" id="mbox" aria-haspopup="dialog" aria-controls="pop">
+        <span class="mbox-t">MISSION</span>
+        <span class="bar" id="bar" role="progressbar" aria-label="Mission progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span class="bar-fill" id="bar-fill"></span>
+          <span class="bar-txt" id="bar-txt">MISSION PROGRESS</span>
+        </span>
+      </button>
+        <div class="tl-row">
+        <button type="button" class="chatbtn" id="btn-chat" aria-haspopup="dialog" aria-controls="chat" aria-expanded="false" aria-label="Chat">Chat <span class="cbadge" id="chat-badge" hidden>0</span></button>
+        <button type="button" class="chatbtn" id="btn-route" aria-haspopup="dialog" aria-controls="route" aria-expanded="false">Route</button>
+        </div>
+      </div>
+
+      <div class="zoom" role="group" aria-label="Map view">
+        <button type="button" id="z-in" aria-label="Zoom in">+</button>
+        <button type="button" id="z-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="v-global">Global</button>
+        <button type="button" id="v-jezero">Jezero</button>
+        <button type="button" id="v-me">Me</button>
+      </div>
+
+      <div class="coords" id="coords" aria-live="off"><span class="coords-k">Present coordinates:</span> <span id="coords-v">--</span></div>
+
+      <div class="br">
+        <button type="button" class="addbtn" id="btn-add" aria-expanded="false" aria-controls="addpanel">Add Location</button>
+        <p class="dist"><span id="dist-k">Distance from chosen location:</span> <b id="dist-v">choose a pin</b>
+          <button type="button" class="unit" id="unit" aria-label="Switch distance unit">km</button></p>
+      </div>
+
+      <section class="addpanel" id="addpanel" hidden aria-labelledby="add-h">
+        <h2 id="add-h">Add location</h2>
+        <p class="hint">Click the map to place it, or enter the coordinates.</p>
+        <label>Name <input id="add-name" type="text" maxlength="40" autocomplete="off"></label>
+        <div class="row2">
+          <label>Latitude <input id="add-lat" type="text" inputmode="decimal" autocomplete="off" placeholder="18.4446"></label>
+          <label>Longitude (E) <input id="add-lon" type="text" inputmode="decimal" autocomplete="off" placeholder="77.4509"></label>
+        </div>
+        <p class="err" id="add-err" role="alert"></p>
+        <div class="acts">
+          <button type="button" id="add-me">My position</button>
+          <button type="button" id="add-cancel">Cancel</button>
+          <button type="button" class="primary" id="add-save">Save</button>
+        </div>
+      </section>
+
+      <section class="pop" id="pop" hidden role="dialog" aria-modal="false" aria-labelledby="pop-h">
+        <header class="pop-hd" id="pop-hd">
+          <h2 id="pop-h">Mission tasks</h2>
+          <span class="pop-cnt" id="pop-cnt"></span>
+          <span class="pop-tools">
+            <button type="button" id="dock-l" class="dock" aria-label="Dock panel left">Left</button>
+            <button type="button" id="dock-r" class="dock" aria-label="Dock panel right">Right</button>
+            <button type="button" id="pop-x" aria-label="Close mission panel (Escape)">Close</button>
+          </span>
+        </header>
+        <div class="pop-view" role="group" aria-label="Group tasks by">
+          <span>Group by</span>
+          <button type="button" id="grp-stop" aria-pressed="true">Stop</button>
+          <button type="button" id="grp-objective" aria-pressed="false">Objective</button>
+        </div>
+        <div class="pop-obj" id="pop-obj"><span id="obj-txt">Objective: not chosen</span> <button type="button" id="obj-change">Choose</button></div>
+        <div class="pop-detail" id="pop-detail" hidden></div>
+        <div class="pop-list" id="pop-list"></div>
+        <form class="pop-add" id="pop-add">
+          <input id="task-new" type="text" maxlength="80" placeholder="Add my own task" aria-label="New task title" autocomplete="off">
+          <label class="chk-inline"><input type="checkbox" id="task-loc"> at chosen location</label>
+          <button type="submit">Add</button>
+        </form>
+      </section>
+
+      <section class="pop chat" id="chat" hidden role="dialog" aria-modal="false" aria-labelledby="chat-h">
+        <header class="pop-hd" id="chat-hd">
+          <h2 id="chat-h">Chat</h2>
+          <span class="pop-cnt" id="chat-cnt"></span>
+          <span class="pop-tools">
+            <button type="button" id="cdock-l" class="dock" aria-label="Dock chat left">Left</button>
+            <button type="button" id="cdock-r" class="dock" aria-label="Dock chat right">Right</button>
+            <button type="button" id="chat-x" aria-label="Close chat (Escape)">Close</button>
+          </span>
+        </header>
+        <div class="chat-body" id="chat-body"><p class="hint" style="margin:12px">Join a room to chat with the crew and Earth control.</p></div>
+      </section>
+
+      <section class="pop route" id="route" hidden role="dialog" aria-modal="false" aria-labelledby="route-h">
+        <header class="pop-hd" id="route-hd">
+          <h2 id="route-h">Safe route</h2>
+          <span class="pop-cnt" id="route-cnt"></span>
+          <span class="pop-tools">
+            <button type="button" id="rdock-l" class="dock" aria-label="Dock route panel left">Left</button>
+            <button type="button" id="rdock-r" class="dock" aria-label="Dock route panel right">Right</button>
+            <button type="button" id="route-x" aria-label="Close route panel (Escape)">Close</button>
+          </span>
+        </header>
+        <div class="route-body" id="route-body"></div>
+      </section>
+
+      <div class="modal" id="obj-back" hidden>
+        <div class="dlg obj-dlg" role="dialog" aria-modal="true" aria-labelledby="obj-t" aria-describedby="obj-d">
+          <h2 id="obj-t">Choose your objective</h2>
+          <p id="obj-d">Which objective will you fulfil on this mission? The task list, progress and next task follow your choice. You can change it later from the mission panel.</p>
+          <div class="obj-opts" role="radiogroup" aria-labelledby="obj-t" id="obj-opts"></div>
+          <div class="acts">
+            <button type="button" id="obj-cancel">Cancel</button>
+            <button type="button" class="primary" id="obj-ok">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="sos-back" hidden>
+        <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="sos-t" aria-describedby="sos-d">
+          <h2 id="sos-t">Send SOS to Earth?</h2>
+          <p id="sos-d">This sends an emergency call with your present position to Earth mission control.</p>
+          <p class="sos-pos" id="sos-pos"></p>
+          <div class="acts">
+            <button type="button" id="sos-cancel">Cancel</button>
+            <button type="button" class="danger" id="sos-go">Send SOS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+</main>
+<script src="../data/link-config.js"></script>
+<script src="../js/link.js"></script>
+<script src="../js/link-ui.js"></script>
+<script src="../js/chat-ui.js"></script>
+<script src="../data/travel-speeds.js"></script>
+<script src="../js/sim-core.js"></script>
+<script src="../js/world-client.js"></script>
+<script src="../data/mission-data.js"></script>
+<script src="../data/craters-data.js"></script>
+<script src="../data/science-layers-data.js"></script>
+<script src="../data/stop-images.js"></script>
+<script src="../data/mars-sites.js"></script>
+<script src="../js/route-planner.js"></script>
+<script src="../js/mission-route.js"></script>
+<script src="../js/objective.js"></script>
+<script src="../js/tablet.js"></script>
+</body>
+</html>

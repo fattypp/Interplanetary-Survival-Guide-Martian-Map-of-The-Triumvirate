@@ -33,7 +33,7 @@ Times are 24-hour `"HH:MM"` strings. Durations are in minutes unless the key say
 
 Priority when fixed blocks collide: sleep, then meals, then health, then recreation. A later one slides to the next free slot.
 
-## Work (your goals and the mission objectives)
+## Work (your goals and the 10 mission tasks)
 
 | Key | Default | Meaning | Safe range |
 |---|---|---|---|
@@ -41,8 +41,8 @@ Priority when fixed blocks collide: sleep, then meals, then health, then recreat
 | `work.breakMinutes` | `10` | Rest left after a block when the same job continues. | 0 to 60 |
 | `work.minPieceMinutes` | `15` | A job is not squeezed into a gap shorter than this (except its last remainder). | 5 to 60 |
 | `work.defaultTaskMinutes` | `30` | Used when a task has no valid estimate (also the default in the form). | 5 to 480 |
-| `work.missionObjectiveMinutes` | `60` | Time given to each mission objective. | 5 to 480 |
-| `work.missionObjectiveImportance` | `3` | Importance (1 to 5) given to mission objectives. | 1 to 5 |
+| `work.missionObjectiveMinutes` | `60` | Time given to a mission task that has no estimate of its own (the 10 mission tasks from `JEZERO_MISSION.tasks` all carry `estMin`, 20 to 60 min). | 5 to 480 |
+| `work.missionObjectiveImportance` | `3` | Importance (1 to 5) given to mission tasks. Mission tasks are placed in stop order (task-1-1, task-1-2, task-2-1 ...). | 1 to 5 |
 | `urgentWithinHours` | `24` | A task due within this many hours gets the urgency boost when ranking. | 0 to 720 |
 | `urgentBoost` | `2` | Extra importance points for urgent tasks. 0 = rank by importance only. | 0 to 4 |
 
@@ -62,7 +62,7 @@ and listed under "Could not schedule" with the reason.
 | `staleAfterHours` | `12` | A saved schedule older than this is rebuilt when the page loads. Before that, task, objective and health blocks that expired while the page was closed count as misses (at most `escalateAfterMisses` are counted per load), the schedule is adapted, and the normal Earth rule applies. | 1 to 336 |
 | `escalateAfterMisses` | `3` | Missed blocks before a report is put in the Earth outbox. The counter then restarts. | 1 to 20 |
 
-Only tasks, mission objectives and health checks are watched for misses. Sleep, meals and recreation are never "missed" or moved.
+Only tasks, mission tasks and health checks are watched for misses. Sleep, meals and recreation are never "missed" or moved.
 The Earth link is **simulated**: the report is only stored in this browser (outbox in the Planner tab). Nothing is transmitted.
 
 ## Testing reminders quickly

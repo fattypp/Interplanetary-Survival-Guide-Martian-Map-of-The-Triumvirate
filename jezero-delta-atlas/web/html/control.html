@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulation Control</title>
+<link rel="stylesheet" href="../css/link-ui.css">
+<link rel="stylesheet" href="../css/control.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to controls</a>
+<header class="ch">
+  <div class="ch-title">
+    <h1>Simulation control</h1>
+    <p class="sub">Operator tool. This page drives the crew simulation for every page in the room; keep it open (and in the foreground) while the others are in use.</p>
+  </div>
+  <dl class="ch-stats" aria-label="Session">
+    <div><dt>Room</dt><dd id="roomCode">none</dd></div>
+    <div><dt>Link</dt><dd id="linkStatus">not joined</dd></div>
+    <div><dt>Mission time</dt><dd id="missionTime">-</dd></div>
+    <div><dt>Local time (Mars)</dt><dd id="localTime">-</dd></div>
+    <div><dt>Clock</dt><dd id="clockNow">x1</dd></div>
+  </dl>
+</header>
+
+<section id="authBanner" class="banner" role="status" hidden>
+  <p id="authText"></p>
+  <button type="button" id="takeOver" class="btn primary">Take over</button>
+</section>
+<p id="pubStatus" class="pubstatus" role="status"></p>
+
+<main id="main">
+  <section class="panel hero" aria-labelledby="h-demo">
+    <h2 id="h-demo">Quick action</h2>
+    <div class="hero-row">
+      <label class="field">Crew member
+        <select id="heroCrew"></select>
+      </label>
+      <button type="button" id="runMission" class="btn big primary">Run mission</button>
+      <label class="check"><input type="checkbox" id="optOrder"> Optimize stop order</label>
+      <p class="hint" id="moveHint">Drives the selected crew member by rover from base camp to each of the five stops in order; at each stop the crew goes out on foot for the stop's tasks, then back in the rover, and finally back to base camp. The rover follows the safe route (around craters and high radiation; it re-plans when a solar or dust event is switched). With the option on, the stops are visited in the order with the lowest hazard-weighted cost instead of the guide order. Raises the clock to x600 if it is slower.</p>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-global">
+    <h2 id="h-global">Clock and events</h2>
+    <div class="row">
+      <div class="group" role="group" aria-label="Clock speed">
+        <span class="lbl">Clock speed</span>
+        <div class="seg" id="clockBtns"></div>
+      </div>
+      <div class="group">
+        <span class="lbl">Events</span>
+        <label class="check"><input type="checkbox" id="evSolar"> Solar particle event (radiation x2.5)</label>
+        <label class="check"><input type="checkbox" id="evDust"> Dust storm (smaller day/night temperature swing)</label>
+      </div>
+      <div class="group">
+        <span class="lbl">Session</span>
+        <button type="button" id="resetBtn" class="btn danger">Reset simulation</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-crew">
+    <div class="panel-head">
+      <h2 id="h-crew">Crew</h2>
+      <form id="addForm" class="addform" autocomplete="off">
+        <label class="field inline">Name <input id="addName" maxlength="24" placeholder="New crew member"></label>
+        <button type="submit" class="btn">Add crew</button>
+      </form>
+    </div>
+    <div id="cards" class="cards"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-table">
+    <h2 id="h-table">World (live)</h2>
+    <div class="tablewrap" tabindex="0" role="region" aria-label="Live world table, scrolls sideways on small screens">
+      <table id="worldTable">
+        <caption class="sr">Live values for every crew member</caption>
+        <thead><tr>
+          <th scope="col">Crew</th><th scope="col">Mode</th><th scope="col">Travel</th><th scope="col">Stop / task</th><th scope="col">Tasks</th><th scope="col">Lat</th><th scope="col">Lon</th><th scope="col">Map x,y</th>
+          <th scope="col">Speed m/s</th><th scope="col">Head</th><th scope="col">O2 %</th><th scope="col">Bat %</th><th scope="col">HR</th>
+          <th scope="col">Suit C</th><th scope="col">Amb C</th><th scope="col">Rad uSv/h</th><th scope="col">Dose mSv</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-links">
+    <h2 id="h-links">Links to the other pages</h2>
+    <p class="hint" id="linksHint">Open these on other devices on the same network (use the relay server address, not localhost, on another device). Each link carries the room code.</p>
+    <ul id="links" class="links"></ul>
+  </section>
+
+  <section class="panel" aria-labelledby="h-log">
+    <h2 id="h-log">Activity</h2>
+    <ol id="log" class="log" aria-live="polite"></ol>
+  </section>
+</main>
+
+<script src="../data/link-config.js"></script>
+<script src="../js/link.js"></script>
+<script src="../js/link-ui.js"></script>
+<script src="../data/craters-data.js"></script>
+<script src="../data/science-layers-data.js"></script>
+<script src="../data/mission-data.js"></script>
+<script src="../data/travel-speeds.js"></script>
+<script src="../js/route-planner.js"></script>
+<script src="../js/mission-route.js"></script>
+<script src="../js/sim-core.js"></script>
+<script src="../js/control.js"></script>
+</body>
+</html>

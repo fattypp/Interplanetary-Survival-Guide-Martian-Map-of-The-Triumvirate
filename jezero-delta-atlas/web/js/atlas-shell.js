@@ -107,17 +107,16 @@
     W: core.W, H: core.H,
     ll: core.ll, xy: core.xy, el: core.el, h: h, icon: icon,
     setInfo: core.setInfo,   // also opens the Map tab through core.onInfo (set below)
-    focus: core.focus,
+    focus: core.focus, focusAt: core.focusAt, view: core.view, setViewPad: core.setPad, onView: core.onView,   // focusAt(x,y,zoom,screenX,screenY); view() -> {k,x,y,w,h}; onView(fn) after every pan/zoom
     mapData: core.mapData, store: store, bus: bus, clock: clock, now: clock.now
   };
 
-  // The landing site lies just east of this map (see the note in atlas-map.js), so for the start position of the
-  // user we take the nearest point on the map, 24 px inside the edge. Atlas.landing keeps the true page point.
-  Atlas.landing = { x: core.landing[0], y: core.landing[1], onMap: core.landing[0] >= 0 && core.landing[0] <= core.W && core.landing[1] >= 0 && core.landing[1] <= core.H };
-  Atlas.me = {
-    x: Math.min(core.W - 24, Math.max(24, core.landing[0])),
-    y: Math.min(core.H - 24, Math.max(24, core.landing[1]))
-  };
+  // Base camp (start and end of the drive, from data/mission-data.js) replaces the old landing site. It lies inside the map, so
+  // Atlas.me starts exactly there (no clamping). Atlas.landing is kept as an alias of the base camp point for older code.
+  var BASE = core.mapData.base;
+  Atlas.base = { id: BASE.id, name: BASE.name, x: BASE.x, y: BASE.y };
+  Atlas.landing = { x: BASE.x, y: BASE.y, onMap: true };
+  Atlas.me = { x: BASE.x, y: BASE.y };
 
   /* map clicks that were not drags */
   var clickFns = [];
@@ -146,7 +145,7 @@
     core.map.classList.toggle('picking', !!o);
     if (pickBar) {
       pickBar.hidden = !o;
-      if (o) pickBar.querySelector('.pk-t').textContent = 'Click the map: ' + (activePick.label || o) + ' (Esc cancels)';
+      if (o) pickBar.querySelector('.pk-t').textContent = 'Click the map: ' + (activePick.label || o) + ' (keyboard: pan with arrows, Enter picks the centre; Esc cancels)';
     }
     bus.emit('pick:changed', { owner: o });
   }
@@ -178,6 +177,9 @@
   Atlas.toast = function (text, level) {
     var t = h('div', { class: 'toast ' + (level === 'warn' || level === 'danger' ? level : 'info'), text: String(text) });
     if (level === 'danger') t.setAttribute('role', 'alert');
+    var last = toasts.lastChild;
+    if (last && last.textContent === t.textContent) return;                       // same message twice in a row: show it once
+    while (toasts.childNodes.length >= 4) toasts.removeChild(toasts.firstChild);   // fast clock or many alerts: never a wall of toasts
     toasts.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, level === 'danger' ? 7000 : 4500);
   };
@@ -187,7 +189,7 @@
   var panelsEl = h('div', { id: 'panels', class: 'ui' });
   var tabs = {};                                  // id -> {def, btn, panel, body, rendered}
   var openState = store.get('tabs.open', null);   // {id: bool}; null on the very first visit
-  var firstVisit = openState === null;
+  var firstVisit = openState === null || typeof openState !== 'object' || Array.isArray(openState);   // missing or corrupt saved value: start fresh
   if (firstVisit) openState = {};
   var phone = window.matchMedia ? window.matchMedia('(max-width:640px)') : { matches: false };
 
@@ -239,7 +241,7 @@
       ]),
       body
     ]);
-    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented) { setOpen(def.id, false); btn.focus(); } });
+    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented && !activePick) { setOpen(def.id, false); btn.focus(); } });   // during a map pick, Esc only cancels the pick
     var btn = h('button', { type: 'button', class: 'dock-tab', attrs: { 'aria-pressed': 'false', 'aria-label': def.title + ' tab' }, onclick: function () { openTab(def.id); } }, [
       h('span', { class: 'ic', attrs: { 'aria-hidden': 'true' } }, [icon(def.icon, 18) || (def.icon || '')]),
       h('span', { class: 'tt', text: def.title })
@@ -247,18 +249,29 @@
     tabs[def.id] = { def: def, btn: btn, panel: panel, body: body, rendered: false };
     layoutDock();
     var want = Object.prototype.hasOwnProperty.call(openState, def.id) ? openState[def.id] : (firstVisit && def.id === 'map' && !phone.matches);
+    if (want && phone.matches && Object.keys(tabs).some(function (k) { return k !== def.id && !tabs[k].panel.hidden; })) want = false;   // phone: one panel at a time, also for a saved desktop layout
     if (want) setOpen(def.id, true);
   };
+  function phoneOnePanel() {   // the window became phone-sized: keep a single open panel
+    var first = null;
+    Object.keys(tabs).forEach(function (k) {
+      if (tabs[k].panel.hidden) return;
+      if (first === null) first = k; else setOpen(k, false);
+    });
+  }
+  if (phone.addEventListener) phone.addEventListener('change', function (e) { if (e.matches) phoneOnePanel(); });
+  else if (phone.addListener) phone.addListener(function (e) { if (e.matches) phoneOnePanel(); });
 
   /* ---------- layers ---------- */
   var layerStore = store.get('layers', {});       // {id: {on, opacity}}
+  if (!layerStore || typeof layerStore !== 'object' || Array.isArray(layerStore)) layerStore = {};   // corrupt saved value
   var layers = {};                                // id -> {def, raster, cb, op}
   var groupOrder = [];
   var stage = core.stage, ov = document.getElementById('ov');
   var lsMenu, lsBody;
 
   function saveLayers() {
-    var o = store.get('layers', {}); if (!o || typeof o !== 'object') o = {};
+    var o = store.get('layers', {}); if (!o || typeof o !== 'object' || Array.isArray(o)) o = {};
     Object.keys(layers).forEach(function (id) { o[id] = { on: layers[id].on, opacity: layers[id].opacity }; });
     store.set('layers', o);
   }
@@ -266,17 +279,18 @@
     var node = L.raster ? L.def.canvas : L.def.node;
     if (node) node.style.display = L.on ? '' : 'none';
     if (L.raster && node) node.style.opacity = L.opacity;
-    if (L.cb) L.cb.checked = L.on;
+    if (L.cb) { L.cb.checked = L.on; if (L.def.locked) L.cb.disabled = true; }
     if (L.slider) { L.slider.value = Math.round(L.opacity * 100); L.slider.disabled = !L.on; }
   }
   function addLayer(def, raster) {
     if (!def || !def.id) throw new Error('layer needs an id');
     if (layers[def.id]) return;
-    var saved = layerStore[def.id] || {};
+    var saved = layerStore[def.id]; if (!saved || typeof saved !== 'object') saved = {};
+    var op = Number(saved.opacity); if (saved.opacity === null || saved.opacity === '' || typeof saved.opacity === 'boolean' || !isFinite(op)) op = def.opacity !== undefined ? def.opacity : 0.7;
     var L = layers[def.id] = {
       def: def, raster: raster,
-      on: saved.on !== undefined ? !!saved.on : !!def.on,
-      opacity: saved.opacity !== undefined ? saved.opacity : (def.opacity !== undefined ? def.opacity : 0.7)
+      on: def.locked ? true : typeof saved.on === 'boolean' ? saved.on : !!def.on,   // a locked layer (def.locked) cannot be switched off
+      opacity: Math.min(1, Math.max(0, op))
     };
     if (raster) {
       var c = def.canvas;
@@ -295,7 +309,7 @@
   Atlas.registerRasterLayer = function (def) { addLayer(def, true); };
   Atlas.layers = {
     setOn: function (id, on) {
-      var L = layers[id]; if (!L) return; L.on = !!on; applyLayer(L); saveLayers();
+      var L = layers[id]; if (!L || L.def.locked) return; L.on = !!on; applyLayer(L); saveLayers();
       bus.emit('layer:changed', { id: id, on: L.on, opacity: L.opacity });
     },
     isOn: function (id) { return !!(layers[id] && layers[id].on); },
@@ -314,10 +328,10 @@
       Object.keys(layers).forEach(function (id) {
         var L = layers[id]; if ((L.def.group || 'Other') !== g) return;
         var dot = h('span', { class: 'dot' }); dot.style.borderColor = L.def.color || '#999';
-        L.cb = h('input', { type: 'checkbox', checked: L.on, onchange: function () { Atlas.layers.setOn(id, L.cb.checked); } });
+        L.cb = h('input', { type: 'checkbox', checked: L.on, disabled: !!L.def.locked, onchange: function () { Atlas.layers.setOn(id, L.cb.checked); } });
         var row = h('div', { class: 'ls-row' }, [
           h('label', { class: 'ls-chk' }, [L.cb, h('span', { class: 'box' }), dot, h('span', { text: L.def.label || id }),
-            h('span', { class: 'n', text: L.def.count !== undefined && L.def.count !== null ? String(L.def.count) : '' })])
+            h('span', { class: 'n', text: L.def.locked ? 'always on' : L.def.count !== undefined && L.def.count !== null ? String(L.def.count) : '' })])
         ]);
         if (L.raster) {
           L.slider = h('input', { type: 'range', min: 0, max: 100, step: 1, attrs: { 'aria-label': 'Opacity of ' + (L.def.label || id) }, oninput: function () { Atlas.layers.setOpacity(id, L.slider.value / 100); } });
@@ -345,12 +359,16 @@
   /* ---------- SOS ---------- */
   var sosBack, sosPrev, sosSent = {};
   function sosPayload() {
+    var w = null;   // in a room the position comes from the shared world (what Earth and the other pages see)
+    try { w = window.JdaWorld && window.JdaWorld.me ? window.JdaWorld.me() : null; } catch (e) { w = null; }
+    if (w && isFinite(w.lat) && isFinite(w.lon)) return { time: Atlas.now().toISOString(), x: isFinite(w.x) ? w.x : Atlas.me.x, y: isFinite(w.y) ? w.y : Atlas.me.y, lat: +w.lat, lon: +w.lon };
     var ll = Atlas.ll(Atlas.me.x, Atlas.me.y);
     return { time: Atlas.now().toISOString(), x: Atlas.me.x, y: Atlas.me.y, lat: ll[1], lon: ll[0] };
   }
+  function roomName() { var r = window.JdaLink && window.JdaLink.room; return r && r.name ? String(r.name).replace(/\s+/g, ' ').trim().slice(0, 24) : ''; }
   function callsign() {
     var v = sosBack ? sosBack.querySelector('.sos-name').value.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
-    return v || 'Crew member';
+    return v || roomName() || 'Crew member';
   }
   function focusables() {
     return Array.prototype.slice.call(sosBack.querySelectorAll('button:not([disabled]),input'));
@@ -372,8 +390,8 @@
   function openSos() {
     var p = sosPayload();
     sosPrev = document.activeElement;
-    sosBack.querySelector('.sos-pos').textContent = 'Your position (simulated): ' + p.lat.toFixed(4) + '°N, ' + p.lon.toFixed(4) + '°E';
-    sosBack.querySelector('.sos-name').value = String(store.get('me.callsign', '') || '');
+    sosBack.querySelector('.sos-pos').textContent = 'Your position: ' + p.lat.toFixed(4) + '°N, ' + p.lon.toFixed(4) + '°E';
+    sosBack.querySelector('.sos-name').value = roomName() || String(store.get('me.callsign', '') || '');
     sosBack.hidden = false;
     document.addEventListener('keydown', sosKey, true);
     sosBack.querySelector('.sos-cancel').focus();   // safe default: Cancel
@@ -384,18 +402,18 @@
     var log = store.get('sos.log', []); if (!Array.isArray(log)) log = [];
     log.push(p); store.set('sos.log', log.slice(-50));
     bus.emit('sos:send', p);
-    var sent = window.JdaLink ? window.JdaLink.send({ type: 'sos', from: p.from, lat: p.lat, lon: p.lon, simTime: p.time }) : null;
+    var sent = window.JdaLink ? window.JdaLink.send({ type: 'sos', name: p.from, fromName: p.from, lat: p.lat, lon: p.lon, simTime: p.time }) : null;
     if (sent) { sosSent[sent.id] = 1; }
     sosPrev = sosBtn;
     closeSos();
-    Atlas.toast('SOS sent to Earth control (simulated)', 'danger');
+    Atlas.toast('SOS sent to Earth control', 'danger');
   }
   function buildSos() {
     sosBtn = h('button', { type: 'button', class: 'sos-btn', text: 'SOS', attrs: { 'aria-label': 'SOS emergency button, opens a confirmation', 'aria-haspopup': 'dialog' }, onclick: openSos });
     sosBack = h('div', { id: 'sos-back', class: 'ui', hidden: true }, [
       h('div', { class: 'sos-dlg', attrs: { role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'sos-t', 'aria-describedby': 'sos-d' } }, [
         h('h2', { id: 'sos-t', text: 'Send SOS?' }),
-        h('p', { id: 'sos-d', text: 'This sends an emergency call with your position to Earth. This is a simulation: nothing real is transmitted.' }),
+        h('p', { id: 'sos-d', text: 'This sends an emergency call with your position to Earth.' }),
         h('p', { class: 'sos-pos' }),
         h('label', { class: 'sos-lbl', attrs: { for: 'sos-name' }, text: 'Your name or callsign' }),
         h('input', { id: 'sos-name', class: 'sos-name', type: 'text', attrs: { maxlength: 24, list: 'sos-names', autocomplete: 'off', placeholder: 'Crew member' } }),
@@ -412,7 +430,7 @@
 
   // Earth control acknowledges an SOS this page sent
   if (window.JdaLink) window.JdaLink.on(function (m) {
-    if (m.type === 'ack' && sosSent[m.sosId]) Atlas.toast('Earth control acknowledged your SOS (simulated)', 'info');
+    if (m.type === 'ack' && sosSent[m.sosId]) Atlas.toast('Earth control acknowledged your SOS', 'info');
   });
 
   /* ---------- mount ---------- */
@@ -428,10 +446,10 @@
   buildLayerSelector();
   layoutDock();
 
-  // layers of atlas-map.js (craters, delta, channel, route, samples, places, grid)
+  // layers of atlas-map.js (craters, delta, channel, grid)
   core.layers.forEach(function (l) { Atlas.registerLayer(l); });
 
-  // Map tab: route planner, selected card, sample list. atlas-map.js bound to their ids at load time, so we move the nodes.
+  // Map tab: route planner and selected card. atlas-map.js bound to their ids at load time, so we move the nodes.
   Atlas.registerTab({
     id: 'map', title: 'Map', icon: 'map', order: 5,
     render: function (container) {

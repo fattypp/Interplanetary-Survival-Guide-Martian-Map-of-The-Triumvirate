@@ -1,4 +1,4 @@
-/* Planner tab: your own to-do list, mission objectives (read-only), automatic schedule, reminders, simulated link to Earth.
+/* Planner tab: your own to-do list, mission objectives (read-only), automatic schedule, reminders, reports to Earth (sent through JdaLink as {type:'report'} when a room is joined, queued otherwise).
    Owned by the planner feature (contract: docs/ARCHITECTURE.md). Numbers: web/data/schedule-config.js, explained in docs/SCHEDULE.md.
    Exposes Atlas.todos and Atlas.schedule. Pure scheduling logic lives in schedule-engine.js. */
 (function () {
@@ -10,13 +10,27 @@
   var RAW = window.JEZERO_SCHEDULE_CONFIG || {};
 
   /* ---------------- persisted state ---------------- */
-  var todos = arr(Atlas.store.get('planner.todos', []));
-  var missionDone = obj(Atlas.store.get('planner.missionDone', {}));
-  var outbox = arr(Atlas.store.get('planner.outbox', []));
+  function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function okTime(v) { return typeof v === 'string' && isFinite(new Date(v).getTime()); }
+  /* saved lists come from older versions or a corrupt store: keep only entries the code can use */
+  var todos = arr(Atlas.store.get('planner.todos', [])).filter(function (t) {
+    if (!isObj(t) || typeof t.id !== 'string' || typeof t.title !== 'string') return false;
+    t.description = typeof t.description === 'string' ? t.description : '';
+    t.deadline = okTime(t.deadline) ? t.deadline : null;
+    var imp = Number(t.importance); t.importance = isFinite(imp) && imp >= 1 && imp <= 5 ? Math.round(imp) : 3;
+    var est = Number(t.estMin); t.estMin = isFinite(est) && est >= 1 ? Math.min(1440, Math.round(est)) : 60;
+    t.done = !!t.done; return true;
+  });
+  var outbox = arr(Atlas.store.get('planner.outbox', [])).filter(function (r) { return isObj(r) && typeof r.id === 'string' && typeof r.subject === 'string' && typeof r.body === 'string' && okTime(r.at); });
   var S = obj(Atlas.store.get('planner.sched', {}));
-  S.blocks = arr(S.blocks); S.unsched = arr(S.unsched); S.reasons = arr(S.reasons);
-  S.blockDone = obj(S.blockDone); S.missedLog = arr(S.missedLog); S.reminded = obj(S.reminded);
-  S.started = obj(S.started); S.misses = S.misses || 0; S.builtAt = S.builtAt || null;
+  S.blocks = arr(S.blocks).filter(function (b) { return isObj(b) && typeof b.id === 'string' && typeof b.type === 'string' && typeof b.title === 'string' && okTime(b.start) && okTime(b.end); });
+  S.unsched = arr(S.unsched).filter(isObj);
+  S.reasons = arr(S.reasons).filter(function (r) { return isObj(r) && typeof r.text === 'string' && okTime(r.at); });
+  S.blockDone = obj(S.blockDone);
+  Object.keys(S.blockDone).forEach(function (id) { var d = S.blockDone[id]; if (!isObj(d) || !okTime(d.start) || !okTime(d.end) || !isFinite(Number(d.min))) delete S.blockDone[id]; });
+  S.missedLog = arr(S.missedLog).filter(function (m) { return isObj(m) && typeof m.title === 'string' && okTime(m.planned); });
+  S.reminded = obj(S.reminded);
+  S.started = obj(S.started); S.misses = Number(S.misses) > 0 ? Math.floor(Number(S.misses)) : 0; S.builtAt = okTime(S.builtAt) ? S.builtAt : null;
 
   function arr(v) { return Array.isArray(v) ? v : []; }
   function obj(v) { return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
@@ -76,11 +90,15 @@
   function userItem(t) {
     return { id: t.id, title: t.title, description: t.description, deadline: t.deadline, importance: t.importance, estMin: t.estMin, done: !!t.done, missionId: null, kind: 'task' };
   }
+  /* The mission tasks (kind 'task' of Atlas.missions, from JEZERO_MISSION.tasks, in stop order: 2 per stop). They are what the planner
+     and the automatic schedule treat as "mission" work; each carries its own estimate (estMin). */
   function objectives() {
-    var l = [];
-    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'objective'; }); } catch (e) { l = []; }
+    var l = [];   // only the tasks of the objective(s) the user chose (m.inScope, js/objective.js)
+    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'task' && m.inScope !== false; }); } catch (e) { l = []; }
     return l;
   }
+  function taskDone(id) { try { return !!(Atlas.missions && Atlas.missions.isDone(id)); } catch (e) { return false; } }
+  function setTaskDone(id, flag) { try { return !!(Atlas.missions && Atlas.missions.setDone(id, flag)); } catch (e) { return false; } }
   function nextHealthBlock() {
     var best = null;
     S.blocks.forEach(function (b) { if (b.type === 'health' && !S.blockDone[b.id] && (!best || ms(b.start) < ms(best.start))) best = b; });
@@ -88,12 +106,13 @@
   }
   function healthItem() {
     var b = nextHealthBlock(); if (!b) return null;
-    return { id: 'health-next', title: 'Health check', description: 'Scheduled health check (simulated sensors).', deadline: b.start, importance: 5, estMin: Math.round((ms(b.end) - ms(b.start)) / MIN), done: false, missionId: null, kind: 'health', blockId: b.id };
+    return { id: 'health-next', title: 'Health check', description: 'Scheduled health check.', deadline: b.start, importance: 5, estMin: Math.round((ms(b.end) - ms(b.start)) / MIN), done: false, missionId: null, kind: 'health', blockId: b.id };
   }
   function missionItems() {
     return objectives().map(function (m) {
-      return { id: 'mission:' + m.id, title: m.title, description: m.description || '', deadline: null, importance: CFG.work.missionObjectiveImportance, estMin: CFG.work.missionObjectiveMinutes,
-        done: !!missionDone[m.id], missionId: m.id, kind: 'mission' };
+      return { id: 'mission:' + m.id, title: m.title, description: (m.stopName ? 'Stop ' + m.stopNo + ', ' + m.stopName + ' (' + m.objectiveShort + '). ' : '') + (m.description || ''),
+        deadline: null, importance: CFG.work.missionObjectiveImportance, estMin: m.estMin || CFG.work.missionObjectiveMinutes,
+        done: taskDone(m.id), missionId: m.id, kind: 'mission' };
     });
   }
   function sortTodos(list) {
@@ -132,7 +151,7 @@
     complete: function (id, done) {
       done = done === undefined ? true : !!done;
       if (id === 'health-next') { var hb = nextHealthBlock(); if (hb && done) scheduleApi.markDone(hb.id, true); return !!hb; }
-      if (String(id).indexOf('mission:') === 0) { var mid = String(id).slice(8); if (done) missionDone[mid] = true; else delete missionDone[mid]; Atlas.store.set('planner.missionDone', missionDone); changed(); return true; }
+      if (String(id).indexOf('mission:') === 0) { var mid = String(id).slice(8); var ok = setTaskDone(mid, done); changed(); return ok; }
       var t = findTodo(id); if (!t) return false;
       t.done = done; saveTodos(); changed(); return true;
     }
@@ -149,10 +168,11 @@
     return m;
   }
   /* work blocks that have started and are not ticked yet but are not missed yet: they keep their place and count as in progress */
+  function inScopeRef(id) { return objectives().some(function (m) { return String(m.id) === String(id); }); }   // a task of the other objective is no longer planned, not even one already under way
   function inflight(excludeIds) {
     var n = nowMs(), g = CFG.graceMinutes * MIN;
     return S.blocks.filter(function (b) {
-      return (b.type === 'task' || b.type === 'mission') && !S.blockDone[b.id] && ms(b.start) <= n && ms(b.end) + g > n && !(excludeIds && excludeIds.indexOf(b.id) >= 0);
+      return (b.type === 'task' || b.type === 'mission') && !S.blockDone[b.id] && ms(b.start) <= n && ms(b.end) + g > n && !(excludeIds && excludeIds.indexOf(b.id) >= 0) && (b.type !== 'mission' || inScopeRef(b.refId));
     });
   }
   function busyList(excludeIds) {
@@ -163,7 +183,7 @@
   }
   function engineInputs() {
     var td = todos.filter(function (t) { return !t.done; }).map(userItem);
-    var ob = objectives().filter(function (m) { return !missionDone[m.id]; });
+    var ob = objectives().filter(function (m) { return !taskDone(m.id); });
     return { todos: td, objectives: ob };
   }
   function keepDoneBlocks(list, n) {
@@ -247,7 +267,7 @@
   function remainingFor(type, refId) {
     var est = 0, found = false;
     if (type === 'task') { var t = findTodo(refId); if (t) { est = t.estMin; found = true; } }
-    else { objectives().forEach(function (m) { if (String(m.id) === String(refId)) { est = CFG.work.missionObjectiveMinutes; found = true; } }); }
+    else { objectives().forEach(function (m) { if (String(m.id) === String(refId)) { est = m.estMin || CFG.work.missionObjectiveMinutes; found = true; } }); }
     if (!found) return null;
     var done = 0; Object.keys(S.blockDone).forEach(function (id) { var d = S.blockDone[id]; if (d.type === type && String(d.refId) === String(refId)) done += d.min; });
     return est - done;
@@ -256,7 +276,7 @@
     var rem = remainingFor(b.type, b.refId);
     if (rem !== null && rem <= 0) {
       if (b.type === 'task') { var t = findTodo(b.refId); if (t) { t.done = true; saveTodos(); } }
-      else { missionDone[b.refId] = true; Atlas.store.set('planner.missionDone', missionDone); }
+      else { missionGuard = true; setTaskDone(b.refId, true); missionGuard = false; }
       Atlas.bus.emit('todos:changed', {});
       S.blocks = S.blocks.filter(function (x) { return x.refId !== b.refId || x.type !== b.type || S.blockDone[x.id]; });
     }
@@ -265,7 +285,7 @@
     var rem = remainingFor(b.type, b.refId);
     if (rem !== null && rem > 0) {
       if (b.type === 'task') { var t = findTodo(b.refId); if (t && t.done) { t.done = false; saveTodos(); rebuild('Re-opened "' + t.title + '".'); } }
-      else if (missionDone[b.refId]) { delete missionDone[b.refId]; Atlas.store.set('planner.missionDone', missionDone); rebuild('Re-opened a mission objective.'); }
+      else if (taskDone(b.refId)) { missionGuard = true; setTaskDone(b.refId, false); missionGuard = false; rebuild('Re-opened a mission task.'); }
     }
   }
   var healthGuard = false;
@@ -281,7 +301,8 @@
     S.blocks.forEach(function (b) { if (b.type === 'health' && !S.blockDone[b.id] && ms(b.start) <= n + 30 * MIN && (!best || ms(b.start) < ms(best.start))) best = b; });
     if (best) { S.blockDone[best.id] = { type: 'health', refId: 'health', start: best.start, end: best.end, title: best.title, min: 0 }; saveS(); Atlas.bus.emit('schedule:changed', { reason: 'health' }); }
   });
-  Atlas.bus.on('missions:changed', function () { rebuild(); });
+  var missionGuard = false;   // true while this file itself marks a mission task done/open (it rebuilds on its own)
+  Atlas.bus.on('missions:changed', function () { if (!missionGuard) rebuild(); });
 
   /* ---------------- monitor: reminders, misses, adaptation, report to Earth ---------------- */
   var lastCheck = 0, lastSig = '';
@@ -334,8 +355,8 @@
 
   function sendReport() {
     var n = Atlas.now(), lines = [];
-    lines.push('SIMULATED REPORT FOR EARTH MISSION CONTROL (nothing was transmitted)');
-    lines.push('Mission time: ' + n.toISOString());
+    lines.push('REPORT FOR EARTH MISSION CONTROL');
+    lines.push('Mission time: ' + n.toISOString().replace('T', ' ').replace(/:\d\d(\.\d+)?Z$/, ' UTC'));
     lines.push('');
     lines.push('Crew member has missed ' + S.misses + ' scheduled block' + (S.misses > 1 ? 's' : '') + ' (limit before reporting: ' + CFG.escalateAfterMisses + '):');
     S.missedLog.slice(-S.misses).forEach(function (m) { lines.push(' - ' + m.title + ' [' + m.type + '], planned ' + when(ms(m.planned))); });
@@ -345,14 +366,30 @@
     if (S.unsched.length) { lines.push('Could not be scheduled:'); S.unsched.slice(0, 6).forEach(function (u) { lines.push(' - ' + u.title + ': ' + u.reason); }); }
     var hl = Atlas.health && Atlas.health.last && Atlas.health.last();
     lines.push('');
-    lines.push(hl ? 'Last health check (simulated): ' + hl.time + ', heart rate ' + hl.heartRate + ' bpm, SpO2 ' + hl.spo2 + '%, fatigue ' + hl.fatigue + '/10.' : 'No health check on record yet.');
-    var entry = { id: 'r' + n.getTime(), at: n.toISOString(), misses: S.misses, subject: 'Schedule adherence report: ' + S.misses + ' missed blocks', body: lines.join('\n'), simulated: true };
+    lines.push(hl ? 'Last health check: ' + hl.time + ', heart rate ' + hl.heartRate + ' bpm, SpO2 ' + hl.spo2 + '%, fatigue ' + hl.fatigue + '/10.' : 'No health check on record yet.');
+    var entry = { id: 'r' + n.getTime(), at: n.toISOString(), misses: S.misses, subject: 'Schedule adherence report: ' + S.misses + ' missed blocks', body: lines.join('\n'), sent: false };
     outbox.unshift(entry); outbox = outbox.slice(0, 30); Atlas.store.set('planner.outbox', outbox);
     S.misses = 0; S.missedLog = []; saveS();
     Atlas.bus.emit('earth:report', entry);
-    Atlas.toast('Report added to the simulated Earth outbox (nothing really leaves your computer).', 'danger');
+    var sentNow = flushOutbox();
+    Atlas.toast(sentNow ? 'Report sent to Earth.' : 'Report queued until a room is joined.', 'danger');
     ui.refreshBadges(); ui.refreshLists();
   }
+  /* Really sends queued reports through JdaLink (message {type:'report', subject, body, misses, at, reportId}); returns how many went out. */
+  function flushOutbox() {
+    var L = window.JdaLink, n = 0;
+    if (!L || !L.room || typeof L.send !== 'function') return 0;
+    outbox.slice().reverse().forEach(function (r) {
+      if (r.sent) return;
+      try {
+        L.send({ type: 'report', to: 'earth', reportId: r.id, subject: String(r.subject).slice(0, 120), body: String(r.body).slice(0, 4000), misses: r.misses, at: r.at });
+        r.sent = true; r.sentAt = new Date().toISOString(); n++;
+      } catch (e) { /* stays queued */ }
+    });
+    if (n) { Atlas.store.set('planner.outbox', outbox); if (ui.ready) { ui.refreshBadges(); ui.refreshLists(); } }
+    return n;
+  }
+  setInterval(flushOutbox, 3000);
 
   /* ---------------- UI ---------------- */
   var ui = { ready: false, refreshLists: function () {}, refreshBadges: function () {} };
@@ -368,16 +405,15 @@
     var mealsTxt = CFG.meals.map(function (m) { return m.title + ' ' + hmStr(m.startMin) + ' (' + m.minutes + ' min)'; }).join(', ');
     function hmStr(x) { return pad(Math.floor(x / 60)) + ':' + pad(Math.round(x % 60)); }
     var note = h('details', { class: 'pl-howto' }, [
-      h('summary', { text: 'How to change these numbers' }),
-      h('p', {}, ['Edit ', h('code', { text: 'web/data/schedule-config.js' }), ', save, reload. Every key is explained in ', h('code', { text: 'docs/SCHEDULE.md' }), ' (in the repository).']),
-      h('p', { text: 'Current values read from the config:' }),
+      h('summary', { text: 'Schedule rules' }),
+      h('p', { text: 'How your day is planned:' }),
       h('ul', {}, [
-        h('li', { text: 'Day length: ' + (RAW.sol ? 'sol, 24 h 39.6 min' : '24 h') + ' (sol: ' + (RAW.sol ? 'true' : 'false') + '), planning ' + CFG.days + ' days' }),
-        h('li', { text: 'Sleep: ' + CFG.sleep.hours + ' h from ' + hmStr(CFG.sleep.startMin) + ' (sleep.hours, sleep.start)' }),
-        h('li', { text: 'Recreation: ' + CFG.recreation.minutes + ' min at ' + hmStr(CFG.recreation.startMin) + ' (recreation.minutes, recreation.start)' }),
-        h('li', { text: 'Meals: ' + mealsTxt + ' (meals)' }),
-        h('li', { text: 'Health check: ' + (CFG.health.enabled ? 'from ' + hmStr(CFG.health.startMin) + ', every ' + CFG.health.intervalHours + ' h, ' + CFG.health.minutes + ' min' : 'off') + ' (health.start, health.intervalHours)' }),
-        h('li', { text: 'Reminders: missed after ' + CFG.graceMinutes + ' min; report to Earth after ' + CFG.escalateAfterMisses + ' misses (graceMinutes, escalateAfterMisses)' })
+        h('li', { text: 'Day length: ' + (RAW.sol ? 'sol, 24 h 39.6 min' : '24 h') + ', planning ' + CFG.days + ' days' }),
+        h('li', { text: 'Sleep: ' + CFG.sleep.hours + ' h from ' + hmStr(CFG.sleep.startMin) }),
+        h('li', { text: 'Recreation: ' + CFG.recreation.minutes + ' min at ' + hmStr(CFG.recreation.startMin) }),
+        h('li', { text: 'Meals: ' + mealsTxt }),
+        h('li', { text: 'Health check: ' + (CFG.health.enabled ? 'from ' + hmStr(CFG.health.startMin) + ', every ' + CFG.health.intervalHours + ' h, ' + CFG.health.minutes + ' min' : 'off') }),
+        h('li', { text: 'Reminders: missed after ' + CFG.graceMinutes + ' min; report to Earth after ' + CFG.escalateAfterMisses + ' misses' })
       ])
     ]);
     var nav = h('div', { class: 'pl-nav', attrs: { role: 'group', 'aria-label': 'Planner views' } });
@@ -488,7 +524,7 @@
       }
       if (kind === 'mission') {
         var m = null; objectives().forEach(function (x) { if (String(x.id) === String(t.missionId)) m = x; });
-        if (m && typeof m.x === 'number' && typeof m.y === 'number') acts.appendChild(h('button', { type: 'button', text: 'Show on map', attrs: { 'aria-label': 'Show ' + t.title + ' on the map' }, onclick: function () { Atlas.focus(m.x, m.y, 3); } }));
+        if (m && typeof m.x === 'number' && typeof m.y === 'number') acts.appendChild(h('button', { type: 'button', text: 'Show on map', attrs: { 'aria-label': 'Show ' + t.title + ' on the map' }, onclick: function () { if (Atlas.missions && Atlas.missions.open) Atlas.missions.open(m.id); else Atlas.focus(m.x, m.y, 3); } }));
       }
       if (acts.childNodes.length) li.appendChild(acts);
       return li;
@@ -500,10 +536,10 @@
       frag.push(open.length ? h('ul', { class: 'pl-list' }, open.map(function (t) { return todoRow(t, 'task'); })) : h('p', { class: 'pl-empty', text: 'No goals yet. Use "+ Add your own goal" to add something you want to do besides the mission.' }));
       var hi = healthItem();
       frag.push(h('h3', { class: 'pl-h', text: 'Health check' }));
-      frag.push(hi ? h('ul', { class: 'pl-list' }, [todoRow(hi, 'health')]) : h('p', { class: 'pl-empty', text: CFG.health.enabled ? 'No health check in the plan yet.' : 'Health checks are switched off in schedule-config.js.' }));
-      frag.push(h('h3', { class: 'pl-h' }, ['Mission objectives ', h('span', { class: 'pl-sub', text: '(from the Mission tab, read-only)' })]));
+      frag.push(hi ? h('ul', { class: 'pl-list' }, [todoRow(hi, 'health')]) : h('p', { class: 'pl-empty', text: CFG.health.enabled ? 'No health check in the plan yet.' : 'Health checks are switched off.' }));
+      frag.push(h('h3', { class: 'pl-h' }, ['Mission tasks ', h('span', { class: 'pl-sub', text: '(your chosen objective, in stop order)' })]));
       var mi = missionItems();
-      frag.push(mi.length ? h('ul', { class: 'pl-list' }, mi.map(function (t) { return todoRow(t, 'mission'); })) : h('p', { class: 'pl-empty', text: Atlas.missions ? 'The Mission tab has no objectives.' : 'Mission objectives appear here once the Mission tab has loaded.' }));
+      frag.push(mi.length ? h('ul', { class: 'pl-list' }, mi.map(function (t) { return todoRow(t, 'mission'); })) : h('p', { class: 'pl-empty', text: Atlas.missions ? 'The Mission tab has no tasks.' : 'Mission tasks appear here once the Mission tab has loaded.' }));
       if (doneL.length) frag.push(h('details', { class: 'pl-done' }, [h('summary', { text: 'Done (' + doneL.length + ')' }), h('ul', { class: 'pl-list' }, doneL.map(function (t) { return todoRow(t, 'task'); }))]));
       while (todoBox.firstChild) todoBox.removeChild(todoBox.firstChild);
       frag.forEach(function (x) { todoBox.appendChild(x); });
@@ -532,14 +568,14 @@
     function renderSched() {
       while (schedBox.firstChild) schedBox.removeChild(schedBox.firstChild);
       var n = nowMs();
-      speedSel = h('select', { id: 'pl-speed', attrs: { 'aria-label': 'Demo clock speed, for testing reminders' }, onchange: function () { Atlas.clock.setSpeed(Number(speedSel.value)); check(); } },
-        [1, 60, 600, 3600].map(function (v) { return h('option', { value: String(v), text: v === 1 ? 'real time' : v + 'x faster' }); }));
+      speedSel = h('select', { id: 'pl-speed', attrs: { 'aria-label': 'Mission clock speed' }, disabled: !!(Atlas.clock.live && Atlas.clock.live()), onchange: function () { Atlas.clock.setSpeed(Number(speedSel.value)); check(); } },
+        (function () { var cur = Number(Atlas.clock.speed) || 1, list = [1, 60, 600, 3600]; if (list.indexOf(cur) < 0) list.push(cur); return list.sort(function (a, b) { return a - b; }); })().map(function (v) { return h('option', { value: String(v), text: v === 1 ? 'real time' : v + 'x faster' }); }));
       speedSel.value = String(Atlas.clock.speed || 1);
       schedBox.appendChild(h('div', { class: 'pl-toolbar' }, [
         h('button', { type: 'button', class: 'pl-primary', text: 'Rebuild', attrs: { 'aria-label': 'Rebuild the schedule now' }, onclick: function () { check(); scheduleApi.rebuild(); Atlas.toast('Schedule rebuilt.', 'info'); } }),
-        h('label', { class: 'pl-speed' }, ['Demo clock: ', speedSel])
+        h('label', { class: 'pl-speed' }, ['Mission clock: ', speedSel])
       ]));
-      schedBox.appendChild(h('p', { class: 'pl-note', text: 'Simulated clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
+      schedBox.appendChild(h('p', { class: 'pl-note', text: 'Mission clock now: ' + new Date(n).toLocaleString() + (RAW.sol ? ' · sols of 24 h 39.6 min' : ' · 24-hour days') + ' · missed blocks since last report: ' + S.misses + ' of ' + CFG.escalateAfterMisses }));
       var legend = h('p', { class: 'pl-legend' }, Object.keys(TYPE_LABEL).map(function (k) { return h('span', { class: 'pl-tag t-' + k }, [Atlas.icon(TYPE_ICON[k], 12), ' ' + TYPE_LABEL[k]]); }));
       schedBox.appendChild(legend);
       if (S.unsched.length) {
@@ -566,12 +602,12 @@
     /* ---- Earth link ---- */
     function renderEarth() {
       while (earthBox.firstChild) earthBox.removeChild(earthBox.firstChild);
-      earthBox.appendChild(h('div', { class: 'pl-earthbanner', attrs: { role: 'note' }, text: 'Simulated link to Earth: nothing actually leaves your computer.' }));
-      earthBox.appendChild(h('p', { class: 'pl-note', text: 'A report is added to this outbox after ' + CFG.escalateAfterMisses + ' missed blocks (now: ' + S.misses + ' of ' + CFG.escalateAfterMisses + '). It is stored only in this browser.' }));
+      earthBox.appendChild(h('div', { class: 'pl-earthbanner', attrs: { role: 'note' }, text: (window.JdaLink && window.JdaLink.room ? 'Connected to room ' + window.JdaLink.room.code + ': reports go to Earth mission control.' : 'No room joined: reports are queued until a room is joined.') }));
+      earthBox.appendChild(h('p', { class: 'pl-note', text: 'A report is sent to Earth after ' + CFG.escalateAfterMisses + ' missed blocks (now: ' + S.misses + ' of ' + CFG.escalateAfterMisses + ').' }));
       if (!outbox.length) earthBox.appendChild(h('p', { class: 'pl-empty', text: 'Outbox is empty. Follow the schedule and it stays that way.' }));
       outbox.forEach(function (r) {
         earthBox.appendChild(h('details', { class: 'pl-report' }, [
-          h('summary', {}, [r.subject, h('span', { class: 'pl-sub', text: ' · ' + new Date(r.at).toLocaleString() + ' · queued (simulated)' })]),
+          h('summary', {}, [r.subject, h('span', { class: 'pl-sub', text: ' · ' + new Date(r.at).toLocaleString() + (r.sent ? ' · sent to Earth' : ' · queued until a room is joined') })]),
           h('pre', { text: r.body })
         ]));
       });

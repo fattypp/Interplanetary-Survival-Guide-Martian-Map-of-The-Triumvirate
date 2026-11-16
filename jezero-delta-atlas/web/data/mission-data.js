@@ -2,544 +2,156 @@
 window.JEZERO_MISSION = {
  "objectives": [
   {
-   "id": "objective-1",
-   "title": "Objective 1",
-   "text": "Find evidence of ancient microbial life."
+   "id": 1,
+   "title": "Find evidence of ancient microbial life",
+   "short": "Microbial life"
   },
   {
-   "id": "objective-2",
-   "title": "Objective 2",
-   "text": "Assess whether the site can sustain life."
+   "id": 2,
+   "title": "Assess whether the site can sustain human life",
+   "short": "Sustaining human life"
   }
  ],
+ "base": {
+  "id": "base",
+  "name": "Base camp",
+  "lat": 18.447,
+  "lon": 77.408,
+  "x": 1872.9,
+  "y": 1334.0
+ },
  "stops": [
   {
-   "id": "sample-1",
-   "no": 1,
-   "name": "Roubion",
-   "kind": "sample",
-   "area": "Polygon Valley",
-   "description": "Atmospheric sample. Target: Roubion.",
-   "sol": 164,
-   "date": "6 Aug 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-1",
+   "n": 1,
+   "name": "Three Forks sample depot",
+   "lat": 18.4525,
+   "lon": 77.4015,
+   "x": 1807.0,
+   "y": 1275.3,
+   "description": "Level ground close to the foot of the delta where the 10 sample tubes were left."
   },
   {
-   "id": "sample-2",
-   "no": 2,
-   "name": "Montdenier",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 194,
-   "date": "6 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-2",
+   "n": 2,
+   "name": "Delta front mudstone",
+   "lat": 18.458,
+   "lon": 77.397,
+   "x": 1761.4,
+   "y": 1216.5,
+   "description": "Fine-grained layers at the front of the delta, laid down in still water."
   },
   {
-   "id": "sample-3",
-   "no": 3,
-   "name": "Montagnac",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 196,
-   "date": "8 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-3",
+   "n": 3,
+   "name": "Delta top boulders",
+   "lat": 18.48,
+   "lon": 77.385,
+   "x": 1639.8,
+   "y": 981.5,
+   "description": "Boulders on top of the delta that the river carried in."
   },
   {
-   "id": "sample-4",
-   "no": 4,
-   "name": "Salette",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 262,
-   "date": "15 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-4",
+   "n": 4,
+   "name": "Western delta clay beds",
+   "lat": 18.502,
+   "lon": 77.369,
+   "x": 1477.7,
+   "y": 746.5,
+   "description": "Clay-rich beds in the western part of the delta."
   },
   {
-   "id": "sample-5",
-   "no": 5,
-   "name": "Coulettes",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 271,
-   "date": "24 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-5",
+   "n": 5,
+   "name": "Western Breach and Bright Angel",
+   "lat": 18.493,
+   "lon": 77.293,
+   "x": 707.5,
+   "y": 842.6,
+   "description": "The ravine where the river entered the crater, near the Bright Angel outcrops and the Cheyava Falls find."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "task-1-1",
+   "stopId": "stop-1",
+   "objective": 1,
+   "title": "Recover the sample tubes",
+   "description": "Recover the 10 sample tubes: photograph, check seal, log, stow.",
+   "estMin": 45
   },
   {
-   "id": "sample-6",
-   "no": 6,
-   "name": "Robine",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 298,
-   "date": "22 Dec 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-1-2",
+   "stopId": "stop-1",
+   "objective": 2,
+   "title": "Check ground and shelter at the depot",
+   "description": "Check how firm and how level the ground is around the depot, and note rock overhangs or hollows that could shelter people from radiation.",
+   "estMin": 25
   },
   {
-   "id": "sample-7",
-   "no": 7,
-   "name": "Malay",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 337,
-   "date": "31 Jan 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-1",
+   "stopId": "stop-2",
+   "objective": 1,
+   "title": "Sample the finest mud layers",
+   "description": "Find the finest mud layers, look for colour spots or rings, sample below the surface.",
+   "estMin": 60
   },
   {
-   "id": "sample-8",
-   "no": 8,
-   "name": "Ha'ahóni",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 371,
-   "date": "7 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-2",
+   "stopId": "stop-2",
+   "objective": 2,
+   "title": "Look for water-bearing minerals in the mudstone",
+   "description": "Check the mudstone for minerals that hold water, as a possible water source, and log whether the slope is stable enough to walk on.",
+   "estMin": 30
   },
   {
-   "id": "sample-9",
-   "no": 9,
-   "name": "Atsá",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 377,
-   "date": "13 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-1",
+   "stopId": "stop-3",
+   "objective": 1,
+   "title": "Photograph and sample the boulders",
+   "description": "Photograph and sample boulders the river carried in.",
+   "estMin": 40
   },
   {
-   "id": "sample-10",
-   "no": 10,
-   "name": "Swift Run",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 490,
-   "date": "7 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-2",
+   "stopId": "stop-3",
+   "objective": 2,
+   "title": "Judge boulder spacing for safe ground",
+   "description": "Measure the size and spacing of the boulders to judge where the rover can drive safely and where a shelter could be placed.",
+   "estMin": 30
   },
   {
-   "id": "sample-11",
-   "no": 11,
-   "name": "Skyland",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 495,
-   "date": "12 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-1",
+   "stopId": "stop-4",
+   "objective": 1,
+   "title": "Sample one intact clay layer",
+   "description": "Photograph the layering and sample one intact clay layer; seal and log it.",
+   "estMin": 45
   },
   {
-   "id": "sample-12",
-   "no": 12,
-   "name": "Hazeltop",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 509,
-   "date": "27 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-2",
+   "stopId": "stop-4",
+   "objective": 2,
+   "title": "Test how much water the clay holds",
+   "description": "Test how much water the clay holds, as a possible water source for the crew.",
+   "estMin": 40
   },
   {
-   "id": "sample-13",
-   "no": 13,
-   "name": "Bearwallow",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 516,
-   "date": "3 Aug 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-1",
+   "stopId": "stop-5",
+   "objective": 1,
+   "title": "Photograph the ravine walls and sample the channel floor",
+   "description": "Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find.",
+   "estMin": 60
   },
   {
-   "id": "sample-14",
-   "no": 14,
-   "name": "Shuyak",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 575,
-   "date": "2 Oct 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-15",
-   "no": 15,
-   "name": "Mageik",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 619,
-   "date": "16 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-16",
-   "no": 16,
-   "name": "Kukaklek",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Hidden Harbor.",
-   "sol": 631,
-   "date": "29 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-17",
-   "no": 17,
-   "name": "Atmo Mountain",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 634,
-   "date": "2 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-18",
-   "no": 18,
-   "name": "Crosswind Lake",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 639,
-   "date": "7 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-19",
-   "no": 19,
-   "name": "Melyn",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Berea.",
-   "sol": 749,
-   "date": "30 Mar 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-20",
-   "no": 20,
-   "name": "Otis Peak",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Emerald Lake.",
-   "sol": 832,
-   "date": "23 Jun 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-21",
-   "no": 21,
-   "name": "Pilot Mountain",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Dream Lake.",
-   "sol": 913,
-   "date": "15 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-22",
-   "no": 22,
-   "name": "Pelican Point",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Hans Amundsen Memorial Workspace.",
-   "sol": 923,
-   "date": "25 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-23",
-   "no": 23,
-   "name": "Lefroy Bay",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Turquoise Bay.",
-   "sol": 949,
-   "date": "21 Oct 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-24",
-   "no": 24,
-   "name": "Comet Geyser",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Silica-cemented carbonate sample. Target: Bunsen Peak.",
-   "sol": 1088,
-   "date": "12 Mar 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-25",
-   "no": 25,
-   "name": "Sapphire Canyon",
-   "kind": "sample",
-   "area": "Neretva Vallis",
-   "description": "Sedimentary sample. Target: Cheyava Falls.",
-   "sol": 1215,
-   "date": "21 Jul 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-26",
-   "no": 26,
-   "name": "Silver Mountain",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Shallow Bay.",
-   "sol": 1401,
-   "date": "28 Jan 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-27",
-   "no": 27,
-   "name": "Green Gardens",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Serpentinite sample. Target: Tablelands.",
-   "sol": 1433,
-   "date": "2 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-28",
-   "no": 28,
-   "name": "Main River",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Broom Point.",
-   "sol": 1441,
-   "date": "10 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-landing",
-   "no": 29,
-   "name": "Octavia E. Butler Landing",
-   "kind": "place",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Landing site of Perseverance, 18 February 2021.",
-   "sol": 0,
-   "date": "18 Feb 2021",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": 18.4446,
-   "lon": 77.4509
-  },
-  {
-   "id": "place-hawksbill-gap",
-   "no": 30,
-   "name": "Hawksbill Gap",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Gap in the delta front that the rover climbed in 2022 to reach the top of the delta. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-three-forks",
-   "no": 31,
-   "name": "Three Forks",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Staging area where three route options to the delta merge, used to start the Delta Front campaign. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-neretva-vallis",
-   "no": 32,
-   "name": "Neretva Vallis",
-   "kind": "place",
-   "area": "Neretva Vallis",
-   "description": "Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-witch-hazel-hill",
-   "no": 33,
-   "name": "Witch Hazel Hill",
-   "kind": "place",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-seitah",
-   "no": 34,
-   "name": "Séítah",
-   "kind": "place",
-   "area": "Séítah",
-   "description": "Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-2",
+   "stopId": "stop-5",
+   "objective": 2,
+   "title": "Check shelter and safe passage in the ravine",
+   "description": "Record how well the ravine walls shelter people from radiation and wind, and check whether the channel floor is safe to cross.",
+   "estMin": 30
   }
  ]
 };

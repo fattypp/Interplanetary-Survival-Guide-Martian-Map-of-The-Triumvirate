@@ -53,9 +53,9 @@
     var sl = of(E.buildSchedule(cfg(), todos, [], NOW).blocks, 'sleep');
     sl.forEach(function (b) { assert.strictEqual(mins(b), 480); });
   });
-  t('no two blocks overlap (30 mixed tasks + objectives)', function () {
+  t('no two blocks overlap (30 mixed tasks + mission tasks)', function () {
     var todos = []; for (var i = 0; i < 30; i++) todos.push(task('n' + i, { estMin: 20 + (i * 7) % 200, importance: 1 + i % 5, deadline: i % 3 ? iso(at(1 + i % 5, 17)) : null }));
-    var objs = [{ id: 'o1', title: 'Obj 1' }, { id: 'o2', title: 'Obj 2' }];
+    var objs = [{ id: 'task-1-1', title: 'Task 1', estMin: 45 }, { id: 'task-1-2', title: 'Task 2', estMin: 25 }];
     var r = E.buildSchedule(cfg(), todos, objs, NOW);
     noOverlap(r.blocks);
     assert.ok(workBlocks(r.blocks).length > 10);
@@ -113,10 +113,22 @@
     assert.ok(workBlocks(r.blocks).some(function (b) { return b.refId === 'A'; }));
     assert.ok(!workBlocks(r.blocks).some(function (b) { return b.refId === 'B'; }));
   });
-  t('mission objectives are scheduled as type "mission" with their own refId', function () {
-    var r = E.buildSchedule(cfg(), [], [{ id: 'obj-1', title: 'Sample the delta' }], NOW);
-    var m = of(r.blocks, 'mission'); assert.ok(m.length >= 1); assert.strictEqual(m[0].refId, 'obj-1');
-    assert.strictEqual(m.reduce(function (a, b) { return a + mins(b); }, 0), 60);
+  t('mission tasks are scheduled as type "mission" with their own refId and their own estimate', function () {
+    var r = E.buildSchedule(cfg(), [], [{ id: 'task-1-1', title: 'Recover the sample tubes', estMin: 45 }], NOW);
+    var m = of(r.blocks, 'mission'); assert.ok(m.length >= 1); assert.strictEqual(m[0].refId, 'task-1-1');
+    assert.strictEqual(m.reduce(function (a, b) { return a + mins(b); }, 0), 45);
+  });
+  t('a mission task without an estimate gets the configured default (missionObjectiveMinutes)', function () {
+    var r = E.buildSchedule(cfg(), [], [{ id: 'task-x', title: 'No estimate' }], NOW);
+    assert.strictEqual(of(r.blocks, 'mission').reduce(function (a, b) { return a + mins(b); }, 0), cfg().work.missionObjectiveMinutes);
+  });
+  t('the 10 mission tasks are scheduled in the order given (stop order), all of them', function () {
+    var objs = []; for (var n = 1; n <= 5; n++) for (var o = 1; o <= 2; o++) objs.push({ id: 'task-' + n + '-' + o, title: 'T' + n + o, estMin: 20 + n * 5 + o });
+    var r = E.buildSchedule(cfg(), [], objs, NOW), seen = [];
+    of(r.blocks, 'mission').sort(function (a, b) { return new Date(a.start) - new Date(b.start); }).forEach(function (b) { if (seen.indexOf(b.refId) < 0) seen.push(b.refId); });
+    assert.strictEqual(seen.join(','), objs.map(function (x) { return x.id; }).join(','));
+    objs.forEach(function (x) { assert.strictEqual(of(r.blocks, 'mission').filter(function (b) { return b.refId === x.id; }).reduce(function (a, b) { return a + mins(b); }, 0), x.estMin); });
+    noOverlap(r.blocks);
   });
   t('long jobs are split into blocks no longer than the work block maximum', function () {
     var r = E.buildSchedule(cfg(), [task('long', { estMin: 400 })], [], NOW);
@@ -220,6 +232,28 @@
     assert.strictEqual(c.days, 7); assert.strictEqual(c.sol, false); assert.strictEqual(c.escalateAfterMisses, 3);
   });
 
+  t('objective choice: the schedule plans only the chosen tasks (5 or 10), in stop order', function () {
+    var OBJ = root.JdaObjective || (typeof require === 'function' && typeof module !== 'undefined' ? require('../jezero-delta-atlas/web/js/objective.js') : null); if (!OBJ) return;
+    var all = []; for (var n = 1; n <= 5; n++) [1, 2].forEach(function (o) { all.push({ id: 'task-' + n + '-' + o, title: 'T' + n + o, objective: o, estMin: 30 }); });
+    [[1, 5], [2, 5], ['both', 10]].forEach(function (c) {
+      var chosen = OBJ.filter(all, c[0]); assert.strictEqual(chosen.length, c[1]);
+      var r = E.buildSchedule(cfg(), [], chosen, NOW), ids = {};
+      of(r.blocks, 'mission').forEach(function (b) { ids[b.refId] = 1; });
+      assert.strictEqual(Object.keys(ids).length, c[1], 'choice ' + c[0] + ' schedules ' + Object.keys(ids).length);
+      Object.keys(ids).forEach(function (id) { assert.ok(c[0] === 'both' || id.slice(-1) === String(c[0]), id); });
+    });
+  });
+  t('Atlas.todos / Atlas.schedule follow the chosen objective (browser)', function () {
+    var A = root.Atlas, OB = root.JdaObjective; if (!A || !A.todos || !OB) return;
+    var was = OB.get(), ids = ['task-1-1', 'task-2-1', 'task-3-1', 'task-4-1', 'task-5-1', 'task-1-2', 'task-2-2', 'task-3-2', 'task-4-2', 'task-5-2'], before = {};
+    ids.forEach(function (i) { before[i] = A.missions.isDone(i); A.missions.setDone(i, false); });
+    function mi() { return A.todos.list().filter(function (x) { return x.kind === 'mission'; }); }
+    OB.set(1); assert.strictEqual(mi().length, 5); assert.ok(mi().every(function (x) { return /^mission:task-\d-1$/.test(x.id); }));
+    assert.ok(A.schedule.get().filter(function (b) { return b.type === 'mission'; }).every(function (b) { return /^task-\d-1$/.test(b.refId); }));
+    OB.set(2); assert.strictEqual(mi().length, 5); assert.ok(mi().every(function (x) { return /-2$/.test(x.id); }));
+    OB.set('both'); assert.strictEqual(mi().length, 10);
+    ids.forEach(function (i) { A.missions.setDone(i, before[i]); }); if (was !== null) OB.set(was);
+  });
   function runPlannerTests() {
     var results = [], failed = 0;
     tests.forEach(function (x) {

@@ -1,11 +1,11 @@
-/* Science layers: SIMULATED / DERIVED radiation, spectral (texture class) and topographic (relative relief) layers,
+/* Science layers: derived (generated, see docs) radiation, spectral (texture class) and topographic (relative relief) layers,
    plus the Atlas.radiation API. Data comes from model/science_layers.py (web/data/science-layers-data.js).
-   None of it is measured data; every UI label says so. See docs/ARCHITECTURE.md. */
+   The data is generated (docs say so; flagged simulated:true in code), the crew UI shows plain product labels. See docs/ARCHITECTURE.md. */
 (function () {
   'use strict';
   var Atlas = window.Atlas, D = window.JEZERO_SCIENCE;
   if (!Atlas || !D || !D.radiation) { console.warn('layers-science: Atlas or JEZERO_SCIENCE missing'); return; }
-  var GROUP = 'Science (simulated)', SIM = 'simulated / derived, not measured data';
+  var GROUP = 'Science';
   var W = Atlas.W, H = Atlas.H;
 
   function decode(b64) {
@@ -131,10 +131,10 @@
   document.getElementById('ov').appendChild(cg);
 
   /* ---------- register ---------- */
-  Atlas.registerRasterLayer({ id: 'radiation', label: 'Radiation (simulated)', group: GROUP, color: '#dd513a', canvas: cRad, opacity: 0.6, on: false });
-  Atlas.registerRasterLayer({ id: 'spectral', label: 'Spectral (texture classes, simulated)', group: GROUP, color: '#009E73', canvas: cSpec, opacity: 0.6, on: false });
-  Atlas.registerRasterLayer({ id: 'topo', label: 'Relative relief (simulated)', group: GROUP, color: '#74add1', canvas: cTop, opacity: 0.6, on: false });
-  Atlas.registerLayer({ id: 'topo-contours', label: 'Relief contours (simulated)', group: GROUP, color: '#8c510a', node: cg, on: false });
+  Atlas.registerRasterLayer({ id: 'radiation', label: 'Radiation', group: GROUP, color: '#dd513a', canvas: cRad, opacity: 0.6, on: false });
+  Atlas.registerRasterLayer({ id: 'spectral', label: 'Spectral (texture classes)', group: GROUP, color: '#009E73', canvas: cSpec, opacity: 0.6, on: false });
+  Atlas.registerRasterLayer({ id: 'topo', label: 'Relative relief', group: GROUP, color: '#74add1', canvas: cTop, opacity: 0.6, on: false });
+  Atlas.registerLayer({ id: 'topo-contours', label: 'Relief contours', group: GROUP, color: '#8c510a', node: cg, on: false });
 
   /* ---------- legend + readout ---------- */
   var h = Atlas.h;
@@ -146,15 +146,28 @@
     collapsed = !collapsed; Atlas.store.set('sci.legendCollapsed', collapsed); applyCollapsed();
   } });
   legendBody.id = 'sci-legend-body';
-  var legend = h('div', { class: 'sci-legend', attrs: { 'aria-label': 'Science layer legend (simulated data)' } }, [legendBtn, legendBody]);
+  var legend = h('div', { class: 'sci-legend', attrs: { 'aria-label': 'Science layer legend' } }, [legendBtn, legendBody]);
   document.body.appendChild(legend);
   function applyCollapsed() {
     legendBody.hidden = collapsed;
     legendBtn.setAttribute('aria-expanded', String(!collapsed));
-    legendBtn.textContent = (collapsed ? '▸ ' : '▾ ') + 'Science legend (simulated)';
+    legendBtn.textContent = (collapsed ? '▸ ' : '▾ ') + 'Science legend';
   }
   applyCollapsed();
   var readout = {}, clickOut = {}, clickPt = null, lastHover = null, speCb = null;
+
+  /* in a room the control page decides whether a solar particle event is on: follow it, and lock the checkbox */
+  function worldLive() { var Wd = window.JdaWorld; return !!(Wd && Wd.source === 'authority' && Wd.world()); }
+  var lastLive = false;
+  function syncWorld() {
+    var live = worldLive();
+    if (live) {
+      var ev = window.JdaWorld.world().events;
+      if (ev && typeof ev.solar === 'boolean' && ev.solar !== spe.on) Atlas.radiation.solarEvent(ev.solar);
+    }
+    if (live !== lastLive) { lastLive = live; updateLegend(); }
+  }
+  if (window.JdaWorld) window.JdaWorld.on(syncWorld);
 
   function fmt(v) { return v.toFixed(1); }
   function specClass(x, y) { var c = classes[gSpec.nearest(x, y)]; return c || classes[0]; }
@@ -162,9 +175,9 @@
   var IDS = ['radiation', 'topo', 'spectral'];
 
   function describe(id, x, y) {
-    if (id === 'radiation') { var v = doseAt(x, y), L = Atlas.radiation.limits, lvl = v >= L.danger ? 'above danger threshold' : v >= L.caution ? 'above caution threshold' : 'below caution threshold'; return fmt(v) + ' ' + R.unit + ' (simulated), ' + lvl; }
-    if (id === 'topo') return 'relative relief ' + Math.round(topoIndex(x, y)) + ' / 100 (simulated, not metres)';
-    var c = specClass(x, y); return 'texture class ' + (c.id + 1) + ' of ' + classes.length + ' (simulated, not mineralogy)';
+    if (id === 'radiation') { var v = doseAt(x, y), L = Atlas.radiation.limits, lvl = v >= L.danger ? 'above danger threshold' : v >= L.caution ? 'above caution threshold' : 'below caution threshold'; return fmt(v) + ' ' + R.unit + ', ' + lvl; }
+    if (id === 'topo') return 'relative relief ' + Math.round(topoIndex(x, y)) + ' / 100 (relative, not metres)';
+    var c = specClass(x, y); return 'texture class ' + (c.id + 1) + ' of ' + classes.length + ' (not a mineral identification)';
   }
   function showValues() {
     IDS.forEach(function (id) {
@@ -177,7 +190,7 @@
     readout[id] = h('div', { class: 'sci-val' });
     clickOut[id] = h('div', { class: 'sci-val sci-click' });
     return h('section', { class: 'sci-card', attrs: { 'data-for': id } },
-      [h('h4', { text: title }), h('div', { class: 'sci-sim', text: SIM })].concat(bodyNodes, [readout[id], clickOut[id]]));
+      [h('h4', { text: title })].concat(bodyNodes, [readout[id], clickOut[id]]));
   }
   function updateLegend() {
     var hadFocus = speCb && document.activeElement === speCb;
@@ -191,11 +204,11 @@
       [['caution', L.caution], ['danger', L.danger]].forEach(function (m) {
         if (m[1] > rg.min && m[1] < rg.max) { var t = h('i', { class: 'sci-tick', attrs: { title: m[0] + ' ' + m[1] } }); t.style.left = ((m[1] - rg.min) / (rg.max - rg.min) * 100) + '%'; bar.appendChild(t); }
       });
-      speCb = h('input', { type: 'checkbox', checked: spe.on, onchange: function () { Atlas.radiation.solarEvent(speCb.checked); } });
+      speCb = h('input', { type: 'checkbox', checked: spe.on, disabled: worldLive(), onchange: function () { Atlas.radiation.solarEvent(speCb.checked); } });
       legendBody.appendChild(card('radiation', 'Radiation dose rate' + (spe.on ? ' (solar event ×' + spe.mult + ')' : ''), [
         bar, h('div', { class: 'sci-scale' }, [h('span', { text: fmt(rg.min) }), h('span', { text: R.unit }), h('span', { text: fmt(rg.max) })]),
-        h('label', { class: 'sci-spe' }, [speCb, h('span', { text: 'Simulate solar particle event (×' + spe.mult + ', scenario)' })]),
-        h('div', { class: 'sci-note', text: 'Caution ' + L.caution + ' / danger ' + L.danger + ' ' + R.unit + ' are scenario thresholds for this simulation, not regulatory limits. Baseline ' + R.baseline + ' ' + R.unit + ' (MSL/RAD, Gale).' })]));
+        h('label', { class: 'sci-spe' }, [speCb, h('span', { text: 'Solar particle event (×' + spe.mult + ')' })]),
+        h('div', { class: 'sci-note', text: 'Caution ' + L.caution + ' / danger ' + L.danger + ' ' + R.unit + ' are the suit alert thresholds of this atlas. Baseline ' + R.baseline + ' ' + R.unit + ' (MSL/RAD, Gale).' })]));
       if (hadFocus) speCb.focus();
     }
     if (Atlas.layers.isOn('topo')) {
@@ -216,7 +229,7 @@
     }
     if (!any && Atlas.layers.isOn('topo-contours')) {
       any = true;
-      legendBody.appendChild(h('div', { class: 'sci-card' }, [h('h4', { text: 'Relief contours' }), h('div', { class: 'sci-sim', text: SIM })]));
+      legendBody.appendChild(h('div', { class: 'sci-card' }, [h('h4', { text: 'Relief contours' })]));
     }
     legend.hidden = !any;
     showValues();

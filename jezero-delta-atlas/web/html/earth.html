@@ -5,23 +5,47 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Earth Mission Control</title>
 <link rel="stylesheet" href="../css/earth.css">
+<link rel="stylesheet" href="../css/link-ui.css">
+<link rel="stylesheet" href="../css/chat-ui.css">
 </head>
 <body>
 <header class="eh">
   <div>
     <h1>Earth Mission Control</h1>
-    <p class="sub">Interplanetary Survival Guide · Jezero Delta · <strong>simulation, no real signals</strong></p>
+    <p class="sub">Interplanetary Survival Guide · Jezero Delta · Mission control</p>
   </div>
-  <div class="conn" id="conn" role="status"></div>
 </header>
-<main>
-  <section id="banner" class="banner" role="alert" hidden></section>
-  <h2 class="sec">Incoming alerts</h2>
-  <p id="empty" class="empty">No alerts. Waiting for the Mars base page to send one (open it in another tab, press SOS).</p>
-  <ul id="alerts" class="alerts" aria-live="polite"></ul>
+<section id="banner" class="banner" role="alert" hidden></section>
+<div class="tabbar" id="tabbar" role="tablist" aria-label="Earth control views">
+  <div class="tabwrap" data-tab="alerts"><button type="button" role="tab" id="tab-alerts" class="tab" aria-selected="true" aria-controls="panel-alerts" tabindex="0">Alerts</button></div>
+</div>
+<div id="panel-alerts" role="tabpanel" aria-labelledby="tab-alerts" tabindex="-1">
+<main class="cols">
+  <section aria-labelledby="h-alerts">
+    <h2 class="sec" id="h-alerts">Incoming alerts</h2>
+    <p id="empty" class="empty">No alerts. Waiting for a crew member to press SOS.</p>
+    <ul id="alerts" class="alerts" aria-live="polite"></ul>
+  </section>
+  <section aria-labelledby="h-reports" class="wide">
+    <h2 class="sec" id="h-reports">Reports <span id="reports-badge" class="cbadge" hidden></span></h2>
+    <p id="reports-empty" class="empty">No reports yet. Crew reports sent from the planner appear here.</p>
+    <div id="reports" class="reports"></div>
+  </section>
+  <section aria-labelledby="h-chat">
+    <h2 class="sec" id="h-chat">Crew chat <span id="chat-badge" class="cbadge" hidden></span></h2>
+    <div id="chat"></div>
+  </section>
 </main>
+</div>
+<div id="panels"></div>
 <script src="../data/link-config.js"></script>
 <script src="../js/link.js"></script>
+<script src="../js/link-ui.js"></script>
+<script src="../js/chat-ui.js"></script>
+<script src="../data/science-layers-data.js"></script>
+<script src="../data/travel-speeds.js"></script>
+<script src="../data/mission-data.js"></script>
+<script src="../js/earth-advice.js"></script>
 <script src="../js/earth.js"></script>
 </body>
 </html>

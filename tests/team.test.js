@@ -150,6 +150,18 @@
     var d = L.loadChat(store, 'd'); assert.strictEqual(d.length, 100); assert.strictEqual(d[99].text, 'm149');
   });
 
+  test('statusLabel: at base only within 100 m, else stopped / at stop N, moving and returning win', function () {
+    var eq = function (a, b) { assert.strictEqual(a, b); }, base = { x: 1000, y: 1000 }, mpp = 5.55, at = function (m) { return L.statusLabel(m, base, mpp); };
+    eq(at({ x: 1010, y: 1000, moving: false }), 'at base');
+    eq(at({ x: 1000 + 3900 / mpp, y: 1000, moving: false }), 'stopped');                       // 3.9 km away, stationary
+    eq(at({ x: 1000 + 3900 / mpp, y: 1000, moving: false, stopId: 'stop-3' }), 'at stop 3');
+    eq(at({ x: 1000 + 18, y: 1000, moving: false }), 'at base');                                // about 100 m
+    eq(at({ x: 1000 + 19, y: 1000, moving: false }), 'stopped');                                // about 105 m
+    eq(at({ x: 1000, y: 1000, moving: true }), 'on traverse');
+    eq(at({ x: 5000, y: 5000, moving: true, mode: 'return' }), 'returning to base');
+    eq(L.statusLabel({ x: 1, y: 1 }, null, mpp), 'stopped');
+  });
+
   test('makeMembers places everyone on a free spot away from the right edge', function () {
     L.makeMembers(ctx).forEach(function (m) { assert.ok(!L.isBlocked(m.x, m.y, ctx)); assert.ok(m.x < W * 0.6 && m.x > W * 0.2); });
   });

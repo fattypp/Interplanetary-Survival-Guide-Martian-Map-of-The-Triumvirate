@@ -179,7 +179,7 @@
       var id = o.id !== undefined ? String(o.id) : 'o' + items.length;
       var est = Math.round(num(o.remainingMin !== undefined ? o.remainingMin : o.estMin, cfg.work.missionObjectiveMinutes, 0, 1440));
       if (done['mission:' + id]) est = Math.max(0, est - done['mission:' + id]);
-      items.push({ key: 'mission:' + id, type: 'mission', refId: id, src: o, title: String(o.title || 'Mission objective'), est: est,
+      items.push({ key: 'mission:' + id, type: 'mission', seq: items.length, refId: id, src: o, title: String(o.title || 'Mission task'), est: est,
         deadline: toMs(o.deadline), importance: Math.round(num(o.importance, cfg.work.missionObjectiveImportance, 1, 5)) });
     });
     return items.filter(function (it) { return it.est > 0; });
@@ -196,12 +196,14 @@
       if (a.importance !== b.importance) return b.importance - a.importance;
       var da = a.deadline === null ? Infinity : a.deadline, db = b.deadline === null ? Infinity : b.deadline;
       if (da !== db) return da < db ? -1 : 1;
+      if (a.type === 'mission' && b.type === 'mission') return a.seq - b.seq;   // mission tasks keep the order given (stop order)
       return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
     };
   }
   function byDeadline(a, b) {
     if (a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
     if (a.importance !== b.importance) return b.importance - a.importance;
+    if (a.type === 'mission' && b.type === 'mission') return a.seq - b.seq;
     return a.key < b.key ? -1 : 1;
   }
 

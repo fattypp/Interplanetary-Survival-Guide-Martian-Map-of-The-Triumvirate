@@ -1,33 +1,28 @@
 /* Mission feature styles (pins on the map + Mission tab). Colours come from the shared theme variables. */
 
-/* ---- pins (inside #ov) ---- */
-#ov .ms-s{transform:scale(var(--inv));transform-box:view-box;transform-origin:0 0}   /* the tip stays on the point at any zoom */
-#ov .ms-pin{outline:none}
-#ov .ms-body{stroke:#000;stroke-width:1.5;fill:var(--accent)}
-#ov .ms-o1 .ms-body{fill:var(--delta)}
-#ov .ms-o2 .ms-body{fill:var(--fan)}
-#ov .ms-o3 .ms-body{fill:var(--margin)}
-#ov .ms-o4 .ms-body{fill:var(--igneous)}
-#ov .ms-multi .ms-body{fill:var(--accent)}
-#ov .ms-none .ms-body{fill:#8a8a8a}
-#ov .ms-custom .ms-body{fill:#2fb36b}
-#ov .ms-approx .ms-body{stroke-dasharray:3 2}
-#ov .ms-edgec{fill:var(--accent);stroke:#000;stroke-width:1.5}
-#ov .ms-arrow{fill:#fff;stroke:#000;stroke-width:1.5;stroke-linejoin:round}
-#ov .ms-edge:focus-visible .ms-edgec{stroke:#fff;stroke-width:3}
-#ov .ms-edge{outline:none}
-#ov .ms-edge:hover,#ov .ms-edge:focus{filter:drop-shadow(0 0 3px #fff)}
-#ov .ms-edge:hover .ms-lab,#ov .ms-edge:focus .ms-lab{display:inline}
-#ov .ms-ghost{pointer-events:none;opacity:.75}
-#ov .ms-ghost .ms-body{stroke-dasharray:3 2}
-#ov .ms-num{font:700 11px var(--font-m);stroke-width:2.5px;pointer-events:none}
-#ov .ms-lab{display:none;font:400 17px var(--font-m);pointer-events:none}
-#ov .ms-pin:hover .ms-lab,#ov .ms-pin:focus .ms-lab{display:inline}
-#ov .ms-pin:hover,#ov .ms-pin:focus{filter:drop-shadow(0 0 3px #fff)}
-#ov .ms-pin:focus-visible .ms-body{stroke:#fff;stroke-width:3}
-#ov .ms-done .ms-body{fill-opacity:.7}
-#ov .ms-tick{fill:#1c8a3c;stroke:#000;stroke-width:1}
-#ov .ms-tickt{font:700 9px var(--font-m);stroke:none;fill:#fff}
+/* ---- pins: their own svg #ov-top above every other layer; constant on-screen size (--inv is 1/zoom) ---- */
+#ov-top{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+#ov-top .ms-pin{pointer-events:auto;outline:none;cursor:pointer}
+#ov-top .ms-s{transform:scale(var(--inv));transform-box:view-box;transform-origin:0 0}   /* the tip stays on the point at any zoom */
+#ov-top .ms-halo{fill:none;stroke:#fff;stroke-width:6;stroke-linejoin:round;opacity:.95}   /* white ring: contrast on dark imagery; the black outline below does it on light layers */
+#ov-top .ms-body{stroke:#000;stroke-width:1.5;fill:var(--accent)}
+#ov-top .ms-multi .ms-body{fill:var(--accent)}
+#ov-top .ms-custom .ms-body{fill:#2fb36b}
+#ov-top .ms-base .ms-body{fill:#fff}
+#ov-top .ms-base .ms-num{fill:#000;stroke:none}
+#ov-top .ms-ghost{pointer-events:none;opacity:.75}
+#ov-top .ms-ghost .ms-body{stroke-dasharray:3 2}
+#ov-top text{font:700 11px var(--font-m);paint-order:stroke;stroke:#000;stroke-width:2.5px;fill:#fff;stroke-linejoin:round}
+#ov-top .ms-num{font:700 12px var(--font-m);pointer-events:none}
+#ov-top .ms-lab{visibility:hidden;font:400 16px var(--font-m);stroke-width:4px;pointer-events:none}
+#ov-top .ms-lab.on{visibility:visible}
+#ov-top .ms-pin:hover .ms-lab,#ov-top .ms-pin:focus .ms-lab{visibility:visible}
+#ov-top .ms-pin:hover,#ov-top .ms-pin:focus{filter:drop-shadow(0 0 3px #fff)}
+#ov-top .ms-pin:focus-visible .ms-halo{stroke:var(--accent);stroke-width:8}
+#ov-top .ms-sel .ms-halo{stroke:#ffd23c;stroke-width:8}
+#ov-top .ms-done .ms-body{fill-opacity:.7}
+#ov-top .ms-tick{fill:#1c8a3c;stroke:#000;stroke-width:1}
+#ov-top .ms-tickp{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;paint-order:normal}
 
 /* ---- tab ---- */
 .ms-tab{font-family:var(--font-b);font-size:13px;color:var(--fg)}
@@ -41,8 +36,6 @@
 .ms-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 10px;color:var(--mute);font-size:12px}
 .ms-legend span{display:inline-flex;align-items:center;gap:5px}
 .ms-sw{display:inline-block;width:11px;height:11px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:1px solid #000;background:var(--accent)}
-.ms-sw.ms-dash{border-style:dashed}
-.ms-sw.ms-arrow-sw{border-radius:50%;transform:none;width:13px;height:13px}
 .ms-sw.ms-o1,.ms-badge.ms-o1{background:var(--delta)}
 .ms-sw.ms-o2,.ms-badge.ms-o2{background:var(--fan)}
 .ms-sw.ms-o3,.ms-badge.ms-o3{background:var(--margin)}
@@ -66,7 +59,6 @@
 .ms-chk input{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--accent)}
 .ms-go{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:5px 4px;border:0;background:none;cursor:pointer;text-align:left}
 .ms-badge{flex:none;min-width:22px;height:22px;padding:0 3px;box-sizing:border-box;border-radius:11px;border:1px solid #000;display:inline-flex;align-items:center;justify-content:center;font:700 11px var(--font-m);color:#fff;text-shadow:0 0 2px #000,0 0 2px #000}
-.ms-badge.ms-off{border-style:dashed;opacity:.65}
 .ms-t{display:flex;flex-direction:column;min-width:0}
 .ms-t b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms-t small{color:var(--mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -88,4 +80,102 @@
 .ms-err{color:var(--igneous);font-weight:600}
 .ms-err:empty{display:none}
 .ms-form input[aria-invalid=true]{border-color:var(--igneous)}
-#ov .ms-tickp{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- v2: objectives, base camp, stops with two tasks each ---- */
+.ms-sw.ms-base,.ms-badge.ms-base{background:#fff;color:#000;text-shadow:none}
+.ms-sw.ms-base{border-radius:2px;transform:none}
+.ms-objt{display:flex;align-items:center;gap:6px;margin:4px 0 2px}
+.ms-objt .ms-n{margin-left:auto}
+.ms-badge.ms-obj{min-width:26px}
+.ms-stop{border:1px solid var(--line);border-radius:var(--radius-s);margin:6px 0;padding:2px 4px 4px}
+.ms-stop.is-done{opacity:.85}
+.ms-stophead .ms-t b{white-space:normal}
+.ms-task{margin-left:10px}
+.ms-task .ms-t b{white-space:normal}
+
+/* ---- objective choice: control in the Mission tab and the dialog ---- */
+.ms-objctl{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-s);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.ms-objlab{order:1;font:700 12px var(--font-d);letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.ms-objval{order:3;flex:1 1 100%;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.ms-objchg{order:2;flex:none;margin-left:auto;padding:4px 10px}
+#ms-ob-back{position:fixed;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.66)}
+.ms-ob-dlg{width:min(880px,100%);max-height:100%;overflow:auto;padding:22px;background:var(--panel);color:var(--fg);border:2px solid var(--accent);border-radius:20px;box-shadow:0 12px 48px rgba(0,0,0,.6)}
+.ms-ob-dlg h2{margin:0 0 6px;font:700 22px var(--font-d);letter-spacing:.05em}
+.ms-ob-dlg>p{margin:0 0 14px;color:var(--mute);line-height:1.4}
+.ms-ob-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ms-ob-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:14px;border:2px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--panel) 70%,var(--bg));color:var(--fg);cursor:pointer;font:400 13px/1.35 var(--font-b)}
+.ms-ob-card:hover{border-color:var(--accent)}
+.ms-ob-card:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ms-ob-card.is-on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.ms-ob-t{font:700 16px var(--font-d);letter-spacing:.04em}
+.ms-ob-s{font-weight:700}
+.ms-ob-l{margin:2px 0 0;padding-left:18px;color:var(--mute);font-size:12px}
+span.ms-ob-l{padding-left:0}
+.ms-ob-n{margin-top:auto;font:400 15px var(--font-m);color:var(--fg)}
+.ms-ob-act{display:flex;justify-content:flex-end;margin-top:14px}
+.ms-ob-act .ms-btn{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:var(--radius-s);padding:8px 16px;cursor:pointer;font:700 13px var(--font-b)}
+@media(max-width:760px){.ms-ob-grid{grid-template-columns:1fr}.ms-ob-l{display:none}.ms-ob-dlg{padding:16px}}
+
+/* ---- always visible strip: Base camp and the 5 stops ---- */
+#ms-strip{position:fixed;right:12px;top:204px;z-index:18;display:flex;flex-direction:column;gap:3px;padding:4px;border:1px solid var(--line);border-radius:26px;background:var(--glass,color-mix(in srgb,var(--panel) 90%,transparent));box-shadow:var(--shadow);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ms-chip{width:36px;height:36px;padding:0;border:2px solid #000;border-radius:50%;background:var(--accent);color:#fff;cursor:pointer;font:700 15px var(--font-m);text-shadow:0 0 2px #000,0 0 2px #000;box-shadow:0 0 0 2px #fff;display:inline-flex;align-items:center;justify-content:center;margin:2px}
+.ms-chip-base{background:#fff;color:#000;text-shadow:none;border-radius:8px}
+.ms-chip.is-done{background:#1c8a3c}
+.ms-chip[aria-pressed=true]{box-shadow:0 0 0 3px #ffd23c}
+.ms-chip:hover{transform:translateY(-2px)}
+.ms-chip:focus-visible,.ms-edge:focus-visible,.ms-card button:focus-visible,.ms-card a:focus-visible,.ms-card input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media(max-width:640px){#ms-strip{top:152px;left:8px;right:auto;flex-direction:row;border-radius:999px}.ms-chip{width:38px;height:38px}}
+
+/* ---- edge indicators ---- */
+#ms-edges{position:fixed;inset:0;z-index:18;pointer-events:none}   /* below the tab panels (20) and the stop card (40): never drawn over their text */
+.ms-edge{position:absolute;width:34px;height:34px;padding:0;border:2px solid #000;border-radius:50%;background:var(--accent);color:#fff;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;font:700 14px var(--font-m);text-shadow:0 0 2px #000,0 0 2px #000;box-shadow:0 0 0 2px #fff,var(--shadow)}
+.ms-edge[hidden]{display:none}
+.ms-edge-base{background:#fff;color:#000;text-shadow:none}
+.ms-edge-arrow{position:absolute;inset:-9px;pointer-events:none}
+.ms-edge-arrow::after{content:"";position:absolute;right:-1px;top:50%;margin-top:-6px;border:6px solid transparent;border-left:9px solid #fff;border-right:0;filter:drop-shadow(0 0 1px #000)}
+
+/* ---- the stop card ---- */
+.ms-card{position:fixed;z-index:40;top:68px;right:62px;width:min(380px,calc(100vw - 80px));max-height:max(300px,calc(100vh - 278px));min-height:200px;display:flex;flex-direction:column;background:var(--glass,var(--panel));color:var(--fg);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);overflow:hidden;font:13px/1.4 var(--font-b)}
+.ms-card[hidden]{display:none}
+.ms-card:focus{outline:none}
+.ms-card-h{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 14px;border-bottom:1px solid var(--line)}
+.ms-card-t{flex:1;margin:0;font:700 15px/1.25 var(--font-d);letter-spacing:.04em}
+.ms-card-x{width:32px;height:32px;flex:none;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.ms-card-b{padding:12px 14px 14px;overflow:auto;min-height:0}
+.ms-fig{margin:0 0 10px}
+.ms-picwrap{border-radius:12px;overflow:hidden;background:#000;aspect-ratio:16/10}
+.ms-pic{display:block;width:100%;height:100%;object-fit:cover}
+.ms-nopic{display:flex;align-items:center;justify-content:center;aspect-ratio:16/10;border-radius:12px;border:1px dashed var(--line);background:color-mix(in srgb,var(--fg) 8%,transparent);color:var(--mute);font:700 13px var(--font-b);text-align:center;padding:8px}
+.ms-cap{margin-top:6px;font-size:11px;color:var(--mute);line-height:1.4}
+.ms-cap a{color:var(--accent);font-weight:700;white-space:nowrap}
+.ms-match{display:block;margin-top:2px;font-style:italic}
+.ms-cdesc0{margin:0 0 6px}
+.ms-ccoord{margin:0 0 8px;font:400 16px var(--font-m);color:var(--fg)}
+.ms-ch{margin:10px 0 2px;font:700 12px var(--font-d);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.ms-cnote{margin:0 0 6px;color:var(--mute);font-size:12px}
+.ms-ctasks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ms-ctask{display:flex;gap:6px;padding:8px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panel) 60%,var(--bg))}
+.ms-ctask.is-off{opacity:.55}
+.ms-ctask.is-done h4{text-decoration:line-through}
+.ms-cchk{display:flex;align-items:flex-start;justify-content:center;width:30px;flex:none;padding-top:2px;cursor:pointer}
+.ms-cchk input{width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.ms-ctext{min-width:0;flex:1}
+.ms-ctext h4{margin:2px 0 2px;font:700 13px/1.3 var(--font-b)}
+.ms-ctext p{margin:0}
+.ms-cobj{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:11px;color:var(--mute)}
+.ms-notin{font-style:normal;font-weight:700;color:var(--fg);padding:1px 6px;border:1px solid var(--line);border-radius:999px}
+.ms-cdesc{color:var(--fg);font-size:12px}
+.ms-cmeta{margin-top:2px!important;font:400 15px var(--font-m);color:var(--mute)}
+/* phones: a bottom sheet above the tab panels; the pin is kept in the map above it */
+.ms-card.ms-sheet{left:0;right:0;top:auto;bottom:0;width:auto;max-height:56vh;border-radius:20px 20px 0 0;z-index:45}
+@media(max-width:640px){.ms-card{left:0;right:0;top:auto;bottom:0;width:auto;max-height:56vh;border-radius:20px 20px 0 0;z-index:45}}
+@media(prefers-reduced-motion:reduce){.ms-chip{transition:none}}
+
+/* layers menu: the 'always on' note of a locked layer never wraps */
+.ls-chk .n{white-space:nowrap}
+/* narrow windows (up to 900 px): the dock tabs are icon-only, so the dock stays one row and never meets the link pill or the panels */
+@media(min-width:641px) and (max-width:900px){
+  #dock{right:190px;gap:6px}
+  .dock-tab{width:40px;height:40px;padding:0;justify-content:center;flex:0 0 auto}.dock-tab .tt{display:none}
+  .sos-btn{height:40px;padding:0 16px;font-size:15px;letter-spacing:.1em;flex:0 0 auto}
+}
