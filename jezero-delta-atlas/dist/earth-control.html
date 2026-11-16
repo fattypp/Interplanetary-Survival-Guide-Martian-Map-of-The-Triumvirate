@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Earth Mission Control</title>
+<style>
+:root{--bg:#0f1318;--panel:#192029;--line:#2c3744;--fg:#e6edf3;--mute:#93a1b0;--danger:#e5484d;--danger-d:#b82d32;--ok:#46b37a;--accent:#5ec8d8;--font:system-ui,-apple-system,'Segoe UI',sans-serif;--mono:ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font)}
+.eh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:20px max(16px,4vw);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:22px;letter-spacing:.04em}
+.sub{margin:2px 0 0;color:var(--mute);font-size:13px}
+.conn{font:13px var(--mono);color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+.sec{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:24px 0 10px}
+.empty{color:var(--mute)}
+.banner{background:var(--danger);color:#fff;border-radius:14px;padding:18px 20px;font-size:22px;font-weight:700;box-shadow:0 0 0 4px rgba(229,72,77,.35);animation:pulse 1.6s ease-in-out infinite}
+.banner small{display:block;font-size:14px;font-weight:400;margin-top:4px;opacity:.95}
+.banner[hidden]{display:none}
+@keyframes pulse{50%{box-shadow:0 0 0 9px rgba(229,72,77,.15)}}
+.alerts{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.alert{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--danger);border-radius:12px;padding:14px 16px}
+.alert.acked{border-left-color:var(--ok)}
+.alert h3{margin:0 0 4px;font-size:18px}
+.alert .meta{font:13px var(--mono);color:var(--mute)}
+.status{display:inline-block;font:700 12px var(--mono);letter-spacing:.08em;margin-right:8px;color:var(--danger)}
+.acked .status{color:var(--ok)}
+.alert button{margin-top:10px;height:40px;padding:0 18px;border-radius:999px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:700 14px var(--font);cursor:pointer}
+.alert button:hover{background:rgba(94,200,216,.12)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.banner{animation:none}}
+
+</style>
+</head>
+<body>
+<header class="eh">
+  <div>
+    <h1>Earth Mission Control</h1>
+    <p class="sub">Interplanetary Survival Guide · Jezero Delta · <strong>simulation, no real signals</strong></p>
+  </div>
+  <div class="conn" id="conn" role="status"></div>
+</header>
+<main>
+  <section id="banner" class="banner" role="alert" hidden></section>
+  <h2 class="sec">Incoming alerts</h2>
+  <p id="empty" class="empty">No alerts. Waiting for the Mars base page to send one (open it in another tab, press SOS).</p>
+  <ul id="alerts" class="alerts" aria-live="polite"></ul>
+</main>
+<script>
+/* Optional online link between the Mars base page and the Earth control page.
+   Leave empty to use the same-browser link (two tabs of one browser). See docs/LINK.md. */
+window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
+
+</script>
+<script>
+/* link.js: message link between the Mars base page and the Earth control page. Exposes window.JdaLink.
+   Mode "same-browser": BroadcastChannel + localStorage, works between tabs of one browser.
+   Mode "online": the same messages are also POSTed to / polled from a Supabase table (see docs/LINK.md).
+   Messages are plain JSON, {id, t, type, ...}. Everything received is treated as untrusted data. */
+(function () {
+  'use strict';
+  var KEY = 'jda.link.msg', LOG = 'jda.link.log', POLL_MS = 3000;
+  var cfg = window.JDA_LINK || {};
+  var online = !!(cfg.url && cfg.key);
+  var subs = [], seen = {}, bc = null;
+
+  function deliver(m) {
+    if (!m || typeof m !== 'object' || typeof m.id !== 'string' || typeof m.type !== 'string' || seen[m.id]) return;
+    seen[m.id] = 1;
+    subs.slice().forEach(function (fn) { try { fn(m); } catch (e) { if (window.console) console.error('JdaLink handler failed', e); } });
+  }
+  function readLog() {
+    try { var a = JSON.parse(localStorage.getItem(LOG) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function appendLog(m) {
+    try { var a = readLog(); a.push(m); localStorage.setItem(LOG, JSON.stringify(a.slice(-100))); } catch (e) { /* ignore */ }
+  }
+
+  try { if (window.BroadcastChannel) { bc = new BroadcastChannel('jda-link'); bc.onmessage = function (e) { deliver(e.data); }; } } catch (e) { bc = null; }
+  window.addEventListener('storage', function (e) {
+    if (e.key !== KEY || !e.newValue) return;
+    try { deliver(JSON.parse(e.newValue)); } catch (err) { /* ignore corrupt */ }
+  });
+
+  function remoteUrl(q) { return cfg.url.replace(/\/+$/, '') + '/rest/v1/' + encodeURIComponent(cfg.table || 'link_messages') + (q || ''); }
+  function remoteHeaders() { return { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }; }
+  function poll() {
+    fetch(remoteUrl('?select=payload&order=created_at.desc&limit=30'), { headers: remoteHeaders() })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (rows) { rows.reverse().forEach(function (row) { appendLog(row.payload); deliver(row.payload); }); })
+      .catch(function (e) { if (window.console) console.warn('JdaLink online poll failed', e); });
+  }
+  if (online) { poll(); setInterval(poll, POLL_MS); }
+
+  window.JdaLink = {
+    mode: online ? 'online' : 'same-browser',
+    on: function (fn) { subs.push(fn); },
+    history: readLog,
+    send: function (msg) {
+      var m = Object.assign({}, msg, { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), t: new Date().toISOString() });
+      seen[m.id] = 1;
+      appendLog(m);
+      try { if (bc) bc.postMessage(m); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) { /* ignore */ }
+      if (online) fetch(remoteUrl(), { method: 'POST', headers: remoteHeaders(), body: JSON.stringify({ id: m.id, payload: m }) })
+        .catch(function (e) { if (window.console) console.warn('JdaLink online send failed', e); });
+      return m;
+    }
+  };
+})();
+
+</script>
+<script>
+/* earth.js: Earth control view. Shows SOS alerts sent by the Mars base page through JdaLink.
+   All text is written with textContent (messages are untrusted). Everything here is simulated. */
+(function () {
+  'use strict';
+  var alerts = {};   // sos id -> {id, from, lat, lon, t, ackAt}
+  var order = [];
+  var list = document.getElementById('alerts'), empty = document.getElementById('empty'),
+      banner = document.getElementById('banner'), conn = document.getElementById('conn');
+  conn.textContent = window.JdaLink.mode === 'online' ? '● online link' : '● same-browser link';
+
+  function name(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 24) || 'Crew member'; }
+  function num(v) { v = Number(v); return isFinite(v) ? v : null; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function when(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+
+  function render() {
+    empty.hidden = order.length > 0;
+    list.textContent = '';
+    order.slice().reverse().forEach(function (id) {
+      var a = alerts[id], li = el('li', 'alert' + (a.ackAt ? ' acked' : ''));
+      var h = el('h3'); h.appendChild(el('span', 'status', a.ackAt ? '■ ACKNOWLEDGED' : '▲ ACTIVE'));
+      h.appendChild(document.createTextNode(a.from + ' pressed SOS'));
+      li.appendChild(h);
+      li.appendChild(el('div', 'meta', 'received ' + when(a.t) + (a.lat !== null ? ' · position (simulated) ' + a.lat.toFixed(4) + '°N, ' + a.lon.toFixed(4) + '°E' : '')));
+      if (!a.ackAt) {
+        var b = el('button', '', 'Acknowledge'); b.type = 'button';
+        b.addEventListener('click', function () { a.ackAt = new Date().toISOString(); window.JdaLink.send({ type: 'ack', sosId: id, by: 'Earth control' }); render(); });
+        li.appendChild(b);
+      }
+      list.appendChild(li);
+    });
+    var active = order.filter(function (id) { return !alerts[id].ackAt; });
+    banner.hidden = !active.length;
+    if (active.length) {
+      var a = alerts[active[active.length - 1]];
+      banner.textContent = '▲ ' + a.from + ' pressed SOS';
+      banner.appendChild(el('small', '', active.length > 1 ? active.length + ' active alerts' : 'Simulated alert from the Mars base page'));
+      document.title = '▲ SOS: ' + a.from + ' · Earth Mission Control';
+    } else document.title = 'Earth Mission Control';
+  }
+
+  function handle(m) {
+    if (m.type === 'sos') {
+      if (alerts[m.id]) return;
+      alerts[m.id] = { id: m.id, from: name(m.from), lat: num(m.lat), lon: num(m.lon), t: m.t, ackAt: null };
+      order.push(m.id);
+    } else if (m.type === 'ack' && alerts[m.sosId]) {
+      alerts[m.sosId].ackAt = m.t;
+    } else return;
+    render();
+  }
+
+  window.JdaLink.history().forEach(handle);   // alerts sent before this page was opened
+  window.JdaLink.on(handle);
+  render();
+})();
+
+</script>
+</body>
+</html>
