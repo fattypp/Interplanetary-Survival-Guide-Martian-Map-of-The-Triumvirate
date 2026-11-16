@@ -23,7 +23,6 @@ Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks
 |---|---|
 | `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
 | `pages/mission-intro.html` | Intro page with the mission story and map. Its videos live in `pages/assets/`. |
-| `pages/rover-sandstorm-simulator.html` | Prototype: Mars rover path and sandstorm simulator. |
 | `docs/mission-guide.md` | The mission: 2 objectives, base camp, 5 stops and 10 tasks (source of `web/data/mission-data.js`). |
 | `docs/to-do.md` | What the team still has to do. |
 
@@ -35,7 +34,6 @@ Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks
 | `web/` | The map's source: page (`html/`), styles (`css/`), code (`js/`), data, images. |
 | `model/` | The crater-detection model (Python). |
 | `integration/` | Scripts that download the Mars image and connect the model to the web page. |
-| `archive/` | Old versions kept for reference. Not used by the current map. |
 | `craters.csv` | Table of every crater found (opens in Excel / Sheets). |
 
 See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re-run the model.
@@ -62,6 +60,6 @@ The Triumvirate:
 ## License and credits
 
 Code is released under the [MIT License](LICENSE). Basemap imagery comes from the
-Murray Lab CTX global mosaic and NASA MOLA data; the intro and simulator pages use
+Murray Lab CTX global mosaic and NASA MOLA data; the intro page uses
 NASA Trek tiles. Those remain under their providers' terms. Credit NASA/JPL/Caltech/Murray Lab
 when reusing them.
