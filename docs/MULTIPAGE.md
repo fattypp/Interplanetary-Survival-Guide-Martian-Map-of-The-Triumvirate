@@ -79,7 +79,7 @@ Need something from another owner? Use the API above, and say so in your report;
 
 ## Mission data v2 (replaces the 34 stops / samples; binding for every page)
 Source of truth: `docs/mission-guide.md`, generated into `web/data/mission-data.js` (`window.JEZERO_MISSION`) by `python3 integration/web_bridge.py missiondata`.
-The mission is "Jezero Pathfinder" (see `MissionGuide` at the repo root for the story and stop coordinates): a crew drives a pressurised rover from base camp, gets out on foot at FIVE stops, then drives back.
+The mission is "Jezero Pathfinder" (see `docs/mission-story.md` for the story and stop coordinates): a crew drives a pressurised rover from base camp, gets out on foot at FIVE stops, then drives back.
 ```
 JEZERO_MISSION = {
   objectives: [ {id:1, title:'Find evidence of ancient microbial life', short:'Microbial life'},

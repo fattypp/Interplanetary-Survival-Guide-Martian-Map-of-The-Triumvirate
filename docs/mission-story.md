@@ -1,8 +1,10 @@
-Here is the whole mission in one place, with each stop located inside the area your atlas covers (18.44176–18.57188° N, 77.22318–77.41956° E).
+# Mission Story: Jezero Pathfinder
+
+The whole mission in one place, with each stop located inside the area the atlas covers (18.44176–18.57188° N, 77.22318–77.41956° E).
 
 ## The mission
 
-**Name:** Jezero Pathfinder (a placeholder; rename it if you like).
+**Name:** Jezero Pathfinder.
 
 **Story:** A crew drives a pressurised rover west from flat ground at the foot of the delta, up and across the old river delta, to the ravine where the river once entered the crater. They get out on foot at five stops, then drive back. One day, about 15 km round trip.
 
