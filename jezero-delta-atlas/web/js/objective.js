@@ -37,7 +37,8 @@
 
   var api = { norm: norm, filter: filter, label: function (c) { c = norm(c); return c === null ? 'Not chosen' : TITLES[c]; }, short: function (c) { c = norm(c); return c === null ? 'Not chosen' : SHORT[c]; } };
   api.TITLES = TITLES;
-  if (typeof window === 'undefined') { if (typeof module !== 'undefined' && module.exports) module.exports = api; return; }
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;   // Node (even with a stub window): pure helpers only
 
   var mem = {}, subs = [], cur = null, offState = null, watchKey = null, lastPub = {};
   function slug(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32); }
