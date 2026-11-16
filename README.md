@@ -5,17 +5,38 @@ Our project for the **NASA Space Apps Challenge 2026**, challenge
 
 ## What it does
 
-A machine-learning model looks at satellite images of Mars (the Jezero Crater delta) and finds obstacles
-that would be dangerous to walk over. For each one it gives the **exact coordinates** and a **guess of what it is**
-(right now: craters). The results are shown on an interactive map.
+A survival map for a crew on a Marswalk at the western delta of Jezero Crater. One mission, *Jezero Pathfinder*,
+with two objectives: find evidence of ancient microbial life, and assess whether the site can sustain human life.
 
-> **Note:** The model learns from example obstacles, so the examples must be checked carefully. Bad examples make it
-> invent obstacles that aren't there, or miss real ones.
+- **Layered atlas.** A real orbital image (CTX, about 10 m per pixel) with crater hazards found by our Python model,
+  five mission stops with real Perseverance photos, and radiation, relief and texture layers. Those three science
+  layers are computed from the orbital image, not measured, and the app labels them that way.
+- **Safe route.** A planner finds a route through the stops that goes around the detected craters and rates each leg's risk.
+- **Three screens.** An astronaut helmet display, an astronaut tablet, and an Earth mission-control page that share
+  a room code, with chat and an SOS alert.
+- **Daily planner.** Mission tasks, a to-do list and an automatic schedule, plus suit, health and team tabs
+  (simulated values).
+
+> **Note:** The crater detector has no human-checked labels. It can mark things that are not craters and miss real
+> ones; low-confidence marks sit in their own layer. See `jezero-delta-atlas/README.md`.
 
 ## Quick start (nothing to install)
 
-Double-click **`jezero-delta-atlas/dist/jezero-delta-atlas.html`**. It opens the map in your browser.
-Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks.
+Open any of these in a browser (each is one self-contained file in `jezero-delta-atlas/dist/`):
+
+| File | What it is |
+|---|---|
+| `jezero-delta-atlas.html` | The atlas: map, layers, mission, route planner, planner, suit, team |
+| `astronaut-helmet.html` | Helmet display |
+| `astronaut-tablet.html` | Tablet with the safe route |
+| `earth-control.html` | Earth mission control (receives SOS and chat) |
+| `simulation-control.html` | Operator page that drives the demo |
+
+Create a room on one page; the others opened in the same browser join it.
+
+## Slides
+
+Our seven-slide presentation: [`docs/slides/jezero-delta-atlas-slides.pdf`](docs/slides/jezero-delta-atlas-slides.pdf).
 
 ## What's in this repo
 
