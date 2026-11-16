@@ -78,6 +78,13 @@ The Triumvirate:
 - Jose Perez-Carreño
 - Juhyeok Ahn
 
+## Use of AI tools
+
+- **Code, documentation and slides:** parts of the code, the documentation and the presentation slides were written
+  with the help of Claude (Anthropic), an AI assistant.
+- **Videos:** the two intro videos in `pages/assets/` were generated with Canva AI. Each carries a visible
+  "AI-generated video (Canva AI)" label and the same note in its file metadata.
+
 ## License and credits
 
 Code is released under the [MIT License](LICENSE). Basemap imagery comes from the

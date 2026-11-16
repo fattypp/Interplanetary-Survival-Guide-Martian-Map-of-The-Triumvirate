@@ -24,3 +24,7 @@ Real Mars 2020 (Perseverance) raw images of the areas near the stops, from the p
 | 4 Western delta clay beds | stop-4.jpg | 800 (21 May 2023) | Left Navcam, NLF_0800_0737945822_612ECM (frame _01_195J) | https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/00800/ids/edr/browse/ncam/NLF_0800_0737945822_612ECM_N0391170NCAM02799_01_195J01_1200.jpg | Representative of the upper delta; not the clay beds themselves |
 | 5 Western Breach and Bright Angel | stop-5.jpg | 1215 (21 Jul 2024) | Left Navcam, NLF_1215_0774814981_145ECM | https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/01215/ids/edr/browse/ncam/NLF_1215_0774814981_145ECM_N0560000NCAM00709_02_095J01_1200.jpg | Neretva Vallis channel, the Cheyava Falls week; position unchecked |
 | Base camp | base.jpg | 690 (28 Jan 2023) | Left Navcam, NLF_0690_0728189040_534ECM (cropped) | https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/00690/ids/edr/browse/ncam/NLF_0690_0728189040_534ECM_N0321184NCAM00501_01_295J01_1200.jpg | Representative of the flat Three Forks floor |
+
+## pages/assets/*.mp4 (intro page videos)
+- `first-person-mars-explorer.mp4` and `mars-microbial-exploration.mp4` are AI-generated, created with Canva AI (https://www.canva.com/). They are not NASA footage.
+- Processing: a visible "AI-GENERATED VIDEO (Canva AI)" label was added to every frame and the files were re-encoded (H.264); the same note is in each file's metadata comment. Labelled 15 Nov 2026.
