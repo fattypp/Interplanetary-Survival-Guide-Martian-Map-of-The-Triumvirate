@@ -13,7 +13,7 @@
     O2_PER_H:   { resting: 4,  walking: 9, working: 12 },   // full tank lasts 25 h resting, ~11 h walking, ~8 h working
     BAT_PER_H:  { resting: 3,  walking: 6, working: 8 },    // battery: 33 h resting, ~17 h walking, 12.5 h working
     JITTER: 0.10,            // consumption varies +-5% per step (seeded, so repeatable)
-    WALK_MPS: 1.4,           // walking speed in metres per simulated second
+    WALK_MPS: (window.JEZERO_SPEEDS && window.JEZERO_SPEEDS.foot && window.JEZERO_SPEEDS.foot.mps) || 1.4,   // walking speed (m/s): data/travel-speeds.js is the source, 1.4 only if that file is not loaded
     CAUTION_PCT: 25,         // oxygen / battery caution below this
     CRITICAL_PCT: 10,        // oxygen / battery critical below this
     PCT_HYST: 3,             // a resource level is left only after recovering this many points above its threshold
@@ -250,17 +250,18 @@
   var W = Atlas.W, H = Atlas.H;
 
   /* ---- persisted state ---- */
-  var START = { x: Atlas.me.x, y: Atlas.me.y };   // initial start point (nearest map edge to the landing site), before a saved position is restored
+  var START = { x: Atlas.me.x, y: Atlas.me.y };   // initial start point (base camp), before a saved position is restored
   var saved = store.get('suit.state', null);
   var S = saved ? sanitize(saved) : freshState(20260101);
   var working = !!store.get('suit.working', false);
   var meSaved = store.get('suit.me', null);
-  if (meSaved && isFinite(meSaved.x) && isFinite(meSaved.y) && meSaved.x >= 0 && meSaved.x <= W && meSaved.y >= 0 && meSaved.y <= H) {
+  // v:2 = saved since base camp replaced the old landing site; older saves (no v) would put the crew back at a place that no longer exists
+  if (meSaved && typeof meSaved === 'object' && meSaved.v === 2 && typeof meSaved.x === 'number' && typeof meSaved.y === 'number' && isFinite(meSaved.x) && isFinite(meSaved.y) && meSaved.x >= 0 && meSaved.x <= W && meSaved.y >= 0 && meSaved.y <= H) {
     Atlas.me.x = meSaved.x; Atlas.me.y = meSaved.y;
   }
   var history = store.get('health.history', []);
   if (!Array.isArray(history)) history = [];
-  history = history.slice(-20);
+  history = history.filter(function (e) { return e && typeof e === 'object' && !Array.isArray(e); }).slice(-20);
 
   var walk = null;               // {pts, i, note}
   var activity = 'resting';
@@ -375,7 +376,7 @@
       if (mv) { Atlas.bus.emit('me:moved', { x: Atlas.me.x, y: Atlas.me.y }); }
       drawMe();
       evalAlerts(nowMs);
-      store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
+      store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y, v: 2 });
       refreshSuit(nowMs); refreshPersonal(nowMs);
       return;
     }
@@ -400,7 +401,7 @@
     if (doneWalk) { Atlas.toast('You arrived', 'info'); drawMe(); }
     evalAlerts(nowMs);
     store.set('suit.state', S);
-    store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
+    store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y, v: 2 });
     refreshSuit(nowMs); refreshPersonal(nowMs);
   }
 
@@ -651,13 +652,8 @@
     ui.banner.className = 'su-banner ' + (worst === 'danger' ? 'bad' : worst === 'caution' ? 'warn' : 'ok');
     ui.banner.firstChild.textContent = ICON[worst];
     ui.banner.lastChild.textContent = msg;
-    // honest notes: start position is not the real landing site; marker may be hidden by the layer checkbox
-    var atStart = Math.hypot(Atlas.me.x - START.x, Atlas.me.y - START.y) < 1;
-    var L = Atlas.landing;
-    if (atStart && L && !L.onMap) {
-      var km = Math.hypot(L.x - START.x, L.y - START.y) * MPP / 1000;
-      ui.startNote.textContent = 'Start position: nearest map edge to the landing site, which lies about ' + km.toFixed(1) + ' km east of this map.';
-    } else ui.startNote.textContent = '';
+    // honest note: the marker may be hidden by the layer checkbox
+    ui.startNote.textContent = '';
     ui.markerNote.textContent = Atlas.layers.isOn('me') ? '' : 'Your marker is hidden on the map (layer "You" is off). Your position is still tracked.';
     if (walk) {
       var rest = 0, px = Atlas.me.x, py = Atlas.me.y;

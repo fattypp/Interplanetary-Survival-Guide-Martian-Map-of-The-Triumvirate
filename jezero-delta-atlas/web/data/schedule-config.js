@@ -44,14 +44,14 @@ window.JEZERO_SCHEDULE_CONFIG = {
     minutes: 15            // length of the block
   },
 
-  /* ---- work (tasks and mission objectives) ---- */
+  /* ---- work (your goals and the 10 mission tasks) ---- */
   work: {
     maxBlockMinutes: 90,           // longest single work block; longer jobs are split into several blocks (15 to 240)
     breakMinutes: 10,              // rest left after a work block when the same job continues in the next block (0 to 60)
     minPieceMinutes: 15,           // do not squeeze a work piece shorter than this into a small gap (5 to 60)
     defaultTaskMinutes: 30,        // used when a task has no valid estimate
-    missionObjectiveMinutes: 60,   // time given to each mission objective (they carry no estimate of their own)
-    missionObjectiveImportance: 3  // importance 1 to 5 given to mission objectives
+    missionObjectiveMinutes: 60,   // time given to a mission task that has no estimate of its own (the 10 mission tasks all carry estMin)
+    missionObjectiveImportance: 3  // importance 1 to 5 given to mission tasks
   },
 
   /* ---- how urgency raises the ranking ---- */

@@ -11,6 +11,9 @@
   var lastWorld = null, taskOff = null, taskFor = null, task = null, crewId = null;
 
   function num(v, d) { if (v === null || v === undefined || v === '') return d; v = Number(v); return isFinite(v) ? v : d; }
+  /* 4-decimal degrees with hemisphere letter; a value that rounds to zero is never shown as south/west or '-0' */
+  function deg(v, pos, neg) { var r = Math.abs(v).toFixed(4); return r + '°' + (v < 0 && Number(r) !== 0 ? neg : pos); }
+  function wrapLon(v) { return ((v + 180) % 360 + 360) % 360 - 180; }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function txt(el, s) { if (el.textContent !== s) el.textContent = s; }
   function me() { try { return window.JdaWorld && JdaWorld.me ? JdaWorld.me() : null; } catch (e) { return null; } }
@@ -29,7 +32,7 @@
     else if (p < T.pctCaution) l = 'caution';
     else l = 'nominal';
     if (prev === 'danger' && l !== 'danger' && p < T.pctCritical + 3) l = 'danger';
-    if (prev !== 'nominal' && l === 'nominal' && p < T.pctCaution + 3) l = prev;
+    else if (prev !== 'nominal' && l === 'nominal' && p < T.pctCaution + 3) l = 'caution';   // leaving danger or caution: one step at a time, never a jump back to danger
     return (lv[key] = l);
   }
   function radLevel(r) {
@@ -54,24 +57,49 @@
   }
 
   /* ---------- minimap ---------- */
+  /* crop of the Jezero CTX mosaic that fits base camp and the five stops; the crew dot moves over it */
+  var MM = null;
+  function mmSetup() {
+    var M = window.JEZERO_MISSION, pts = [];
+    if (M && M.base && isFinite(M.base.x)) pts.push({ x: +M.base.x, y: +M.base.y, base: true, name: 'Base camp' });
+    if (M && M.stops) M.stops.forEach(function (s) { if (isFinite(s.x) && isFinite(s.y)) pts.push({ x: +s.x, y: +s.y, n: s.n, name: s.name }); });
+    if (!pts.length) return null;
+    var xs = pts.map(function (q) { return q.x; }), ys = pts.map(function (q) { return q.y; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var box = $('map'), marks = [];
+    pts.forEach(function (q) {
+      var e = document.createElement('i'); e.className = 'mk' + (q.base ? ' base' : ''); e.textContent = q.base ? '' : String(q.n);
+      box.insertBefore(e, $('dot')); marks.push({ q: q, el: e });
+    });
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: Math.max(60, x1 - x0), h: Math.max(60, y1 - y0), marks: marks };
+  }
   function minimap(m) {
     m = m || {};
+    if (MM === null) MM = mmSetup() || false;
     var map = $('map'), cw = map.clientWidth, ch = map.clientHeight, img = $('mapImg'), dot = $('dot');
-    var iw = cw * ZOOM, ih = iw * MAP_H / MAP_W;
-    img.style.backgroundSize = iw + 'px ' + ih + 'px';
+    var c = MM || { cx: MAP_W / 2, cy: MAP_H / 2, w: MAP_W, h: MAP_H, marks: [] };
+    var PAD = 14, sc = Math.min((cw - 2 * PAD) / c.w, (ch - 2 * PAD) / c.h);
+    var ox = cw / 2 - c.cx * sc, oy = ch / 2 - c.cy * sc;    // atlas px -> minimap px: p * sc + o
+    img.style.backgroundSize = MAP_W * sc + 'px ' + MAP_H * sc + 'px';
+    img.style.backgroundPosition = ox + 'px ' + oy + 'px';
+    c.marks.forEach(function (k) { k.el.style.left = (k.q.x * sc + ox) + 'px'; k.el.style.top = (k.q.y * sc + oy) + 'px'; });
     var x = num(m.x, NaN), y = num(m.y, NaN);
-    if (!isFinite(x) || !isFinite(y)) { dot.style.display = 'none'; img.style.backgroundPosition = '50% 50%'; return; }
+    if (!isFinite(x) || !isFinite(y)) { dot.style.display = 'none'; return; }
     dot.style.display = '';
-    var px = x / MAP_W * iw, py = y / MAP_H * ih;
-    var bx = Math.min(0, Math.max(cw - iw, cw / 2 - px)), by = Math.min(0, Math.max(ch - ih, ch / 2 - py));
-    img.style.backgroundPosition = bx + 'px ' + by + 'px';
-    var dx = bx + px, dy = by + py;
-    var off = dx < 0 || dx > cw || dy < 0 || dy > ch || x < 0 || y < 0 || x > MAP_W || y > MAP_H;
+    var dx = x * sc + ox, dy = y * sc + oy;
+    var off = dx < 0 || dx > cw || dy < 0 || dy > ch;
     dx = Math.min(cw - 6, Math.max(6, dx)); dy = Math.min(ch - 6, Math.max(6, dy));
     dot.style.left = dx + 'px'; dot.style.top = dy + 'px';
     dot.classList.toggle('off', off);
     dot.style.setProperty('--hd', num(m.headingDeg, 0) + 'deg');
-    $('map').setAttribute('aria-label', 'Minimap, position ' + Math.round(x) + ' by ' + Math.round(y) + (off ? ', outside the mapped area' : ''));
+    $('map').setAttribute('aria-label', 'Minimap: base camp, stops 1 to 5 and your position' + (off ? ' (you are outside the mapped area)' : ''));
+  }
+  function travelTag(m) {
+    var moving = m && (m.mode === 'walking' || m.mode === 'returning');   // no tag while idle or resting at base: nobody is out or driving
+    var t = moving ? (m.travel === 'rover' ? 'ROVER' : m.travel === 'foot' ? 'EVA' : '') : '', sp = m ? num(m.speedMps, NaN) : NaN;
+    var tag = $('travel');
+    txt(tag, t ? t + (isFinite(sp) && sp > 0.05 ? ' ' + sp.toFixed(1) + ' m/s' : '') : '');
+    tag.hidden = !t;
   }
 
   /* ---------- alerts ---------- */
@@ -120,11 +148,33 @@
   }
 
   /* ---------- next task ---------- */
-  function fallbackTask() {
-    var M = window.JEZERO_MISSION, s = M && M.stops;
-    if (!s || !s.length) return null;
-    for (var i = 0; i < s.length; i++) if (!s[i].done) return { title: str(s[i].name, 120), startISO: null, whenText: null };
-    return null;
+  function missionTasks() { var M = window.JEZERO_MISSION; return M && M.tasks ? M.tasks : []; }
+  function stopName(id) {
+    var M = window.JEZERO_MISSION, st = M && M.stops ? M.stops.filter(function (x) { return x.id === id; })[0] : null;
+    return st ? (st.n ? 'Stop ' + st.n + ': ' : '') + st.name : '';
+  }
+  function doneIds() {
+    var set = {}, ms = task && Array.isArray(task.missions) ? task.missions : null;
+    if (ms) ms.forEach(function (x) { if (x && x.done) set[x.id] = 1; });
+    return set;
+  }
+  /* next undone task of the ordered list; a world record naming a task (taskId) sets the starting point */
+  function nextTask(m) {
+    var list = missionTasks(), done = task && Array.isArray(task.missions) ? doneIds() : null, i = 0, n;
+    if (!list.length) {
+      n = task && task.next && typeof task.next === 'object' ? task.next : null;
+      return n ? { title: str(n.title, 120), where: str(n.stopName, 80), startISO: n.startISO || null } : null;
+    }
+    if (m && m.taskId) { for (var k = 0; k < list.length; k++) if (list[k].id === m.taskId) { i = k; break; } }
+    else if (m && m.stopId) { for (var j = 0; j < list.length; j++) if (list[j].stopId === m.stopId) { i = j; break; } }
+    else if (m && !done && m.progress && isFinite(Number(m.progress.done))) i = Math.max(0, Math.min(list.length, Math.floor(Number(m.progress.done))));   // no tablet data and no task in the record (e.g. after a fallback): continue after the tasks the run finished
+    for (; i < list.length; i++) if (!done || !done[list[i].id]) break;
+    if (i >= list.length) return { done: true };
+    if (!(m && (m.taskId || m.stopId)) && !done && task && task.next && task.next.taskId) {
+      for (var q = 0; q < list.length; q++) if (list[q].id === task.next.taskId) { i = q; break; }
+    }
+    var t = list[i], n2 = task && task.next && task.next.taskId === t.id ? task.next : null;
+    return { title: str(t.title, 120), where: stopName(t.stopId), startISO: n2 && n2.startISO ? n2.startISO : null };
   }
   function watchTasks(id) {
     if (!id || id === taskFor || !window.JdaLink || !JdaLink.onState) return;
@@ -133,20 +183,16 @@
     try { taskOff = JdaLink.onState('tasks:' + id, function (v) { task = v && typeof v === 'object' ? v : null; renderTask(); }); } catch (e) { taskOff = null; }
   }
   function renderTask() {
-    var n = task && task.next && typeof task.next === 'object' ? task.next : null, title, when = '';
-    if (n) {
-      title = str(n.title, 120);
-      var d = n.startISO ? new Date(n.startISO) : null, nw = now();
+    var nt = nextTask(lastWorld), title, when = '';
+    if (nt && nt.done) title = 'All tasks complete';
+    else if (nt) {
+      title = nt.title; when = nt.where;
+      var d = nt.startISO ? new Date(nt.startISO) : null, nw = now();
       if (d && !isNaN(d) && nw) {
         var mins = Math.round((d - nw) / 60000);
-        when = mins > 1 ? 'Starts at ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' (in ' + (mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min') + ')' : 'Starting now';
-      } else when = 'No start time set';
-    } else if (task && task.progress && task.progress.total > 0 && task.progress.done >= task.progress.total) {
-      title = 'All tasks complete'; when = '';
-    } else {
-      var f = fallbackTask();
-      if (f) { title = f.title; when = ''; } else { title = 'No task scheduled'; }
-    }
+        when += (when ? ' - ' : '') + (mins > 1 ? 'in ' + (mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min') : 'now');
+      }
+    } else title = 'No task scheduled';
     txt($('taskTitle'), title); txt($('taskWhen'), when);
   }
 
@@ -159,7 +205,8 @@
     var lh = lmst();
     txt($('clock'), lh == null ? '--:--' : pad(Math.floor(lh)) + ':' + pad(Math.floor((lh % 1) * 60)));
     var temp = m ? num(m.ambientTempC, NaN) : NaN, rad = m ? num(m.radUsvH, NaN) : NaN;
-    txt($('temp'), isFinite(temp) ? Math.round(temp) + ' °C' : '--');
+    if (isFinite(rad)) rad = Math.max(0, Math.min(99999, rad));
+    txt($('temp'), isFinite(temp) ? (Math.round(Math.max(-999, Math.min(999, temp))) || 0) + ' °C' : '--');
     var rl = isFinite(rad) ? radLevel(rad) : 'nominal';
     var rd = $('rad'); txt(rd, isFinite(rad) ? rad.toFixed(rad < 10 ? 1 : 0) + ' µSv/h' : '--'); rd.className = rl === 'nominal' ? '' : rl;
     var o2 = m && isFinite(num(m.o2Pct, NaN)) ? num(m.o2Pct, 0) : null, bt = m && isFinite(num(m.batPct, NaN)) ? num(m.batPct, 0) : null;
@@ -170,15 +217,17 @@
     setAlert('bat', lb, lb === 'danger' ? 'battery critical' : 'battery low');
     if (m && isFinite(num(m.lat, NaN)) && isFinite(num(m.lon, NaN))) {
       var z = num(m.zM, NaN);
-      txt($('coords'), Math.abs(m.lat).toFixed(4) + '°' + (m.lat >= 0 ? 'N' : 'S') + ', ' + Math.abs(m.lon).toFixed(4) + '°' + (m.lon >= 0 ? 'E' : 'W') + ', z ' + (isFinite(z) ? Math.round(z) + ' m' : '--'));
+      txt($('coords'), deg(num(m.lat, 0), 'N', 'S') + ', ' + deg(wrapLon(num(m.lon, 0)), 'E', 'W') + ', z ' + (isFinite(z) ? Math.round(z) + ' m' : '--'));
     } else txt($('coords'), '--');
-    minimap(m);
+    minimap(m); travelTag(m);
     renderTask();
   }
 
   /* ---------- parallax drift while walking ---------- */
   function drift(ts) {
     var m = lastWorld, walking = m && (m.mode === 'walking' || m.mode === 'returning');
+    if (!walking && ts - drift.last < 66) { requestAnimationFrame(drift); return; }   // idle sway is a few px per second: about 15 updates a second are enough
+    drift.last = ts;
     var t = ts / 1000, sp = walking ? Math.max(0.6, Math.min(2.5, num(m && m.speedMps, 1))) : 0;
     var amp = walking ? 1 : 0.18;
     var x = Math.sin(t * 0.21) * 14 * amp + (walking ? Math.sin(t * 0.9 * sp) * 2.5 : 0);
@@ -186,6 +235,8 @@
     $('scene').style.setProperty('--px', x.toFixed(1) + 'px'); $('scene').style.setProperty('--py', y.toFixed(1) + 'px');
     requestAnimationFrame(drift);
   }
+
+  drift.last = 0;
 
   /* ---------- wiring ---------- */
   function start() {

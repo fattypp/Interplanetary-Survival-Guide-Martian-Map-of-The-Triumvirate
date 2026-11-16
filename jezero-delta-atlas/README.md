@@ -1,6 +1,6 @@
 # Jezero Delta Atlas
 
-Interactive map of the western Jezero Crater delta and the mouth of the Neretva Vallis channel on Mars (CTX imagery), with a Python model that marks craters as walking hazards. Crater marks sit in their own layers, switched on and off from the Layers menu.
+Interactive map of the western Jezero Crater delta and the mouth of the river channel on its western side on Mars (CTX imagery), with a Python model that marks craters as walking hazards. Crater marks sit in their own layers, switched on and off from the Layers menu.
 
 ## Map area
 
@@ -59,9 +59,9 @@ These credits and caveats were removed from the web page itself (the page shows 
 
 **Imagery.** CTX mosaic by the [Bruce Murray Laboratory, Caltech](https://murray-lab.caltech.edu/CTX/) (global mosaic V01, 5 m/pixel), cut to this area with integration/fetch_ctx.py. Inset is MOLA colour-shaded relief from [NASA Mars Trek](https://trek.nasa.gov/mars/).
 
-**Samples.** Names, areas, rock types and sols from NASA's [Mars rock samples](https://science.nasa.gov/mission/mars-2020-perseverance/mars-rock-samples/) page.
+**Mission.** Base camp, the five stops and their coordinates come from the repository's `MissionGuide` file (the stops are placed to about 400 to 500 m; see its accuracy notes). The ten tasks are editorial and need the science owner's confirmation. Perseverance's rock-sample sites are no longer part of this atlas.
 
-**Route.** Three Forks and Hawksbill Gap follow NASA's Delta Front campaign posts. Raw camera frames at [Mars 2020 raw images](https://mars.nasa.gov/mars2020/multimedia/raw-images/) carry no map coordinates, so they were not used for placement.
+**Route.** The route planner avoids detected craters. The Three Forks area follows NASA's depot map. Raw camera frames at [Mars 2020 raw images](https://mars.nasa.gov/mars2020/multimedia/raw-images/) carry no map coordinates, so they were not used for placement.
 
 **Crater detection.** Python script `model/crater_detector.py` run on the CTX mosaic above. Output is the crater data embedded in this page (`craters-data.js`).
 

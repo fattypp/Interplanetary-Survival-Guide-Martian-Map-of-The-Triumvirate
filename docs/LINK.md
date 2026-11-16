@@ -6,7 +6,7 @@ The API is in `docs/MULTIPAGE.md`; this file is the operations guide.
 
 ## Rooms
 - A code has 5 characters: A-Z without I and O, and 2-9 (example `K7M2P`). `JdaLink.join(null, ...)` or the "Create new room" button makes one.
-- Enter the same code on every page and device that should talk. `#room=K7M2P` at the end of a page URL joins directly (changing the hash on an open page switches rooms); "Copy link" in the status chip copies it.
+- Enter the same code on every page and device that should talk. `#room=K7M2P` at the end of a page URL joins directly (pages that ask who you are, atlas/helmet/tablet, show the dialog on a browser that has not chosen a crew yet; add `&crew=jayesh` or `&crew=juhyeok` to skip it, or mount with `defaultCrew:'jayesh'`) (changing the hash on an open page switches rooms); "Copy link" in the status chip copies it.
 - Messages, state and presence never cross rooms (the code is part of every message, relay path, storage key and BroadcastChannel name; anything whose room field differs is dropped).
 - The last room and crew choice are remembered in the browser (`localStorage` key `jda.linkui.last`).
 - Backwards compatibility: if a page uses `on/send/history/...` without ever calling `join()`, it is placed in the room `LOCAL`, which never leaves that browser.
@@ -63,3 +63,8 @@ The Supabase transport was written against the documented REST API and has NOT b
 ## Tests
 `tests/link.test.js` (browser, see the header of the file) covers codes, validation, isolation between rooms, dedupe, no echo, state and presence on the local transport.
 The relay tests (status `relay`, messages, state, presence, isolation, 413/400/404/429) run automatically when the page is served by `relay.py`, otherwise they are skipped; run the file on both servers. `tests/link-harness.html` is a small page for manual two-tab / two-device checks.
+
+## Recovery and delivery (relay)
+- Messages wait in an outbox until the relay accepted them (relay restarting, 429, brief outage) and are retried on every poll; the relay and readers dedupe by id.
+- The relay reports an `epoch` (new on every start). When it changes, a page re-posts its own recent messages and its own state values that the relay no longer has, and restarts its cursors. A relay that is down at load is probed again every 4 s.
+- Message and state sizes are measured in UTF-8 bytes on both sides (500 emoji fit). A page keeps the last 200 messages (`history()`), the relay 200 per room.

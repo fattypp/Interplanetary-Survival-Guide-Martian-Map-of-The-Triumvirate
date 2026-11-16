@@ -17,12 +17,35 @@
   }
   function load() { try { var o = JSON.parse(localStorage.getItem(LAST) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
   function save(o) { try { localStorage.setItem(LAST, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function hashRaw() {   // the room text in the URL hash as typed (normalised), or null when there is none
+    var m = /[#&]room=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* use as typed */ }
+    return window.JdaLink.normCode(raw);
+  }
+  var BAD_CODE = 'Room codes have 5 letters or digits, no I or O. Check the code or create a new room.';
+  function hashBad() { var r = hashRaw(); return r !== null && !window.JdaLink.isValidCode(r); }
   function hashCode() {
     var m = /[#&]room=([^&]*)/.exec(location.hash || '');
     if (!m) return '';
-    var c = window.JdaLink.normCode(decodeURIComponent(m[1]));
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* malformed escape: use the text as typed */ }
+    var c = window.JdaLink.normCode(raw);
     return window.JdaLink.isValidCode(c) ? c : '';
   }
+  function hashCrew() {   // #room=CODE&crew=jayesh picks a known crew member without asking
+    var m = /[#&]crew=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var v = m[1];
+    try { v = decodeURIComponent(v); } catch (e) { return null; }
+    v = slug(v);
+    for (var i = 0; i < CREW.length; i++) if (CREW[i].id === v) return CREW[i];
+    // crew members added on the control page: any valid id that is not reserved
+    if (v && RESERVED.indexOf(v) < 0) return { id: v, name: v.charAt(0).toUpperCase() + v.slice(1) };
+    return null;
+  }
+  var RESERVED = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];
   function linkFor(code) {
     return location.origin + location.pathname + location.search + '#room=' + code;
   }
@@ -44,7 +67,11 @@
     var offs = [];
 
     function who(saved) {
-      if (wantCrew) return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      if (wantCrew) {
+        var hc2 = hashCrew() || (saved.crewId ? null : CREW.filter(function (c) { return c.id === opts.defaultCrew; })[0]);
+        if (hc2 && hashCode()) return { role: role, id: hc2.id, name: hc2.name };
+        return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      }
       if (wantName) return { role: role, id: opts.id || role, name: saved.name || opts.name || '' };
       return { role: role, id: opts.id || role, name: opts.name || '' };
     }
@@ -150,7 +177,7 @@
       opener = from || null;
       var saved = load(), n = ++uid, firstRun = !joined();
       var cur = joined() ? L.room : null;
-      var codeVal = hashCode() || (cur && cur.code) || saved.code || '';
+      var badHash = hashBad(), codeVal = badHash ? hashRaw().slice(0, 5) : (hashCode() || (cur && cur.code) || saved.code || '');
       back = el('div', 'lu-back');
       dlg = el('div', 'lu-dlg', null, { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'lu-t' + n, 'aria-describedby': 'lu-d' + n });
       dlg.appendChild(el('h2', null, firstRun ? 'Join a room' : 'Change room', { id: 'lu-t' + n }));
@@ -197,7 +224,7 @@
         crewOther.parentNode.querySelector('#lu-otherl' + n).hidden = !other;
         crewOther.hidden = !other;
       }
-      var err = el('p', 'lu-err', '', { id: 'lu-e' + n, role: 'alert' });
+      var err = el('p', 'lu-err', badHash ? BAD_CODE : '', { id: 'lu-e' + n, role: 'alert' });
       form.appendChild(err);
       var act = el('div', 'lu-act');
       var joinBtn = el('button', 'lu-btn lu-primary', 'Join room', { type: 'submit' });
@@ -213,7 +240,9 @@
           if (!r) return { error: 'Choose who you are.' };
           if (r.value !== '__other') { var c = CREW.filter(function (x) { return x.id === r.value; })[0]; return { role: role, id: c.id, name: c.name }; }
           var nm = crewOther.value.trim().slice(0, 24), sl = slug(nm);
-          if (!sl) return { error: 'Enter your name.' };
+          if (!nm) return { error: 'Enter your name.' };
+          if (!sl) return { error: 'Use at least one letter A-Z or digit in your name.' };
+          if (RESERVED.indexOf(sl) >= 0) return { error: 'That name is reserved. Choose another one.' };
           return { role: role, id: sl, name: nm };
         }
         if (wantName) { var v = nameIn.value.trim().slice(0, 24); return { role: role, id: opts.id || role, name: v || opts.name || '' }; }
@@ -234,7 +263,7 @@
       back.appendChild(dlg);
       root.appendChild(back);
       document.addEventListener('keydown', onKey, true);
-      (code.value ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
+      (code.value && !badHash ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
     }
 
     /* ----- start ----- */
@@ -242,11 +271,13 @@
     var saved = load(), hc = hashCode(), code = hc || saved.code || '';
     var info = who(saved);
     var identityKnown = !wantCrew || !!info.id;
-    if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
+    if (hashBad()) openDialog(null);   // a broken code in the URL never falls back to the remembered room
+    else if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
     else openDialog(null);
 
     function onHash() {
       var c = hashCode();
+      if (!c && hashBad() && !dlg) { openDialog(null); return; }
       if (!c || (L.room && L.room.code === c && joined())) return;
       var sv = load(), inf = who(sv);
       if (!wantCrew || inf.id) { if (dlg) closeDialog(); joinNow(c, inf); }

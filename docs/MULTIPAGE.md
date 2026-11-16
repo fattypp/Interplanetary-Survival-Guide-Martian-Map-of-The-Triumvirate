@@ -76,3 +76,21 @@ Need something from another owner? Use the API above, and say so in your report;
 - Serve with your own port: `python3 -m http.server <PORT>` from the repo root (your port is given in your task), or the relay server once it exists. Test in a real browser (Chrome tools): a fresh load must have no console errors. Open your own tab and close it when done. Stop your server when done.
 - User-facing text must read like the real product used by an astronaut: no "simulated", "simulation", "demo", "mock", "(sim)" wording on crew-facing pages (helmet, tablet, atlas, earth, chat). Only the control page (`control.html`) may say it drives a simulation. Provenance notes belong in docs, not in the UI.
 - Final report: what you built, files, what you verified in the browser (and how), what you could NOT verify, open questions. Be honest; a boss will interrogate you.
+
+## Mission data v2 (replaces the 34 stops / samples; binding for every page)
+Source of truth: `docs/mission-guide.md`, generated into `web/data/mission-data.js` (`window.JEZERO_MISSION`) by `python3 integration/web_bridge.py missiondata`.
+The mission is "Jezero Pathfinder" (see `MissionGuide` at the repo root for the story and stop coordinates): a crew drives a pressurised rover from base camp, gets out on foot at FIVE stops, then drives back.
+```
+JEZERO_MISSION = {
+  objectives: [ {id:1, title:'Find evidence of ancient microbial life', short:'Microbial life'},
+                {id:2, title:'Assess whether the site can sustain human life', short:'Sustaining human life'} ],
+  base:  { id:'base', name:'Base camp', lat, lon, x, y },              // start and end of the drive, INSIDE the atlas map (18.447 N, 77.408 E)
+  stops: [ {id:'stop-1', n:1, name, lat, lon, x, y, description}, ... ],  // exactly 5, in visiting order
+  tasks: [ {id:'task-1-1', stopId:'stop-1', objective:1|2, title, description, estMin}, ... ] // exactly 10: per stop one task for Objective 1 and one for Objective 2
+}
+```
+x,y are atlas page px (1990x1390). There are NO sample sites, NO "places", NO per-sample sols/dates anywhere any more. Pages must not invent other stops. Base camp replaces the old landing site everywhere (Atlas.landing, world.base, BASE pin, SOS home): it is on the map, so Atlas.me is no longer clamped to the edge.
+Travel speeds, single source `web/data/travel-speeds.js` (`window.JEZERO_SPEEDS = {rover:{label,mps}, foot:{label,mps}}`): the pressurised rover is FASTER than a person on foot. Nothing may hard-code 0.042 or 1.4 m/s any more.
+
+### World additions (sim agent, round 2)
+Additive fields on each crew record: `travel:'rover'|'foot'`, `stopId:<id>|null` and `taskId:<id>|null` (set while the crew is on foot at a stop during the mission run), `progress:{done,total}` (tasks finished by the run), `distM`, `etaS` (to the current target, simulated seconds). `mode` values are unchanged. `world.base` is the base camp. New cmds: `runMission {crew}`, `setTravel {crew, mode}`; `walk` accepts `travel`.

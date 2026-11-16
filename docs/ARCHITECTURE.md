@@ -50,12 +50,13 @@ Atlas.pick.cancel(owner?)  // cancel the active pick (only if it belongs to owne
 Atlas.pick.busy()          // true while a pick is active or just consumed a click: pin click handlers should return early
 Atlas.picking()            // owner of the active pick, or null
 // bus: 'pick:changed' {owner|null}
-Atlas.mapData = { samples: [{n, name, area, x, y, onMap}], places: [{id, name, x, y, onMap}] }   // page px, the same values the sample / place layers draw; onMap false = outside this map
-Atlas.landing = { x, y, onMap }   // true page point of the landing site (east of the map). Atlas.me starts at the nearest map-edge point instead
+Atlas.mapData = { base:{id,name,x,y}, stops:[{id,n,name,x,y}] }   // page px of base camp and the 5 stops (from data/mission-data.js). There are no sample sites or place names any more
+Atlas.base = { id:'base', name, x, y }   // base camp, start and end of the drive, inside the map; Atlas.me starts exactly here
+Atlas.landing = { x, y, onMap:true }   // alias of base camp for old code
 ```
 **Picking rules.** Anything that needs "click a point on the map" (route planner, mission "Pick on map", suit "Move here") must use `Atlas.pick`,
 not `Atlas.onMapClick` (which stays a plain broadcast for passive listeners). While a pick is active, the next non-drag map click goes ONLY to `fn({x,y,event})`:
-it is not sent to `onMapClick` subscribers, and crater / sample / place clicks do nothing (so a pick never opens other UI; pins drawn by other features should start their click handler with `if (Atlas.pick.busy()) return;`, which is true while a pick is active and for the instant after a pick consumed the click). The pick then ends.
+it is not sent to `onMapClick` subscribers, and crater clicks do nothing (so a pick never opens other UI; pins drawn by other features should start their click handler with `if (Atlas.pick.busy()) return;`, which is true while a pick is active and for the instant after a pick consumed the click). The pick then ends.
 Starting a new pick cancels the previous one (its `onCancel` runs), Esc or the banner's Cancel button cancels the active one. A banner "Click the map: <label> (Esc cancels)" is shown. To pick several points, call `Atlas.pick` again from inside `fn`.
 
 ### Tabs
@@ -82,7 +83,7 @@ The existing crater / reference layers are registered by the shell through the s
 ### Position of the user (simulated)
 
 ```js
-Atlas.me = { x, y }                   // page px of the user (the astronaut). Starts at the landing site. Owned by suit.js, which moves it.
+Atlas.me = { x, y }                   // page px of the user (the astronaut). Starts at base camp (Atlas.base). Owned by suit.js, which moves it.
 Atlas.bus.emit('me:moved', {x, y})
 ```
 
@@ -90,9 +91,12 @@ Atlas.bus.emit('me:moved', {x, y})
 
 ```js
 // mission.js
-Atlas.missions.list()   -> [{ id, title, kind:'objective'|'stop'|'custom', description, x, y, lat, lon, source }]  // objectives from docs/mission-guide.md, stops, user-added
+Atlas.missions.list()   -> [{ id, title, kind:'objective'|'stop'|'task'|'custom', description, x, y, lat, lon, source }]  // 2 objectives, 5 stops, 10 tasks (docs/mission-guide.md), then user-added
+  // stop: {n, name, taskIds, done (both tasks done)}; task: {stopId, stopNo, stopName, objective:1|2, objectiveShort, estMin, done, x, y (of its stop)}
 Atlas.missions.add({ title, description, x, y })
-Atlas.missions.stops()  -> stops only
+Atlas.missions.stops()  -> stops only;  Atlas.missions.tasks() -> the 10 tasks;  Atlas.missions.base() -> base camp
+Atlas.missions.setDone(id, flag) / isDone(id)   // id of a task, a stop (sets both its tasks) or a custom mission
+// Atlas.todos.list() mission items: id 'mission:<taskId>', missionId = task id, estMin = task estMin, in stop order
 // events: 'missions:changed'
 
 // planner.js / schedule-engine.js

@@ -1,11 +1,10 @@
-/* Astronaut tablet: global Mars map, BASE / YOU pins, mission task pop-up, Add Location, distance, SOS.
+/* Astronaut tablet: global Mars map, BASE (base camp) / YOU pins, five numbered stops with the route, mission task pop-up, Add Location, distance, SOS.
    Needs data/mars-sites.js and data/mission-data.js. Uses JdaLink, JdaLinkUI and JdaWorld when present (all guarded). */
 (function () {
   'use strict';
-  var SITES = window.MARS_SITES, MD = window.JEZERO_MISSION || { objectives: [], stops: [] };
+  var SITES = window.MARS_SITES, MD = window.JEZERO_MISSION || { objectives: [], stops: [], tasks: [], base: null };
   if (!SITES) { if (window.console) console.error('tablet.js needs data/mars-sites.js'); return; }
-  var RK = SITES.radiusKm, D2R = Math.PI / 180, MAX_PPD = 9000, JZ_PPD_MIN = 700;
-  var LANDING = { lat: 18.4446, lon: 77.4509 };
+  var RK = SITES.radiusKm, D2R = Math.PI / 180, MAX_PPD = 9000, JZ_PPD_MIN = 400;
 
   function $(id) { return document.getElementById(id); }
   function el(tag, props, kids) {
@@ -23,7 +22,7 @@
   function lsGet(k, f) { try { var v = localStorage.getItem('jda.' + k); return v == null ? f : JSON.parse(v); } catch (e) { return f; } }
   function lsSet(k, v) { try { localStorage.setItem('jda.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
   function link() { return window.JdaLink || null; }
-  function normLon(l) { l = ((l + 180) % 360 + 360) % 360 - 180; return l; }
+  function normLon(l) { l = ((l + 180) % 360 + 360) % 360 - 180; l = Math.round(l * 1e6) / 1e6; return l === 0 ? 0 : l; }   // rounded so 77.4 stays 77.4 (no 77.39999999999998), never -0
 
   /* ---------- identity and world ---------- */
   var lastWorld = null;
@@ -32,10 +31,11 @@
   function crewId() { var l = link(), r = l && l.room, m = me(); return (isJoined() && r.id) || (m && m.id) || 'crew'; }
   function crewName() { var l = link(), r = l && l.room, m = me(); return (m && m.name) || (isJoined() && r.name) || crewId(); }
   function baseLL() {
+    if (MD.base && isFinite(MD.base.lat) && isFinite(MD.base.lon)) return { lat: +MD.base.lat, lon: +MD.base.lon };
     var w = lastWorld;
     if (!w && link() && link().getState) { try { var s = link().getState('world'); w = s && s.value; } catch (e) { /* ignore */ } }
     if (w && w.base && isFinite(w.base.lat) && isFinite(w.base.lon)) return { lat: +w.base.lat, lon: +w.base.lon };
-    return LANDING;
+    return MD.base && isFinite(MD.base.lat) ? { lat: +MD.base.lat, lon: +MD.base.lon } : { lat: SITES.jezero.lat, lon: SITES.jezero.lon };
   }
   function youLL() {
     var m = me();
@@ -49,8 +49,9 @@
     var s = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
     return 2 * RK * Math.asin(Math.min(1, Math.sqrt(s)));
   }
-  function fmtLat(v) { return Math.abs(v).toFixed(4) + ' ' + (v >= 0 ? 'N' : 'S'); }
-  function fmtLon(v) { v = normLon(v); return Math.abs(v).toFixed(4) + ' ' + (v >= 0 ? 'E' : 'W'); }
+  function fmtDeg(v, pos, neg) { var r = Math.abs(v).toFixed(4); return r + ' ' + (v < 0 && Number(r) !== 0 ? neg : pos); }   // a value that rounds to zero is never shown as S or W
+  function fmtLat(v) { return fmtDeg(v, 'N', 'S'); }
+  function fmtLon(v) { return fmtDeg(normLon(v), 'E', 'W'); }
 
   /* ---------- map view ---------- */
   var map = $('map'), cv = $('cv'), pinsEl = $('pins'), screen = $('screen'), ctx = cv.getContext('2d');
@@ -102,6 +103,7 @@
       var cx0 = W / 2 + (CTX.lon0 - view.lon) * view.ppd, cy0 = H / 2 - (CTX.lat1 - view.lat) * view.ppd, cw = (CTX.lon1 - CTX.lon0) * view.ppd, ch = (CTX.lat1 - CTX.lat0) * view.ppd;
       if (cx0 < W && cy0 < H && cx0 + cw > 0 && cy0 + ch > 0) { ctx.globalAlpha = cA; ctx.drawImage(cimg, cx0, cy0, cw, ch); ctx.globalAlpha = 1; }
     }
+    drawRoute();
     // graticule
     var raw = 120 / view.ppd, step = STEPS[0], i;
     for (i = 0; i < STEPS.length; i++) if (STEPS[i] >= raw) step = STEPS[i];
@@ -120,6 +122,33 @@
     ctx.shadowBlur = 0;
     placePins();
     updateNote();
+  }
+
+  /* dashed route: base camp -> stops 1..5 -> base camp, from JEZERO_MISSION */
+  function routePts() {
+    var pts = [], b = MD.base;
+    if (!b || !isFinite(b.lat) || !(MD.stops || []).length) return pts;
+    pts.push(b); (MD.stops || []).forEach(function (s) { if (isFinite(s.lat) && isFinite(s.lon)) pts.push(s); }); pts.push(b);
+    return pts;
+  }
+  function drawRoute() {
+    if (view.ppd < 150) return;
+    var pts = routePts(); if (pts.length < 3) return;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash([9, 7]);
+    [['#000', 5], ['#ffd23f', 2.5]].forEach(function (st) {
+      ctx.strokeStyle = st[0]; ctx.lineWidth = st[1]; ctx.beginPath();
+      pts.forEach(function (q, i) { var p = project(q.lon, q.lat); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+  /* view that shows base camp and all five stops inside the free part of the screen */
+  function jezeroView() {
+    var pts = routePts(), j = SITES.jezero; if (!pts.length) return { lat: j.lat, lon: j.lon, ppd: j.ppd };
+    var la = pts.map(function (q) { return q.lat; }), lo = pts.map(function (q) { return q.lon; });
+    var la0 = Math.min.apply(null, la), la1 = Math.max.apply(null, la), lo0 = Math.min.apply(null, lo), lo1 = Math.max.apply(null, lo);
+    var a = bestFree() || { w: W, h: H }, ppd = Math.min(MAX_PPD, Math.max(JZ_PPD_MIN, Math.min((a.w - 320) / Math.max(1e-6, lo1 - lo0), (a.h - 300) / Math.max(1e-6, la1 - la0))));
+    return { lat: (la0 + la1) / 2, lon: (lo0 + lo1) / 2, ppd: ppd };
   }
 
   function animateTo(t, ms) {
@@ -205,7 +234,7 @@
     return { lon: lon - (cx - W / 2) / ppd, lat: lat + (cy - H / 2) / ppd, ppd: ppd };
   }
   function goGlobal() { var hv = homeView(); animateTo(hv, 450); }
-  function goJezero() { var j = SITES.jezero; animateTo(viewCenteredOn(j.lat, j.lon, j.ppd, bestFree()), 600); }
+  function goJezero() { var j = jezeroView(); animateTo(viewCenteredOn(j.lat, j.lon, j.ppd, bestFree()), 600); }
   function goMe() { var y = youLL(); animateTo(viewCenteredOn(y.lat, y.lon, Math.max(view.ppd, 300), bestFree()), 500); }
   $('v-global').addEventListener('click', goGlobal);
   $('v-jezero').addEventListener('click', goJezero);
@@ -220,18 +249,33 @@
 
   /* ---------- tasks ---------- */
   var tasks = [], byId = {}, doneMap = {}, ownTasks = [], locs = [], sel = null, chosen = null, boundCrew = null;
-  function isDone(t) { return Object.prototype.hasOwnProperty.call(doneMap, t.id) ? !!doneMap[t.id] : !!t.seedDone; }
+  var stopList = [], mtasks = [], groupBy = lsGet('tablet.group', 'stop') === 'objective' ? 'objective' : 'stop';
+  function objShort(n) { var o = (MD.objectives || []).filter(function (x) { return x.id === n; })[0]; return o ? (o.short || o.title) : 'Objective ' + n; }
+  /* what the shared world says is already done (by the crew's current task or its progress count); a manual check always wins */
+  function worldDoneSet() {
+    var m = me(), set = {}; if (!m) return set;
+    var idx = -1, i;
+    if (m.taskId) for (i = 0; i < mtasks.length; i++) if (mtasks[i].id === m.taskId) idx = i;
+    var n = idx >= 0 ? idx : (m.progress && isFinite(m.progress.done) ? Math.max(0, Math.min(mtasks.length, +m.progress.done)) : 0);
+    for (i = 0; i < n; i++) set[mtasks[i].id] = true;
+    return set;
+  }
+  var wDone = {};
+  function isDone(t) {
+    if (Object.prototype.hasOwnProperty.call(doneMap, t.id)) return !!doneMap[t.id];
+    return t.kind === 'mtask' ? !!wDone[t.id] : !!t.seedDone;
+  }
   function buildTasks() {
-    var out = [], sp = SITES.stopPos || {};
-    (MD.objectives || []).forEach(function (o) {
-      out.push({ id: o.id, title: o.title + ': ' + o.text, sub: 'Mission objective', kind: 'objective', desc: o.text, lat: null, lon: null });
+    var out = [];
+    stopList = (MD.stops || []).filter(function (s) { return s && isFinite(s.lat) && isFinite(s.lon); }).map(function (s) {
+      return { id: s.id, kind: 'stop', no: s.n, name: s.name, title: s.name, sub: 'Stop ' + s.n, desc: s.description || '', lat: +s.lat, lon: +s.lon };
     });
-    (MD.stops || []).forEach(function (s) {
-      var p = sp[s.id] || (isFinite(s.lat) && s.lat != null ? [s.lat, s.lon] : null);
-      var bits = [s.area]; if (s.sol != null) bits.push('Sol ' + s.sol); if (s.date) bits.push(s.date);
-      out.push({ id: s.id, no: s.no, title: s.kind === 'sample' ? 'Sample ' + s.no + ' - ' + s.name : s.name, sub: bits.join(' - '), kind: 'stop',
-        desc: s.description, lat: p ? p[0] : null, lon: p ? p[1] : null, approx: s.id !== 'place-landing' });
+    var stopBy = {}; stopList.forEach(function (s) { stopBy[s.id] = s; });
+    mtasks = (MD.tasks || []).filter(function (t) { return t && stopBy[t.stopId]; }).map(function (t) {
+      var st = stopBy[t.stopId];
+      return { id: t.id, kind: 'mtask', stop: st, stopId: t.stopId, obj: t.objective, tag: objShort(t.objective), title: t.title, desc: t.description || '', estMin: t.estMin, lat: st.lat, lon: st.lon };
     });
+    wDone = worldDoneSet();
     ownTasks.forEach(function (c) {
       out.push({ id: c.id, title: c.title, sub: 'My task', kind: 'task', desc: '', lat: c.lat == null ? null : c.lat, lon: c.lon == null ? null : c.lon, own: true });
     });
@@ -240,7 +284,7 @@
       if (t && typeof t.title === 'string' && t.title && t.id != null) out.push({ id: 'todo-' + String(t.id).slice(0, 40), title: t.title.slice(0, 80), sub: 'Planner to-do',
         kind: 'task', desc: typeof t.description === 'string' ? t.description.slice(0, 300) : '', lat: null, lon: null, seedDone: !!t.done });
     });
-    tasks = out; byId = {}; out.forEach(function (t) { byId[t.id] = t; });
+    tasks = out; byId = {}; stopList.concat(mtasks, out).forEach(function (t) { byId[t.id] = t; });
     if (sel && !byId[sel.id]) sel = null; else if (sel) sel = byId[sel.id];
   }
   function loadCrewData() {
@@ -250,72 +294,105 @@
     var l = lsGet('tablet.locs.' + c, []); locs = Array.isArray(l) ? l.filter(function (x) { return x && isFinite(x.lat) && isFinite(x.lon) && typeof x.name === 'string'; }) : [];
     buildTasks();
   }
-  function progress() { var d = 0; tasks.forEach(function (t) { if (isDone(t)) d++; }); return { done: d, total: tasks.length }; }
+  function progress() { var d = 0; mtasks.forEach(function (t) { if (isDone(t)) d++; }); return { done: d, total: mtasks.length }; }
   function updateProgress() {
     var p = progress(), pct = p.total ? Math.round(p.done / p.total * 100) : 0;
     $('bar-fill').style.width = pct + '%'; $('bar-txt').textContent = 'MISSION PROGRESS ' + p.done + ' / ' + p.total;
     var b = $('bar'); b.setAttribute('aria-valuenow', String(pct)); b.setAttribute('aria-valuetext', p.done + ' of ' + p.total + ' tasks done');
     $('pop-cnt').textContent = p.done + ' of ' + p.total + ' done';
   }
+  function refreshWorldDone() {
+    var n = worldDoneSet(), ch = Object.keys(n).length !== Object.keys(wDone).length;
+    if (!ch) return; wDone = n; updateProgress(); mtasks.forEach(refreshRow); refreshStopDots(); publish();
+  }
   var pubT = null;
   function publish() {
     clearTimeout(pubT);
     pubT = setTimeout(function () {
       var l = link(); if (!isJoined() || !l.setState) return;
-      var next = null, order = tasks.filter(function (t) { return t.kind === 'stop' || t.kind === 'task'; }).concat(tasks.filter(function (t) { return t.kind === 'objective'; }));
-      for (var i = 0; i < order.length; i++) if (!isDone(order[i])) { next = { title: order[i].title.slice(0, 80), startISO: null, kind: order[i].kind }; break; }
+      var next = null;
+      for (var i = 0; i < mtasks.length; i++) if (!isDone(mtasks[i])) {
+        var t = mtasks[i]; next = { title: t.title.slice(0, 80), startISO: null, kind: 'task', taskId: t.id, stopId: t.stopId, stopName: t.stop.name.slice(0, 60), objective: t.obj, estMin: t.estMin == null ? null : t.estMin }; break;
+      }
       try {
-        l.setState('tasks:' + crewId(), { next: next, missions: tasks.slice(0, 160).map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t) }; }), progress: progress() });
+        l.setState('tasks:' + crewId(), { next: next, missions: mtasks.map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t), stopId: t.stopId, objective: t.obj }; }), progress: progress() });
       } catch (e) { if (window.console) console.warn('tasks state not published', e); }
     }, 120);
   }
   function setDone(t, flag) {
     doneMap[t.id] = !!flag; lsSet('tablet.done.' + crewId(), doneMap);
     updateProgress(); refreshRow(t); if (sel && sel.id === t.id) renderDetail(); refreshStopDots();
-    try { var l = link(); if (l && isJoined()) l.send({ type: 'task', crew: crewId(), taskId: t.id, done: !!flag }); } catch (e) { /* link not ready */ }
+    if (t.kind === 'mtask') try { var l = link(); if (l && isJoined()) l.send({ type: 'task', crew: crewId(), taskId: t.id, done: !!flag }); } catch (e) { /* link not ready */ }
     publish();
   }
 
   /* ---------- pop-up ---------- */
-  var pop = $('pop'), listEl = $('pop-list'), rows = {}, userPlaced = false, dock = 'left';
+  var pop = $('pop'), listEl = $('pop-list'), rows = {}, heads = {}, userPlaced = false, dock = 'left';
   function atlasHref() { return /\/web\/html\//.test(location.pathname) ? 'index.html' : 'jezero-delta-atlas.html'; }
   function isSheet() { return W < 640 || (H > W * 1.2 && W < 900); }
+  function setGroup(g) {
+    groupBy = g; lsSet('tablet.group', g); renderList();
+    ['stop', 'objective'].forEach(function (k) { var b = $('grp-' + k); b.setAttribute('aria-pressed', k === g ? 'true' : 'false'); });
+  }
   function renderList() {
-    var keep = listEl.scrollTop; listEl.textContent = ''; rows = {};
-    [['Objectives', 'objective'], ['Stops', 'stop'], ['My tasks', 'task']].forEach(function (g) {
-      var items = tasks.filter(function (t) { return t.kind === g[1]; });
-      if (!items.length && g[1] !== 'task') return;
-      listEl.appendChild(el('h3', { text: g[0] }));
-      if (!items.length) { listEl.appendChild(el('p', { class: 'hint', text: 'None yet. Add one below.', attrs: { style: 'margin:2px 12px' } })); return; }
-      var ul = el('ul'); items.forEach(function (t) { ul.appendChild(makeRow(t)); }); listEl.appendChild(ul);
-    });
+    var keep = listEl.scrollTop; listEl.textContent = ''; rows = {}; heads = {};
+    function list(items) { var ul = el('ul'); items.forEach(function (t) { ul.appendChild(makeRow(t)); }); listEl.appendChild(ul); }
+    if (groupBy === 'objective') {
+      (MD.objectives || []).forEach(function (o) {
+        var its = mtasks.filter(function (t) { return t.obj === o.id; }); if (!its.length) return;
+        listEl.appendChild(el('h3', { text: o.title })); list(its);
+      });
+    } else {
+      stopList.forEach(function (st) {
+        var h = el('button', { type: 'button', class: 'grp', attrs: { 'aria-pressed': 'false' } }, [el('b', { text: String(st.no) }), el('span', { text: st.name })]);
+        h.addEventListener('click', function () { selectTask(st.id); });
+        heads[st.id] = h; listEl.appendChild(el('h3', { class: 'stop-h' }, [h]));
+        list(mtasks.filter(function (t) { return t.stopId === st.id; }));
+      });
+    }
+    listEl.appendChild(el('h3', { text: 'My tasks' }));
+    if (!tasks.length) listEl.appendChild(el('p', { class: 'hint', text: 'None yet. Add one below.', attrs: { style: 'margin:2px 12px' } })); else list(tasks);
+    Object.keys(heads).forEach(refreshHead);
     listEl.scrollTop = keep; updateProgress();
+  }
+  function rowSub(t) {
+    if (t.kind !== 'mtask') return t.sub;
+    return groupBy === 'objective' ? 'Stop ' + t.stop.no + ': ' + t.stop.name : t.tag + (t.estMin ? ' - about ' + t.estMin + ' min' : '');
   }
   function makeRow(t) {
     var cb = el('input', { type: 'checkbox', checked: isDone(t), attrs: { 'aria-label': 'Done: ' + t.title } });
     cb.addEventListener('change', function () { setDone(t, cb.checked); });
-    var ttl = el('button', { type: 'button', class: 'ttl', attrs: { 'aria-pressed': 'false' } }, [el('span', { text: t.title }), el('small', { text: t.sub + (t.lat != null ? '' : '') })]);
+    var subKids = [];
+    if (t.kind === 'mtask' && groupBy === 'stop') subKids.push(el('i', { class: 'tag o' + t.obj, text: t.tag }), el('span', { text: t.estMin ? ' about ' + t.estMin + ' min' : '' }));
+    else subKids.push(el('span', { text: rowSub(t) }));
+    var ttl = el('button', { type: 'button', class: 'ttl', attrs: { 'aria-pressed': 'false' } }, [el('span', { text: t.title }), el('small', {}, subKids)]);
     ttl.addEventListener('click', function () { selectTask(t.id); });
     var li = el('li', { class: 'task' }, [el('label', {}, [cb]), ttl]);
     rows[t.id] = { li: li, cb: cb, ttl: ttl }; refreshRow(t); return li;
+  }
+  function refreshHead(id) {
+    var h = heads[id]; if (!h) return; var s = !!(sel && (sel.id === id || sel.stopId === id));
+    h.classList.toggle('sel', s); h.setAttribute('aria-pressed', sel && sel.id === id ? 'true' : 'false');
   }
   function refreshRow(t) {
     var r = rows[t.id]; if (!r) return;
     var d = isDone(t); r.cb.checked = d; r.li.classList.toggle('done', d);
     var s = !!(sel && sel.id === t.id); r.li.classList.toggle('sel', s); r.ttl.setAttribute('aria-pressed', s ? 'true' : 'false');
+    r.li.classList.toggle('grp', !!(sel && sel.kind === 'stop' && t.stopId === sel.id));
   }
   function renderDetail() {
     var d = $('pop-detail');
     if (!sel) { d.hidden = true; return; }
     d.hidden = false; d.textContent = '';
-    var t = sel, acts = el('div', { class: 'acts' });
-    d.appendChild(el('h3', { text: t.title })); d.appendChild(el('p', { text: t.sub }));
-    if (t.desc && t.kind !== 'objective') d.appendChild(el('p', { text: t.desc }));
-    if (t.lat != null) d.appendChild(el('p', { text: fmtLat(t.lat) + ', ' + fmtLon(t.lon) + (t.approx ? ' (approximate)' : '') }));
-    else d.appendChild(el('p', { text: t.kind === 'objective' ? 'Applies to the whole Jezero campaign: no single place on the map.' : 'No map location.' }));
+    var t = sel, acts = el('div', { class: 'acts' }), st = t.kind === 'mtask' ? t.stop : t.kind === 'stop' ? t : null;
+    d.appendChild(el('h3', { text: t.title }));
+    d.appendChild(el('p', { text: t.kind === 'mtask' ? 'Stop ' + st.no + ': ' + st.name + ' - ' + t.tag + (t.estMin ? ' - about ' + t.estMin + ' min' : '') : t.kind === 'stop' ? 'Stop ' + t.no + ' of ' + stopList.length + ': tasks below are highlighted' : t.sub }));
+    if (t.desc) d.appendChild(el('p', { text: t.desc }));
+    if (t.lat != null) d.appendChild(el('p', { text: fmtLat(t.lat) + ', ' + fmtLon(t.lon) }));
+    else d.appendChild(el('p', { text: 'No map location.' }));
     if (t.lat != null) acts.appendChild(el('button', { type: 'button', text: 'Show on map', onclick: function () { focusTask(t, true); } }));
-    acts.appendChild(el('button', { type: 'button', text: isDone(t) ? 'Mark not done' : 'Mark done', onclick: function () { setDone(t, !isDone(t)); } }));
-    if (t.kind === 'stop') acts.appendChild(el('a', { class: 'lnk', href: atlasHref(), text: 'Open detailed Jezero map', target: '_blank', rel: 'noopener' }));
+    if (t.kind !== 'stop') acts.appendChild(el('button', { type: 'button', text: isDone(t) ? 'Mark not done' : 'Mark done', onclick: function () { setDone(t, !isDone(t)); } }));
+    if (st) acts.appendChild(el('a', { class: 'lnk', href: atlasHref(), text: 'Open detailed Jezero map', target: '_blank', rel: 'noopener' }));
     d.appendChild(acts);
   }
   /* ---------- side panels (mission pop-up and chat): adaptive docking ---------- */
@@ -337,7 +414,7 @@
     var sheet = isSheet(), cap = $('coords'), br = document.querySelector('.br');
     screen.classList.toggle('sheet-open', sheet && vis.length > 0);
     if (!vis.length) return;
-    screen.style.setProperty('--sheet-h', Math.round(Math.min(H * 0.5, 480)) + 'px');
+    screen.style.setProperty('--sheet-h', Math.round(Math.min(H * 0.44, 440)) + 'px');
     if (sheet) { vis.forEach(function (p) { resetBox(p.el); p.el.dataset.dock = 'sheet'; }); return; }
     // keep the readouts (coordinates, distance) visible: docked panels end above them
     var rl = relRect(cap), rr = relRect(br);
@@ -386,7 +463,36 @@
     c.forEach(function (r) { var a = r.w * r.h; if (a > ba) { ba = a; best = r; } });
     return best;
   }
+  /* the always-visible controls at the top (mission box and chat button at the left, map buttons): a pin must not sit under them */
+  function hudRects() { return [relRect($('tl')), relRect(document.querySelector('.zoom'))]; }
+  function pinBox(x, y) { return { x: x - 20, y: y - 66, w: 40, h: 66 }; }   // marker body and label above its tip
+  function boxHits(b, r) { return b.x < r.x + r.w + 6 && b.x + b.w > r.x - 6 && b.y < r.y + r.h + 6 && b.y + b.h > r.y - 6; }
+  function boxHitsHud(b) { return hudRects().some(function (r) { return boxHits(b, r); }); }
+  /* view that puts the point in the free area, moved down when the marker would sit under the top controls */
+  /* bottom sheet (phones): the only free band for a marker lies between the top controls and the readouts that ride above the sheet */
+  function sheetBand() {
+    if (!isSheet()) return null;
+    var tl = relRect($('tl')), rd = [relRect($('coords')), relRect(document.querySelector('.br'))];
+    return { top: tl.y + tl.h + 6, bot: Math.min.apply(null, rd.map(function (r) { return r.y; })) - 6 };
+  }
+  function centeredClear(lat, lon, ppd) {
+    var band = sheetBand();
+    if (band && pop_visible_any()) {
+      var ty = Math.max(band.top + 66, Math.min(band.bot, (band.top + band.bot) / 2 + 33));
+      return { lon: lon, lat: lat + (ty - H / 2) / ppd, ppd: ppd };
+    }
+    var v = viewCenteredOn(lat, lon, ppd, bestFree()), x = W / 2 + (lon - v.lon) * ppd, y = H / 2 - (lat - v.lat) * ppd, dy = 0;
+    hudRects().forEach(function (r) {
+      if (boxHits(pinBox(x, y), r)) dy = Math.max(dy, r.y + r.h + 12 + 66 - y);
+    });
+    if (dy > 0) v.lat += dy / ppd;
+    return v;
+  }
+  function pop_visible_any() { return panels.some(pvis); }
   function pinVisibleInFree(pos) {
+    if (boxHitsHud(pinBox(pos.x, pos.y))) return false;
+    var band = sheetBand();
+    if (band) return pos.y <= band.bot + 1 && pos.y - 66 >= band.top - 1 && pos.x >= 24 && pos.x <= W - 24;
     return freeRects().some(function (r) { return pos.x >= r.x + 36 && pos.x <= r.x + r.w - 36 && pos.y >= r.y + 56 && pos.y <= r.y + r.h - 16; });
   }
   /* keep the selected task's pin visible and away from every panel */
@@ -394,26 +500,26 @@
     var t = sel; if (!t || t.lat == null) return;
     var pos = project(t.lon, t.lat);
     if (!anim && view.ppd >= JZ_PPD_MIN && pinVisibleInFree(pos)) return;
-    var ppd = view.ppd >= JZ_PPD_MIN ? view.ppd : Math.min(MAX_PPD, SITES.jezero.ppd);
-    animateTo(viewCenteredOn(t.lat, t.lon, ppd, bestFree()), ms == null ? 600 : ms);
+    var ppd = view.ppd >= JZ_PPD_MIN ? view.ppd : jezeroView().ppd;
+    animateTo(centeredClear(t.lat, t.lon, ppd), ms == null ? 600 : ms);
   }
   function focusTask(t, force) {
     if (!t || t.lat == null) return;
     if (!force) { ensureVisible(); return; }
-    animateTo(viewCenteredOn(t.lat, t.lon, Math.max(view.ppd, SITES.jezero.ppd), bestFree()), 600);
+    animateTo(centeredClear(t.lat, t.lon, Math.max(view.ppd, jezeroView().ppd)), 600);
   }
   function selectTask(id) {
     var t = byId[id]; if (!t) return;
     var prev = sel; sel = t;
     if (pop.hidden) openPop(true);
-    if (prev) refreshRow(prev);
-    refreshRow(t); renderDetail(); updateTaskPin();
+    if (prev && prev.kind !== 'stop') refreshRow(prev);
+    refreshRow(t); Object.keys(heads).forEach(refreshHead); mtasks.forEach(refreshRow); renderDetail(); updateTaskPin();
     if (t.lat != null) {
-      setChosen({ kind: 'task', id: t.id, name: t.title, lat: t.lat, lon: t.lon });
+      setChosen({ kind: 'task', id: t.id, name: t.kind === 'mtask' ? t.stop.name : t.title, lat: t.lat, lon: t.lon });
       if (!userPlaced && !isSheet() && view.ppd >= JZ_PPD_MIN) { var s = project(t.lon, t.lat); dock = s.x > W / 2 ? 'left' : 'right'; }
       applyLayout(); ensureVisible();
     } else { applyLayout(); }
-    var r = rows[t.id]; if (r && r.li.scrollIntoView) r.li.scrollIntoView({ block: 'nearest' });
+    var r = rows[t.id] || { li: heads[t.id] }; if (r.li && r.li.scrollIntoView) r.li.scrollIntoView({ block: 'nearest' });
   }
   function setExpanded() {
     var m = !pop.hidden, c = !chatPanel.hidden;
@@ -532,16 +638,15 @@
   function buildPins() {
     items = []; pinsEl.textContent = ''; stopDots = {}; taskPin = null; pendingPin = null; nearOn = false;
     SITES.sites.forEach(makeSite);
-    tasks.forEach(function (t) {
-      if (t.kind !== 'stop' || t.lat == null) return;
-      var b = el('button', { type: 'button', class: 'pin stopdot', text: String(t.no || ''), attrs: { 'aria-label': t.title } }, [el('span', { class: 'lab', text: t.title })]);
-      var it = { kind: 'stop', id: t.id, name: t.title, lat: t.lat, lon: t.lon, el: b, task: t, dot: true };
+    stopList.forEach(function (t) {
+      var b = el('button', { type: 'button', class: 'pin stopdot', text: String(t.no), attrs: { 'aria-label': 'Stop ' + t.no + ': ' + t.name } }, [el('span', { class: 'lab', text: t.name })]);
+      var it = { kind: 'stop', id: t.id, name: t.name, lat: t.lat, lon: t.lon, el: b, task: t, dot: true };
       b.addEventListener('click', function () { if (!suppress) selectTask(t.id); });
       stopDots[t.id] = it; addItem(it);
     });
     locs.forEach(addLocPin);
     var bl = baseLL(), yl = youLL();
-    baseItem = makeMarker('base', 'BASE', bl.lat, bl.lon, 'Base (landing site)');
+    baseItem = makeMarker('base', 'BASE', bl.lat, bl.lon, 'Base camp'); baseItem.name = 'Base camp';
     youItem = makeMarker('you', 'YOU', yl.lat, yl.lon, 'You, ' + crewName());
     refreshStopDots(); updateTaskPin(); markChosen(); queueDraw();
   }
@@ -550,14 +655,14 @@
   }
   function refreshStopDots() {
     Object.keys(stopDots).forEach(function (k) {
-      var it = stopDots[k]; it.el.classList.toggle('done', isDone(it.task)); it.el.classList.toggle('sel', !!(sel && sel.id === k));
+      var it = stopDots[k], ts = mtasks.filter(function (x) { return x.stopId === k; }); it.el.classList.toggle('done', ts.length > 0 && ts.every(isDone)); it.el.classList.toggle('sel', !!(sel && (sel.id === k || sel.stopId === k)));
     });
   }
   function updateTaskPin() {
     if (taskPin) { var i = items.indexOf(taskPin); if (i >= 0) items.splice(i, 1); taskPin.el.remove(); taskPin = null; }
     refreshStopDots();
     if (sel && sel.lat != null) {
-      taskPin = makeMarker('task', sel.title, sel.lat, sel.lon, 'Selected task: ' + sel.title); taskPin.isTask = true;
+      taskPin = makeMarker('task', sel.kind === 'stop' ? 'Stop ' + sel.no : sel.kind === 'mtask' ? 'Stop ' + sel.stop.no : sel.title, sel.lat, sel.lon, 'Selected: ' + sel.title); taskPin.isTask = true;
       taskPin.el.style.zIndex = '3';
     }
     queueDraw();
@@ -573,7 +678,7 @@
     var x, y, p, vis;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it.dot && view.ppd < JZ_PPD_MIN && !(sel && sel.id === it.id)) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
+      if (it.dot && view.ppd < 150 && !(sel && sel.id === it.id)) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
       p = project(it.lon, it.lat); x = p.x; y = p.y;
       vis = x > -80 && x < W + 80 && y > -60 && y < H + 100;
       if (!vis) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
@@ -736,16 +841,18 @@
   var joinedKey = null, offMsg = null;
   function onJoined() {
     var r = link().room; joinedKey = r.code + '|' + r.id;
-    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat();
+    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat(); setGroup(groupBy);
     if (offMsg) { try { offMsg(); } catch (e) { /* ignore */ } offMsg = null; }
     if (link().on) offMsg = link().on(onMsg);
   }
   resize(); loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords();
+  $('grp-stop').addEventListener('click', function () { setGroup('stop'); }); $('grp-objective').addEventListener('click', function () { setGroup('objective'); });
+  setGroup(groupBy);
   // mount the room dialog first; nothing is published or sent before the crew member has joined
   try {
     if (window.JdaLinkUI && window.JdaLinkUI.mount) window.JdaLinkUI.mount({ role: 'tablet', ask: ['code', 'crew'], position: 'top-right', onJoin: function () { if (isJoined()) onJoined(); } });
   } catch (e) { if (window.console) console.error('JdaLinkUI.mount failed', e); }
-  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); }); } catch (e) { /* world not ready */ }
+  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); refreshWorldDone(); }); } catch (e) { /* world not ready */ }
   setInterval(function () {
     if (isJoined() && joinedKey !== link().room.code + '|' + link().room.id) onJoined();
     updateCoords();

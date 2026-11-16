@@ -15,7 +15,7 @@
     <button type="button" class="side side-r" id="btn-sos" aria-label="SOS emergency call: opens a confirmation" aria-haspopup="dialog" title="SOS"><span class="side-cap" aria-hidden="true">SOS</span></button>
 
     <div class="screen" id="screen">
-      <div class="map" id="map" tabindex="0" role="application" aria-label="Global Mars map. Drag to pan, scroll or pinch to zoom, arrow keys pan, plus and minus zoom.">
+      <div class="map" id="map" tabindex="0" role="application" aria-label="Mars map with the five stops. Drag to pan, scroll or pinch to zoom, arrow keys pan, plus and minus zoom.">
         <canvas id="cv" aria-hidden="true"></canvas>
         <div class="pins" id="pins"></div>
       </div>
@@ -73,6 +73,11 @@
             <button type="button" id="pop-x" aria-label="Close mission panel (Escape)">Close</button>
           </span>
         </header>
+        <div class="pop-view" role="group" aria-label="Group tasks by">
+          <span>Group by</span>
+          <button type="button" id="grp-stop" aria-pressed="true">Stop</button>
+          <button type="button" id="grp-objective" aria-pressed="false">Objective</button>
+        </div>
         <div class="pop-detail" id="pop-detail" hidden></div>
         <div class="pop-list" id="pop-list"></div>
         <form class="pop-add" id="pop-add">
@@ -115,6 +120,7 @@
 <script src="../js/link.js"></script>
 <script src="../js/link-ui.js"></script>
 <script src="../js/chat-ui.js"></script>
+<script src="../data/travel-speeds.js"></script>
 <script src="../js/sim-core.js"></script>
 <script src="../js/world-client.js"></script>
 <script src="../data/mission-data.js"></script>

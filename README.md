@@ -24,7 +24,7 @@ Drag to move, scroll to zoom, use the *Layers* menu to show or hide crater marks
 | `jezero-delta-atlas/` | **The main project:** the map, the crater-detection model and its data. Has its own README with all the details. |
 | `pages/mission-intro.html` | Intro page with the mission story and map. Its videos live in `pages/assets/`. |
 | `pages/rover-sandstorm-simulator.html` | Prototype: Mars rover path and sandstorm simulator. |
-| `docs/mission-guide.md` | The mission objectives. |
+| `docs/mission-guide.md` | The mission: 2 objectives, base camp, 5 stops and 10 tasks (source of `web/data/mission-data.js`). |
 | `docs/to-do.md` | What the team still has to do. |
 
 ## Inside `jezero-delta-atlas/`
@@ -49,7 +49,7 @@ See [`jezero-delta-atlas/README.md`](jezero-delta-atlas/README.md) for how to re
 
 ## Route planner
 
-The atlas has a **Route planner** panel. Click *Pick start and destination*, then click two points on the map. It finds the fastest route that avoids the detected craters (A* search on a grid of about 17 m cells) and reports the distance in km or m and the travel time for a rover (0.042 m/s) or an astronaut on foot (1.4 m/s). Craters with detector confidence 0.6 or higher are blocked; weaker marks only slow the route down. The code is in `jezero-delta-atlas/web/js/route-planner.js`. Slope, rocks and dunes are not modelled yet, because the repo has no elevation data fine enough for that.
+The atlas has a **Route planner** panel. Click *Pick start and destination*, then click two points on the map. It finds the fastest route that avoids the detected craters (A* search on a grid of about 17 m cells) and reports the distance in km or m and the travel time for the pressurised rover (2.8 m/s) or an astronaut on foot (1.4 m/s); the speeds come from `web/data/travel-speeds.js`. Craters with detector confidence 0.6 or higher are blocked; weaker marks only slow the route down. The code is in `jezero-delta-atlas/web/js/route-planner.js`. Slope, rocks and dunes are not modelled yet, because the repo has no elevation data fine enough for that.
 
 ## Team
 

@@ -28,6 +28,9 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--hud);font:600 c
 .dot.off{background:transparent;border:2px solid var(--warn);box-shadow:0 0 0 1px #000}
 .dot i{position:absolute;left:50%;top:-9px;margin-left:-4px;border:4px solid transparent;border-bottom:7px solid var(--hud);transform-origin:4px 15px;transform:rotate(var(--hd,0deg))}
 @keyframes ping{50%{box-shadow:0 0 0 2px #000,0 0 16px 8px rgba(95,227,255,.2)}}
+.mk{position:absolute;width:11px;height:11px;margin:-5px 0 0 -5px;border-radius:50%;background:rgba(4,7,10,.85);border:1.5px solid var(--hud);font:700 7px/8px "Segoe UI",system-ui,sans-serif;font-style:normal;color:var(--hud);text-align:center;text-shadow:none}
+.mk.base{border-radius:2px;width:11px;height:11px;background:var(--warn);border-color:#000;transform:rotate(45deg)}
+.tag.trv{left:auto;right:6px;top:auto;bottom:3px;font-weight:700;color:var(--hud);text-shadow:0 0 3px #000,0 0 3px #000}
 .tag{position:absolute;left:6px;top:3px;font-size:.7em;letter-spacing:.2em;color:var(--hud2)}
 .reads{margin:1.2vmin 0 0;display:grid;gap:.5vmin}
 .reads div{display:flex;gap:.8em;align-items:baseline;white-space:nowrap}

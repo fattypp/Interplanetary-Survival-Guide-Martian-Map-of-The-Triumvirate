@@ -198,13 +198,8 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 #ov .ms-multi .ms-body{fill:var(--accent)}
 #ov .ms-none .ms-body{fill:#8a8a8a}
 #ov .ms-custom .ms-body{fill:#2fb36b}
-#ov .ms-approx .ms-body{stroke-dasharray:3 2}
-#ov .ms-edgec{fill:var(--accent);stroke:#000;stroke-width:1.5}
-#ov .ms-arrow{fill:#fff;stroke:#000;stroke-width:1.5;stroke-linejoin:round}
-#ov .ms-edge:focus-visible .ms-edgec{stroke:#fff;stroke-width:3}
-#ov .ms-edge{outline:none}
-#ov .ms-edge:hover,#ov .ms-edge:focus{filter:drop-shadow(0 0 3px #fff)}
-#ov .ms-edge:hover .ms-lab,#ov .ms-edge:focus .ms-lab{display:inline}
+#ov .ms-base .ms-body{fill:#fff}
+#ov .ms-base .ms-num{fill:#000;stroke:none}
 #ov .ms-ghost{pointer-events:none;opacity:.75}
 #ov .ms-ghost .ms-body{stroke-dasharray:3 2}
 #ov .ms-num{font:700 11px var(--font-m);stroke-width:2.5px;pointer-events:none}
@@ -228,8 +223,6 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .ms-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 10px;color:var(--mute);font-size:12px}
 .ms-legend span{display:inline-flex;align-items:center;gap:5px}
 .ms-sw{display:inline-block;width:11px;height:11px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:1px solid #000;background:var(--accent)}
-.ms-sw.ms-dash{border-style:dashed}
-.ms-sw.ms-arrow-sw{border-radius:50%;transform:none;width:13px;height:13px}
 .ms-sw.ms-o1,.ms-badge.ms-o1{background:var(--delta)}
 .ms-sw.ms-o2,.ms-badge.ms-o2{background:var(--fan)}
 .ms-sw.ms-o3,.ms-badge.ms-o3{background:var(--margin)}
@@ -253,7 +246,6 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .ms-chk input{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--accent)}
 .ms-go{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:5px 4px;border:0;background:none;cursor:pointer;text-align:left}
 .ms-badge{flex:none;min-width:22px;height:22px;padding:0 3px;box-sizing:border-box;border-radius:11px;border:1px solid #000;display:inline-flex;align-items:center;justify-content:center;font:700 11px var(--font-m);color:#fff;text-shadow:0 0 2px #000,0 0 2px #000}
-.ms-badge.ms-off{border-style:dashed;opacity:.65}
 .ms-t{display:flex;flex-direction:column;min-width:0}
 .ms-t b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms-t small{color:var(--mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -276,6 +268,18 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-b)}
 .ms-err:empty{display:none}
 .ms-form input[aria-invalid=true]{border-color:var(--igneous)}
 #ov .ms-tickp{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- v2: objectives, base camp, stops with two tasks each ---- */
+.ms-sw.ms-base,.ms-badge.ms-base{background:#fff;color:#000;text-shadow:none}
+.ms-sw.ms-base{border-radius:2px;transform:none}
+.ms-objt{display:flex;align-items:center;gap:6px;margin:4px 0 2px}
+.ms-objt .ms-n{margin-left:auto}
+.ms-badge.ms-obj{min-width:26px}
+.ms-stop{border:1px solid var(--line);border-radius:var(--radius-s);margin:6px 0;padding:2px 4px 4px}
+.ms-stop.is-done{opacity:.85}
+.ms-stophead .ms-t b{white-space:normal}
+.ms-task{margin-left:10px}
+.ms-task .ms-t b{white-space:normal}
 
 </style>
 <style>
@@ -617,13 +621,12 @@ body .lu-chip[data-pos="top-right"] .lu-panel{position:absolute;right:calc(100% 
 
 <!-- Content of the "Map" tab. atlas-map.js binds to these ids at load; atlas-shell.js then moves this block into the tab panel. -->
 <div id="map-tab-src" hidden>
-  <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the layer selector (bottom-left) to show or hide each group.</p><div class="meta">model/crater_detector.py · <span id="ncr">36</span> marks</div></div>
+  <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the layer selector (bottom-left) to show or hide each group.</p><div class="meta"><span id="ncr">36</span> crater marks detected</div></div>
   <div class="card" id="route-card"><h2>Route planner</h2>
     <p id="rt-help">Find the fastest safe route between two points, avoiding detected craters.</p>
-    <label class="rt-row" for="rt-speed"><span>Travel by</span><select id="rt-speed"><option value="0.042">Rover, 0.042 m/s</option><option value="1.4">Astronaut on foot, 1.4 m/s</option></select></label>
+    <label class="rt-row" for="rt-speed"><span>Travel by</span><select id="rt-speed"></select></label>
     <div class="rt-btns"><button type="button" id="rt-go">Pick start and destination</button><button type="button" id="rt-clear">Clear</button></div>
     <div id="rt-out" aria-live="polite"></div></div>
-  <div class="card"><h2>Sample sites <span style="font-weight:400;letter-spacing:0">(28 sealed)</span></h2><div class="list" id="samples"></div></div>
 </div>
 
 <script>
@@ -636,546 +639,167 @@ window.JEZERO_CRATERS = {"meta":{"m_per_px":9.7,"threshold":0.5,"sun_bright_wall
 window.JEZERO_MISSION = {
  "objectives": [
   {
-   "id": "objective-1",
-   "title": "Objective 1",
-   "text": "Find evidence of ancient microbial life."
+   "id": 1,
+   "title": "Find evidence of ancient microbial life",
+   "short": "Microbial life"
   },
   {
-   "id": "objective-2",
-   "title": "Objective 2",
-   "text": "Assess whether the site can sustain life."
+   "id": 2,
+   "title": "Assess whether the site can sustain human life",
+   "short": "Sustaining human life"
   }
  ],
+ "base": {
+  "id": "base",
+  "name": "Base camp",
+  "lat": 18.447,
+  "lon": 77.408,
+  "x": 1872.9,
+  "y": 1334.0
+ },
  "stops": [
   {
-   "id": "sample-1",
-   "no": 1,
-   "name": "Roubion",
-   "kind": "sample",
-   "area": "Polygon Valley",
-   "description": "Atmospheric sample. Target: Roubion.",
-   "sol": 164,
-   "date": "6 Aug 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-1",
+   "n": 1,
+   "name": "Three Forks sample depot",
+   "lat": 18.4525,
+   "lon": 77.4015,
+   "x": 1807.0,
+   "y": 1275.3,
+   "description": "Level ground close to the foot of the delta where the 10 sample tubes were left."
   },
   {
-   "id": "sample-2",
-   "no": 2,
-   "name": "Montdenier",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 194,
-   "date": "6 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-2",
+   "n": 2,
+   "name": "Delta front mudstone",
+   "lat": 18.458,
+   "lon": 77.397,
+   "x": 1761.4,
+   "y": 1216.5,
+   "description": "Fine-grained layers at the front of the delta, laid down in still water."
   },
   {
-   "id": "sample-3",
-   "no": 3,
-   "name": "Montagnac",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 196,
-   "date": "8 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-3",
+   "n": 3,
+   "name": "Delta top boulders",
+   "lat": 18.48,
+   "lon": 77.385,
+   "x": 1639.8,
+   "y": 981.5,
+   "description": "Boulders on top of the delta that the river carried in."
   },
   {
-   "id": "sample-4",
-   "no": 4,
-   "name": "Salette",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 262,
-   "date": "15 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-4",
+   "n": 4,
+   "name": "Western delta clay beds",
+   "lat": 18.502,
+   "lon": 77.369,
+   "x": 1477.7,
+   "y": 746.5,
+   "description": "Clay-rich beds in the western part of the delta."
   },
   {
-   "id": "sample-5",
-   "no": 5,
-   "name": "Coulettes",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 271,
-   "date": "24 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-5",
+   "n": 5,
+   "name": "Western Breach and Bright Angel",
+   "lat": 18.493,
+   "lon": 77.293,
+   "x": 707.5,
+   "y": 842.6,
+   "description": "The ravine where the river entered the crater, near the Bright Angel outcrops and the Cheyava Falls find."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "task-1-1",
+   "stopId": "stop-1",
+   "objective": 1,
+   "title": "Recover the sample tubes",
+   "description": "Recover the 10 sample tubes: photograph, check seal, log, stow.",
+   "estMin": 45
   },
   {
-   "id": "sample-6",
-   "no": 6,
-   "name": "Robine",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 298,
-   "date": "22 Dec 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-1-2",
+   "stopId": "stop-1",
+   "objective": 2,
+   "title": "Check ground and shelter at the depot",
+   "description": "Check how firm and how level the ground is around the depot, and note rock overhangs or hollows that could shelter people from radiation.",
+   "estMin": 25
   },
   {
-   "id": "sample-7",
-   "no": 7,
-   "name": "Malay",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 337,
-   "date": "31 Jan 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-1",
+   "stopId": "stop-2",
+   "objective": 1,
+   "title": "Sample the finest mud layers",
+   "description": "Find the finest mud layers, look for colour spots or rings, sample below the surface.",
+   "estMin": 60
   },
   {
-   "id": "sample-8",
-   "no": 8,
-   "name": "Ha'ahóni",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 371,
-   "date": "7 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-2",
+   "stopId": "stop-2",
+   "objective": 2,
+   "title": "Look for water-bearing minerals in the mudstone",
+   "description": "Check the mudstone for minerals that hold water, as a possible water source, and log whether the slope is stable enough to walk on.",
+   "estMin": 30
   },
   {
-   "id": "sample-9",
-   "no": 9,
-   "name": "Atsá",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 377,
-   "date": "13 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-1",
+   "stopId": "stop-3",
+   "objective": 1,
+   "title": "Photograph and sample the boulders",
+   "description": "Photograph and sample boulders the river carried in.",
+   "estMin": 40
   },
   {
-   "id": "sample-10",
-   "no": 10,
-   "name": "Swift Run",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 490,
-   "date": "7 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-2",
+   "stopId": "stop-3",
+   "objective": 2,
+   "title": "Judge boulder spacing for safe ground",
+   "description": "Measure the size and spacing of the boulders to judge where the rover can drive safely and where a shelter could be placed.",
+   "estMin": 30
   },
   {
-   "id": "sample-11",
-   "no": 11,
-   "name": "Skyland",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 495,
-   "date": "12 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-1",
+   "stopId": "stop-4",
+   "objective": 1,
+   "title": "Sample one intact clay layer",
+   "description": "Photograph the layering and sample one intact clay layer; seal and log it.",
+   "estMin": 45
   },
   {
-   "id": "sample-12",
-   "no": 12,
-   "name": "Hazeltop",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 509,
-   "date": "27 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-2",
+   "stopId": "stop-4",
+   "objective": 2,
+   "title": "Test how much water the clay holds",
+   "description": "Test how much water the clay holds, as a possible water source for the crew.",
+   "estMin": 40
   },
   {
-   "id": "sample-13",
-   "no": 13,
-   "name": "Bearwallow",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 516,
-   "date": "3 Aug 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-1",
+   "stopId": "stop-5",
+   "objective": 1,
+   "title": "Photograph the ravine walls and sample the channel floor",
+   "description": "Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find.",
+   "estMin": 60
   },
   {
-   "id": "sample-14",
-   "no": 14,
-   "name": "Shuyak",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 575,
-   "date": "2 Oct 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-15",
-   "no": 15,
-   "name": "Mageik",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 619,
-   "date": "16 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-16",
-   "no": 16,
-   "name": "Kukaklek",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Hidden Harbor.",
-   "sol": 631,
-   "date": "29 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-17",
-   "no": 17,
-   "name": "Atmo Mountain",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 634,
-   "date": "2 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-18",
-   "no": 18,
-   "name": "Crosswind Lake",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 639,
-   "date": "7 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-19",
-   "no": 19,
-   "name": "Melyn",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Berea.",
-   "sol": 749,
-   "date": "30 Mar 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-20",
-   "no": 20,
-   "name": "Otis Peak",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Emerald Lake.",
-   "sol": 832,
-   "date": "23 Jun 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-21",
-   "no": 21,
-   "name": "Pilot Mountain",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Dream Lake.",
-   "sol": 913,
-   "date": "15 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-22",
-   "no": 22,
-   "name": "Pelican Point",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Hans Amundsen Memorial Workspace.",
-   "sol": 923,
-   "date": "25 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-23",
-   "no": 23,
-   "name": "Lefroy Bay",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Turquoise Bay.",
-   "sol": 949,
-   "date": "21 Oct 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-24",
-   "no": 24,
-   "name": "Comet Geyser",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Silica-cemented carbonate sample. Target: Bunsen Peak.",
-   "sol": 1088,
-   "date": "12 Mar 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-25",
-   "no": 25,
-   "name": "Sapphire Canyon",
-   "kind": "sample",
-   "area": "Neretva Vallis",
-   "description": "Sedimentary sample. Target: Cheyava Falls.",
-   "sol": 1215,
-   "date": "21 Jul 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-26",
-   "no": 26,
-   "name": "Silver Mountain",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Shallow Bay.",
-   "sol": 1401,
-   "date": "28 Jan 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-27",
-   "no": 27,
-   "name": "Green Gardens",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Serpentinite sample. Target: Tablelands.",
-   "sol": 1433,
-   "date": "2 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-28",
-   "no": 28,
-   "name": "Main River",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Broom Point.",
-   "sol": 1441,
-   "date": "10 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-landing",
-   "no": 29,
-   "name": "Octavia E. Butler Landing",
-   "kind": "place",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Landing site of Perseverance, 18 February 2021.",
-   "sol": 0,
-   "date": "18 Feb 2021",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": 18.4446,
-   "lon": 77.4509
-  },
-  {
-   "id": "place-hawksbill-gap",
-   "no": 30,
-   "name": "Hawksbill Gap",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Gap in the delta front that the rover climbed in 2022 to reach the top of the delta. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-three-forks",
-   "no": 31,
-   "name": "Three Forks",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Staging area where three route options to the delta merge, used to start the Delta Front campaign. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-neretva-vallis",
-   "no": 32,
-   "name": "Neretva Vallis",
-   "kind": "place",
-   "area": "Neretva Vallis",
-   "description": "Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-witch-hazel-hill",
-   "no": 33,
-   "name": "Witch Hazel Hill",
-   "kind": "place",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-seitah",
-   "no": 34,
-   "name": "Séítah",
-   "kind": "place",
-   "area": "Séítah",
-   "description": "Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-2",
+   "stopId": "stop-5",
+   "objective": 2,
+   "title": "Check shelter and safe passage in the ravine",
+   "description": "Record how well the ravine walls shelter people from radiation and wind, and check whether the channel floor is safe to cross.",
+   "estMin": 30
   }
  ]
+};
+
+</script>
+<script>
+/* Travel speeds, single source for the atlas route planner, the simulation and the control page.
+   The crew drives a pressurised rover between stops (about 10 km/h) and walks at the stops (about 5 km/h). */
+window.JEZERO_SPEEDS = {
+  rover: { label: 'Pressurised rover', mps: 2.8 },
+  foot:  { label: 'Astronaut on foot', mps: 1.4 }
 };
 
 </script>
@@ -1226,14 +850,14 @@ window.JEZERO_SCHEDULE_CONFIG = {
     minutes: 15            // length of the block
   },
 
-  /* ---- work (tasks and mission objectives) ---- */
+  /* ---- work (your goals and the 10 mission tasks) ---- */
   work: {
     maxBlockMinutes: 90,           // longest single work block; longer jobs are split into several blocks (15 to 240)
     breakMinutes: 10,              // rest left after a work block when the same job continues in the next block (0 to 60)
     minPieceMinutes: 15,           // do not squeeze a work piece shorter than this into a small gap (5 to 60)
     defaultTaskMinutes: 30,        // used when a task has no valid estimate
-    missionObjectiveMinutes: 60,   // time given to each mission objective (they carry no estimate of their own)
-    missionObjectiveImportance: 3  // importance 1 to 5 given to mission objectives
+    missionObjectiveMinutes: 60,   // time given to a mission task that has no estimate of its own (the 10 mission tasks all carry estMin)
+    missionObjectiveImportance: 3  // importance 1 to 5 given to mission tasks
   },
 
   /* ---- how urgency raises the ranking ---- */
@@ -1402,68 +1026,21 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
 
 </script>
 <script>
-/* Jezero Delta Atlas: pan/zoom map, overlay layers (registered by atlas-shell.js), sample list, route planner UI.
+/* Jezero Delta Atlas: pan/zoom map, overlay layers (registered by atlas-shell.js), route planner UI.
    Reads window.JEZERO_CRATERS from ../data/craters-data.js (written by integration/web_bridge.py). */
 (function(){
 var CR=window.JEZERO_CRATERS||{craters:[]};   // set by ../data/craters-data.js; its meta also carries the map extent
 var M=CR.meta||{},BB=M.bbox||{lon0:77.1,lon1:77.8,lat0:18.1,lat1:18.75},PG=M.page||[1990,1848];
 var W=PG[0],H=PG[1],LON0=BB.lon0,LAT1=BB.lat1,DLON=BB.lon1-BB.lon0,DLAT=BB.lat1-BB.lat0;
-// The place names, sample clusters, delta outline, channel and route below were drawn on the first, larger map
+// The delta outline and channel below were drawn on the first, larger map
 // (77.10-77.80E, 18.10-18.75N, 1990 x 1848). o2n turns such a point into a lon/lat and then into a pixel of the current map.
 function o2n(p){var lo=77.1+p[0]/1990*0.7,la=18.75-p[1]/1848*0.65;return [(lo-LON0)/DLON*W,(LAT1-la)/DLAT*H]}
 function inMap(p){return p[0]>=0&&p[0]<=W&&p[1]>=0&&p[1]<=H}
 var ll=function(x,y){return [LON0+x/W*DLON, LAT1-y/H*DLAT]};
 var NS='http://www.w3.org/2000/svg';
-var C={ig:'var(--igneous)',sed:'var(--sed)',fan:'var(--fan)',mar:'var(--margin)'};
-var areas={
- 'Polygon Valley':[1040,925],'Artuby Ridge':[950,1010],'South Séítah':[860,985],
- "Octavia E. Butler Landing / Ch'ał outcrop":[1005,868],'Delta Front':[915,815],'Upper Fan':[700,655],
- 'Margin Unit':[540,960],'Neretva Vallis':[430,540],'Crater Rim (Witch Hazel Hill)':[455,1020],'Crater Rim (Krokodillen)':[360,880]};
-var S=[
-[1,'Roubion','Roubion','Polygon Valley','Atmospheric',164,'6 Aug 2021'],
-[2,'Montdenier','Rochette','Artuby Ridge','Igneous',194,'6 Sep 2021'],
-[3,'Montagnac','Rochette','Artuby Ridge','Igneous',196,'8 Sep 2021'],
-[4,'Salette','Brac','South Séítah','Igneous',262,'15 Nov 2021'],
-[5,'Coulettes','Brac','South Séítah','Igneous',271,'24 Nov 2021'],
-[6,'Robine','Issole','South Séítah','Igneous',298,'22 Dec 2021'],
-[7,'Malay','Issole','South Séítah','Igneous',337,'31 Jan 2022'],
-[8,"Ha'ahóni",'Sid',"Octavia E. Butler Landing / Ch'ał outcrop",'Igneous',371,'7 Mar 2022'],
-[9,'Atsá','Sid',"Octavia E. Butler Landing / Ch'ał outcrop",'Igneous',377,'13 Mar 2022'],
-[10,'Swift Run','Skinner Ridge','Delta Front','Sedimentary',490,'7 Jul 2022'],
-[11,'Skyland','Skinner Ridge','Delta Front','Sedimentary',495,'12 Jul 2022'],
-[12,'Hazeltop','Wildcat Ridge','Delta Front','Sedimentary',509,'27 Jul 2022'],
-[13,'Bearwallow','Wildcat Ridge','Delta Front','Sedimentary',516,'3 Aug 2022'],
-[14,'Shuyak','Amalik','Delta Front','Sedimentary',575,'2 Oct 2022'],
-[15,'Mageik','Amalik','Delta Front','Sedimentary',619,'16 Nov 2022'],
-[16,'Kukaklek','Hidden Harbor','Delta Front','Sedimentary',631,'29 Nov 2022'],
-[17,'Atmo Mountain','Observation Mountain','Delta Front','Regolith',634,'2 Dec 2022'],
-[18,'Crosswind Lake','Observation Mountain','Delta Front','Regolith',639,'7 Dec 2022'],
-[19,'Melyn','Berea','Upper Fan','Sedimentary',749,'30 Mar 2023'],
-[20,'Otis Peak','Emerald Lake','Upper Fan','Sedimentary',832,'23 Jun 2023'],
-[21,'Pilot Mountain','Dream Lake','Upper Fan','Sedimentary',913,'15 Sep 2023'],
-[22,'Pelican Point','Hans Amundsen Memorial Workspace','Margin Unit','Sedimentary',923,'25 Sep 2023'],
-[23,'Lefroy Bay','Turquoise Bay','Margin Unit','Sedimentary',949,'21 Oct 2023'],
-[24,'Comet Geyser','Bunsen Peak','Margin Unit','Silica-cemented carbonate',1088,'12 Mar 2024'],
-[25,'Sapphire Canyon','Cheyava Falls','Neretva Vallis','Sedimentary',1215,'21 Jul 2024'],
-[26,'Silver Mountain','Shallow Bay','Crater Rim (Witch Hazel Hill)','Igneous / impactite',1401,'28 Jan 2025'],
-[27,'Green Gardens','Tablelands','Crater Rim (Witch Hazel Hill)','Serpentinite',1433,'2 Mar 2025'],
-[28,'Main River','Broom Point','Crater Rim (Witch Hazel Hill)','Igneous / impactite',1441,'10 Mar 2025']];
-function col(s){var a=s[3];if(a==='Upper Fan')return C.fan;if(a==='Margin Unit'||a==='Neretva Vallis'||a.indexOf('Rim')===0)return C.mar;if(s[4].indexOf('Sedimentary')===0||s[4]==='Regolith')return C.sed;return C.ig}
-var cnt={};S.forEach(function(s){var n=cnt[s[3]]=(cnt[s[3]]||0)+1;var b=o2n(areas[s[3]]),ang=n*2.4+s[0],r=10+n*5;s.x=b[0]+Math.cos(ang)*r;s.y=b[1]+Math.sin(ang)*r;s.off=!inMap([s.x,s.y])});
-var nOn=S.filter(function(s){return !s.off}).length;
-var F=[
- {id:'landing',n:'Octavia E. Butler Landing',x:998,y:868,d:'Landing site of Perseverance, 18 February 2021. Coordinates 18.4446°N, 77.4509°E.'},
- {id:'hawks',n:'Hawksbill Gap',x:850,y:772,d:'Gap in the delta front that the rover climbed in 2022 to reach the top of the delta. Position approximate.'},
- {id:'three',n:'Three Forks',x:932,y:862,d:'Staging area where three route options to the delta merge, used to start the Delta Front campaign. Position approximate.'},
- {id:'neretva',n:'Neretva Vallis',x:430,y:470,d:'Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it.'},
- {id:'whh',n:'Witch Hazel Hill',x:455,y:1005,d:'Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate.'},
- {id:'seitah',n:'Séítah',x:890,y:975,d:'Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate.'}];
-var F0=F.slice();
-F=F.map(function(f){var p=o2n([f.x,f.y]);f.x=p[0];f.y=p[1];return f}).filter(function(f){return inMap([f.x,f.y])});
 var delta=[[470,735],[560,640],[700,610],[850,570],[935,600],[958,690],[950,770],[905,838],[830,858],[740,838],[670,776],[580,748]];
 var chan=[[60,400],[200,380],[330,455],[430,470],[405,560],[392,640],[470,728]];
-var route=[[998,868],[940,985],[880,985],[950,905],[932,862],[850,772],[780,702],[700,655],[560,700],[470,730],[430,545],[470,800],[455,1005]];
-delta=delta.map(o2n);chan=chan.map(o2n);route=route.map(o2n);var dlab=o2n([760,725]);
+delta=delta.map(o2n);chan=chan.map(o2n);var dlab=o2n([760,725]);
 
 var ov=document.getElementById('ov');
 function el(t,a,p){var e=document.createElementNS(NS,t);for(var k in a)e.setAttribute(k,a[k]);(p||ov).appendChild(e);return e}
@@ -1479,16 +1056,6 @@ el('polygon',{points:pts(delta),fill:'#5ec8d8','fill-opacity':.16,stroke:'#5ec8d
 var dl=el('g',{transform:'translate('+dlab[0]+' '+dlab[1]+')'},d);var dk=el('g',{class:'k'},dl);var dt=el('text',{x:0,y:0,'text-anchor':'middle',style:'font-size:15px'},dk);dt.textContent='WESTERN DELTA FAN';
 var ch=L.chan=el('g');
 el('polyline',{points:pts(chan),fill:'none',stroke:'#7fd8ff','stroke-width':3,'stroke-opacity':.9,'vector-effect':'non-scaling-stroke'},ch);
-var rt=L.route=el('g');
-el('polyline',{points:pts(route),fill:'none',stroke:'#ffb347','stroke-width':3,'stroke-dasharray':'2 7','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},rt);
-var sm=L.samples=el('g');
-var smEls=[];
-S.forEach(function(s,i){if(s.off){smEls.push(null);return}var gg=el('g',{transform:'translate('+s.x+' '+s.y+')',class:'hit','data-i':i},sm);var k=el('g',{class:'k'},gg);el('circle',{r:6,fill:col(s),stroke:'#000','stroke-width':1.5},k);el('circle',{r:13,fill:'transparent'},k);var t=el('text',{x:9,y:4,class:'lab',style:'font-size:10px'},k);t.textContent=s[0];smEls.push(gg);gg.addEventListener('click',function(e){e.stopPropagation();if(core.busy())return;pickSample(i)})});
-var ft=L.features=el('g');
-F.forEach(function(f){var gg=el('g',{transform:'translate('+f.x+' '+f.y+')',class:'hit'},ft);var k=el('g',{class:'k'},gg);
- if(f.id==='landing'){el('path',{d:'M0,-12 L3.5,-4 12,-4 5,2 7.5,11 0,5.5 -7.5,11 -5,2 -12,-4 -3.5,-4Z',fill:'#fff',stroke:'#000','stroke-width':1.5},k)}
- else{el('rect',{x:-6,y:-6,width:12,height:12,transform:'rotate(45)',fill:'#fff',stroke:'#000','stroke-width':1.5},k)}
- el('circle',{r:16,fill:'transparent'},k);var t=el('text',{x:15,y:5},k);t.textContent=f.n;gg.addEventListener('click',function(e){e.stopPropagation();if(core.busy())return;pickFeature(f)})});
 
 // craters: one layer per size class, plus a layer for low-confidence marks
 var CC={cL:'#ff5a44',cM:'#ffd23c',cS:'#4fd6ff',cU:'#d7d7d7'},cnt2={cL:0,cM:0,cS:0,cU:0};
@@ -1505,22 +1072,13 @@ var LAYERDEFS=[
  {id:'craters-small',label:'Small craters  <250 m',group:'Hazards · detected',color:CC.cS,node:L.cS,on:true,count:cnt2.cS},
  {id:'craters-low',label:'Low-confidence marks',group:'Hazards · detected',color:CC.cU,node:L.cU,on:false,count:cnt2.cU},
  {id:'delta',label:'Delta fan',group:'Reference',color:'#5ec8d8',node:L.delta,on:false},
- {id:'channel',label:'Neretva Vallis channel',group:'Reference',color:'#7fd8ff',node:L.chan,on:false},
- {id:'route',label:'Rover route',group:'Reference',color:'#ffb347',node:L.route,on:false},
- {id:'samples',label:'Sample sites',group:'Reference',color:'#5ec8d8',node:L.samples,on:false,count:nOn},
- {id:'places',label:'Place names',group:'Reference',color:'#ffffff',node:L.features,on:false},
+ {id:'channel',label:'River channel',group:'Reference',color:'#7fd8ff',node:L.chan,on:false},
  {id:'grid',label:'Lat / lon grid',group:'Reference',color:'#999999',node:L.grid,on:false}];
 LAYERDEFS.forEach(function(l){l.node.style.display=l.on?'':'none'});
 function mk(t,x,c){var e=document.createElement(t);if(x!==undefined&&x!=='')e.textContent=x;if(c)e.className=c;return e}
-var list=document.getElementById('samples');
-S.forEach(function(s,i){var r=document.createElement('button');r.className='row';r.appendChild(mk('b',s[0]));var sp=mk('span',s[1]+' ');sp.appendChild(mk('em','· '+s[3].replace(/ \/.*|Crater Rim /,'')+(s.off?' · off this map':'')));r.appendChild(sp);r.appendChild(mk('em','sol '+s[5]));r.onclick=function(){pickSample(i)};list.appendChild(r)});
 var info=document.getElementById('info');var ncr=document.getElementById('ncr');if(ncr)ncr.textContent=CR.craters.length;
 function setInfo(h,p,m){if(core.onInfo)core.onInfo();info.innerHTML='<h2>Selected</h2><h3></h3><p></p><div class="meta"></div>';info.querySelector('h3').textContent=h;info.querySelector('p').textContent=p;info.querySelector('.meta').textContent=m}
 function fmt(x,y){var q=ll(x,y);return q[1].toFixed(4)+'°N  '+q[0].toFixed(4)+'°E'}
-function pickSample(i){var s=S[i];var rows=list.children;for(var j=0;j<rows.length;j++)rows[j].classList.toggle('on',j===i);rows[i].scrollIntoView({block:'nearest'});
- if(s.off){setInfo('Sample '+s[0]+' · '+s[1],s[2]+' ('+s[3]+'). '+s[4]+' rock, sealed '+s[6]+' on sol '+s[5]+'.','outside the current map area');return}
- setInfo('Sample '+s[0]+' · '+s[1],s[2]+' ('+s[3]+'). '+s[4]+' rock, sealed '+s[6]+' on sol '+s[5]+'.','≈ '+fmt(s.x,s.y)+' · placed by area');focus(s.x,s.y,2.6)}
-function pickFeature(f){setInfo(f.n,f.d,fmt(f.x,f.y)+(f.id==='landing'?'':' · approximate'));focus(f.x,f.y,2.2)}
 
 // pan / zoom
 var map=document.getElementById('map'),stage=document.getElementById('stage');
@@ -1565,12 +1123,12 @@ function draw(){while(plan.firstChild)plan.removeChild(plan.firstChild);
   el('polyline',{points:pts,fill:'none',stroke:'#ff4fd8','stroke-width':4,'stroke-linejoin':'round','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},plan)}
  if(rt.start)marker(rt.start,'#7CFC00','Start');if(rt.goal)marker(rt.goal,'#ff4fd8','Destination')}
 var HELP0='Find the fastest safe route between two points, avoiding detected craters.';
-function arm(label){window.Atlas.pick({owner:'route',label:label,onCancel:function(){if(rt.on){reset(false);say('');help.textContent=HELP0}}},onPick)}
+function arm(label){window.Atlas.pick({owner:'route',label:label,onCancel:function(){if(rt.on){reset(false);say('');help.textContent=HELP0}}},onPick);try{map.focus({preventScroll:true})}catch(e){}}
 function onPick(ev){var p=[ev.x,ev.y];if(!rt.start){rt.start=p;draw();help.textContent='Now click the destination.';say('Start set: '+fmtPos(p));arm('route destination')}else{rt.goal=p;draw();solve()}}
 function reset(keepMode){if(!keepMode&&rt.on&&window.Atlas&&window.Atlas.picking&&window.Atlas.picking()==='route'){rt.on=false;window.Atlas.pick.cancel('route')}rt.start=rt.goal=rt.route=null;rt.on=!!keepMode;go.classList.toggle('on',rt.on);go.textContent=rt.on?'Cancel':'Pick start and destination';draw()}
 function solve(){var speed=parseFloat(spd.value);
  if(!rt.grid)rt.grid=window.RoutePlanner.buildGrid(CR.craters,CR.meta);
- var res=window.RoutePlanner.plan(rt.grid,rt.start,rt.goal,speed);
+ var res=Math.hypot(rt.goal[0]-rt.start[0],rt.goal[1]-rt.start[1])<2?{error:'Start and destination are the same point. Pick a different destination.'}:window.RoutePlanner.plan(rt.grid,rt.start,rt.goal,speed);
  if(res.error){rt.goal=null;draw();say(res.error,true);help.textContent='Click another destination.';rt.on=true;arm('route destination');return}
  rt.route=res;rt.on=false;go.classList.remove('on');go.textContent='Pick new points';draw();
  var extra=Math.round((res.distance_m/res.straight_m-1)*100);
@@ -1578,21 +1136,26 @@ function solve(){var speed=parseFloat(spd.value);
  help.textContent='Craters with detector confidence 0.6 or higher are avoided. Slope and rocks are not modelled.'}
 go.onclick=function(){if(rt.on){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.';return}reset(true);say('');help.textContent='Click the map to set the start.';arm('route start')};
 clr.onclick=function(){reset(false);say('');help.textContent='Find the fastest safe route between two points, avoiding detected craters.'};
+// "Travel by": options come from data/travel-speeds.js (rover first, so it is the default); nothing is hard-coded here
+var SP=window.JEZERO_SPEEDS||{rover:{label:'Pressurised rover',mps:2.8},foot:{label:'Astronaut on foot',mps:1.4}};
+['rover','foot'].forEach(function(k){if(!SP[k])return;var o=document.createElement('option');o.value=String(SP[k].mps);o.textContent=SP[k].label+', '+SP[k].mps+' m/s (about '+Math.round(SP[k].mps*3.6)+' km/h)';spd.appendChild(o)});
 spd.onchange=function(){if(rt.route)solve()};
 })();
 /* Keyboard access: arrow keys pan, + / - zoom, 0 resets (map must be focused). */
 map.addEventListener('keydown',function(e){if(e.target!==map)return;var r=map.getBoundingClientRect(),st=60,h=true;
  if(e.key==='ArrowLeft')v.x+=st;else if(e.key==='ArrowRight')v.x-=st;else if(e.key==='ArrowUp')v.y+=st;else if(e.key==='ArrowDown')v.y-=st;
  else if(e.key==='+'||e.key==='=')zoomAt(r.width/2,r.height/2,1.5);else if(e.key==='-'||e.key==='_')zoomAt(r.width/2,r.height/2,1/1.5);
- else if(e.key==='0')fit();else h=false;
+ else if(e.key==='0')fit();
+ else if((e.key==='Enter'||e.key===' ')&&core.busy()&&core.onClick){var k=base*v.s;core.onClick({x:(r.width/2-v.x)/k,y:(r.height/2-v.y)/k,event:e})}   // keyboard: while a map pick is active, Enter takes the centre of the view
+ else h=false;
  if(h){e.preventDefault();apply()}});
 fit();
 // what atlas-shell.js needs to build window.Atlas (see docs/ARCHITECTURE.md)
-var lp=F0.filter(function(f){return f.id==='landing'})[0];
+var MS=window.JEZERO_MISSION||{base:{x:W-24,y:H/2},stops:[]};   // data/mission-data.js: base camp and the 5 stops (page px)
 core.W=W;core.H=H;core.ll=ll;core.xy=function(lon,lat){return [(lon-LON0)/DLON*W,(LAT1-lat)/DLAT*H]};
 core.el=el;core.setInfo=setInfo;core.focus=focus;core.layers=LAYERDEFS;core.map=map;core.stage=stage;core.fit=fit;
-core.mapData={samples:S.map(function(s){return {n:s[0],name:s[1],area:s[3],x:s.x,y:s.y,onMap:!s.off}}),places:F0.map(function(f){return {id:f.id,name:f.n,x:f.x,y:f.y,onMap:inMap([f.x,f.y])}})};
-core.landing=[lp.x,lp.y];   // (already through o2n; F objects are mutated in place) page px of the landing site; lies east of this map, so it can be outside 0..W
+core.mapData={base:{id:'base',name:MS.base.name,x:MS.base.x,y:MS.base.y},stops:MS.stops.map(function(s){return {id:s.id,n:s.n,name:s.name,x:s.x,y:s.y}})};
+core.landing=[MS.base.x,MS.base.y];   // page px of base camp (it replaces the old landing site and lies inside the map)
 window.AtlasMapCore=core;
 })();
 
@@ -1611,11 +1174,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 (function () {
   'use strict';
   var CODE_RE = /^[A-HJ-NP-Z2-9]{5}$/, LEGACY = 'LOCAL', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 100;
+  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 200, OUTBOX_N = 100;
   var ROLES = ['crew', 'earth', 'control', 'helmet', 'tablet', 'legacy'];
   var cfg = window.JDA_LINK || {};
   var cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);   // this page load
-  var subs = [], statusSubs = [], presSubs = [], stateSubs = {};
+  var subs = [], statusSubs = [], presSubs = [], stateSubs = Object.create(null);
   var room = null, status = 'local', S = null, implicit = false, pendingOut = { msgs: [], state: {} };   // pendingOut: what an implicit (LOCAL) room sent, replayed into the first explicit room   // S = per-join session (timers, seen, log, state, presence)
 
   /* ---------- helpers ---------- */
@@ -1631,7 +1194,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function size(o) { try { return JSON.stringify(o).length; } catch (e) { return Infinity; } }
+  function size(o) {   // JSON size in UTF-8 bytes, the same measure the relay uses (emoji / CJK count by bytes, not UTF-16 units)
+    var j; try { j = JSON.stringify(o); } catch (e) { return Infinity; }
+    if (typeof j !== 'string') return Infinity;
+    try { return unescape(encodeURIComponent(j)).length; } catch (e) { return j.length * 3; }
+  }
   function isObj(o) { return o && typeof o === 'object' && !Array.isArray(o); }
   function safeKey(k) { return typeof k === 'string' && /^[A-Za-z0-9:_.-]{1,64}$/.test(k) && k !== '__proto__'; }
   function warn() { if (window.console) console.warn.apply(console, ['JdaLink'].concat([].slice.call(arguments))); }
@@ -1668,7 +1235,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
   /* ---------- session ---------- */
   function newSession(code) {
-    return { code: code, seen: {}, seenQ: [], log: [], state: {}, relayVer: {}, pres: {}, timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
+    var N = Object.create; return { code: code, seen: N(null), seenQ: [], log: [], state: N(null), mine: N(null), outbox: [], epoch: null, repub: false, relayVer: N(null), pres: N(null), timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
   }
   function markSeen(id) { S.seen[id] = 1; S.seenQ.push(id); if (S.seenQ.length > 3000) delete S.seen[S.seenQ.shift()]; }
   function setStatus(s) { if (s === status) return; status = s; statusSubs.slice().forEach(function (fn) { call(fn, s); }); }
@@ -1758,31 +1325,66 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     opt = opt || {};
     var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : 0;
     return fetch('/api' + path, { method: opt.method || 'GET', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, body: opt.body ? JSON.stringify(opt.body) : undefined, cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+      .then(function (r) { clearTimeout(tm); if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; } return r.json(); }, function (e) { clearTimeout(tm); throw e; });
   }
   function probeRelay() {
     if (!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
     return api('/ping').then(function (j) { return !!(j && j.ok); }, function () { return false; });
   }
   function relayOk() { var ses = S; if (ses && ses.relayFails) { ses.relayFails = 0; setStatus('relay'); } }
-  function relayFail(e) { var ses = S; if (!ses) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  function relayFail(e) { var ses = S; if (!ses || (e && e.status === 429)) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  /* messages wait in the outbox until the relay has accepted them (relay restarting, rate limit, brief outage) */
+  function postOut(ses, item) {
+    if (item.busy || ses.closed) return;
+    item.busy = true;
+    api('/rooms/' + ses.code + '/msg', { method: 'POST', body: item.m }).then(function () {
+      var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1);
+    }, function (e) {
+      item.busy = false;
+      if (e && (e.status === 400 || e.status === 403 || e.status === 404 || e.status === 411 || e.status === 413)) { var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1); warn('relay refused a message', e.message); }
+      else relayFail(e);
+    });
+  }
+  function queueOut(ses, m) {
+    var item = { m: m, busy: false };
+    ses.outbox.push(item);
+    if (ses.outbox.length > OUTBOX_N) ses.outbox.shift();
+    if (ses.relay) postOut(ses, item);
+  }
+  function flushOut(ses) { ses.outbox.slice().forEach(function (it) { postOut(ses, it); }); }
+  function republishAll(ses) {   // a relay that restarted (or was not reachable before) has none of this page's messages or state: send them again (the relay and readers dedupe by id)
+    ses.log.forEach(function (m) { if (m.from && m.from.cid === cid && !ses.outbox.some(function (it) { return it.m.id === m.id; })) queueOut(ses, m); });
+    ses.repub = true;
+  }
   function startRelay() {
-    var ses = S, base = '/rooms/' + ses.code;
+    var ses = S, base = '/rooms/' + ses.code, delay = POLL_MS;
     ses.relay = true; setStatus('relay');
+    republishAll(ses);
     function loop() {
       if (ses.closed) return;
+      delay = POLL_MS;
       Promise.all([api(base + '/msgs?since=' + ses.since), api(base + '/state?since=' + ses.stateVer)]).then(function (r) {
         if (ses.closed) return;
-        var first = !ses.synced;
+        var first = !ses.synced, restarted = !!(r[0].epoch && ses.epoch && r[0].epoch !== ses.epoch);
+        if (r[0].epoch) ses.epoch = r[0].epoch;
+        if (restarted) { ses.relayVer = {}; ses.since = 0; ses.stateVer = 0; republishAll(ses); }
         if (r[0].reset) ses.since = 0;
         (r[0].msgs || []).forEach(function (m) { deliver(m, first); });
-        if (isFinite(r[0].next)) ses.since = r[0].next;
+        if (isFinite(r[0].next) && !restarted) ses.since = r[0].next;
+        if (r[1].reset || restarted) ses.relayVer = {};
         var items = r[1].items || {};
         Object.keys(items).forEach(function (key) { applyState(key, items[key], true); });
-        if (isFinite(r[1].ver)) ses.stateVer = r[1].ver;
+        if (isFinite(r[1].ver) && !restarted) ses.stateVer = r[1].ver;
+        if (ses.repub && !restarted) {   // put back this page's own state values that the relay does not have
+          ses.repub = false;
+          Object.keys(ses.mine).forEach(function (key) {
+            if (!(key in items) && !(ses.state[key] && ses.state[key].from.cid !== cid)) api(base + '/state/' + encodeURIComponent(key), { method: 'PUT', body: ses.mine[key] }).catch(function (x) { relayFail(x); });
+          });
+        }
         ses.synced = true;
+        flushOut(ses);
         relayOk();
-      }).catch(relayFail).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, POLL_MS)); });
+      }).catch(function (e) { if (e && e.status === 429) delay = 2500; relayFail(e); }).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, delay)); });
     }
     loop();
   }
@@ -1896,10 +1498,18 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       Object.keys(carry.state).forEach(function (key) { try { setState(key, carry.state[key]); } catch (e) { /* ignore */ } });
       pendingOut = { msgs: [], state: {} };
     }
+    function reprobe(ses2) {   // relay not reachable at load: keep looking, so a relay started later (or restarted) is picked up without a reload
+      var tm = setTimeout(function () {
+        if (ses2.closed || ses2.relay) return;
+        probeRelay().then(function (ok2) { if (ses2.closed) return; if (ok2) { startRelay(); heartbeat(); } else reprobe(ses2); });
+      }, 4000);
+      ses2.timers.push(tm);
+    }
     if (c !== LEGACY) {   // the legacy default room never leaves this browser
       probeRelay().then(function (ok) {
         if (ses.closed) return;
         if (ok) startRelay();
+        else if (/^https?:$/.test(location.protocol)) reprobe(ses);
         if (online) startOnline();
         heartbeat();
         flushCarry();
@@ -1928,7 +1538,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     lsSet(k(ses.code, 'log'), JSON.stringify(ses.log.slice(-LOG_N)));
     try { if (ses.bc) ses.bc.postMessage({ k: 'msg', m: m }); } catch (e) { /* ignore */ }
     lsSet(k(ses.code, 'msg'), JSON.stringify(m));
-    if (ses.relay) api('/rooms/' + ses.code + '/msg', { method: 'POST', body: m }).catch(function (e) { warn('relay send failed', e && e.message); relayFail(e); });
+    queueOut(ses, m);
     if (ses.online) remoteUpsert({ id: m.id, room: ses.code, kind: 'msg', payload: m }).catch(function (e) { warn('online send failed', e && e.message); });
     return m;
   }
@@ -1942,6 +1552,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var wire = { value: e.value, t: e.t, from: e.from };
     lsSet(k(ses.code, 'state.' + key), JSON.stringify(wire));
     try { if (ses.bc) ses.bc.postMessage({ k: 'state', key: key, e: wire }); } catch (x) { /* ignore */ }
+    ses.mine[key] = wire;
     if (ses.relay) api('/rooms/' + ses.code + '/state/' + encodeURIComponent(key), { method: 'PUT', body: wire }).catch(function (x) { relayFail(x); });
     if (ses.online) remoteUpsert({ id: 'state:' + ses.code + ':' + key, room: ses.code, kind: 'state', payload: { key: key, entry: wire }, updated_at: new Date().toISOString() }).catch(function () { });
     return true;
@@ -2000,12 +1611,35 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function load() { try { var o = JSON.parse(localStorage.getItem(LAST) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
   function save(o) { try { localStorage.setItem(LAST, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function hashRaw() {   // the room text in the URL hash as typed (normalised), or null when there is none
+    var m = /[#&]room=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* use as typed */ }
+    return window.JdaLink.normCode(raw);
+  }
+  var BAD_CODE = 'Room codes have 5 letters or digits, no I or O. Check the code or create a new room.';
+  function hashBad() { var r = hashRaw(); return r !== null && !window.JdaLink.isValidCode(r); }
   function hashCode() {
     var m = /[#&]room=([^&]*)/.exec(location.hash || '');
     if (!m) return '';
-    var c = window.JdaLink.normCode(decodeURIComponent(m[1]));
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* malformed escape: use the text as typed */ }
+    var c = window.JdaLink.normCode(raw);
     return window.JdaLink.isValidCode(c) ? c : '';
   }
+  function hashCrew() {   // #room=CODE&crew=jayesh picks a known crew member without asking
+    var m = /[#&]crew=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var v = m[1];
+    try { v = decodeURIComponent(v); } catch (e) { return null; }
+    v = slug(v);
+    for (var i = 0; i < CREW.length; i++) if (CREW[i].id === v) return CREW[i];
+    // crew members added on the control page: any valid id that is not reserved
+    if (v && RESERVED.indexOf(v) < 0) return { id: v, name: v.charAt(0).toUpperCase() + v.slice(1) };
+    return null;
+  }
+  var RESERVED = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];
   function linkFor(code) {
     return location.origin + location.pathname + location.search + '#room=' + code;
   }
@@ -2027,7 +1661,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var offs = [];
 
     function who(saved) {
-      if (wantCrew) return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      if (wantCrew) {
+        var hc2 = hashCrew() || (saved.crewId ? null : CREW.filter(function (c) { return c.id === opts.defaultCrew; })[0]);
+        if (hc2 && hashCode()) return { role: role, id: hc2.id, name: hc2.name };
+        return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      }
       if (wantName) return { role: role, id: opts.id || role, name: saved.name || opts.name || '' };
       return { role: role, id: opts.id || role, name: opts.name || '' };
     }
@@ -2133,7 +1771,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       opener = from || null;
       var saved = load(), n = ++uid, firstRun = !joined();
       var cur = joined() ? L.room : null;
-      var codeVal = hashCode() || (cur && cur.code) || saved.code || '';
+      var badHash = hashBad(), codeVal = badHash ? hashRaw().slice(0, 5) : (hashCode() || (cur && cur.code) || saved.code || '');
       back = el('div', 'lu-back');
       dlg = el('div', 'lu-dlg', null, { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'lu-t' + n, 'aria-describedby': 'lu-d' + n });
       dlg.appendChild(el('h2', null, firstRun ? 'Join a room' : 'Change room', { id: 'lu-t' + n }));
@@ -2180,7 +1818,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         crewOther.parentNode.querySelector('#lu-otherl' + n).hidden = !other;
         crewOther.hidden = !other;
       }
-      var err = el('p', 'lu-err', '', { id: 'lu-e' + n, role: 'alert' });
+      var err = el('p', 'lu-err', badHash ? BAD_CODE : '', { id: 'lu-e' + n, role: 'alert' });
       form.appendChild(err);
       var act = el('div', 'lu-act');
       var joinBtn = el('button', 'lu-btn lu-primary', 'Join room', { type: 'submit' });
@@ -2196,7 +1834,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           if (!r) return { error: 'Choose who you are.' };
           if (r.value !== '__other') { var c = CREW.filter(function (x) { return x.id === r.value; })[0]; return { role: role, id: c.id, name: c.name }; }
           var nm = crewOther.value.trim().slice(0, 24), sl = slug(nm);
-          if (!sl) return { error: 'Enter your name.' };
+          if (!nm) return { error: 'Enter your name.' };
+          if (!sl) return { error: 'Use at least one letter A-Z or digit in your name.' };
+          if (RESERVED.indexOf(sl) >= 0) return { error: 'That name is reserved. Choose another one.' };
           return { role: role, id: sl, name: nm };
         }
         if (wantName) { var v = nameIn.value.trim().slice(0, 24); return { role: role, id: opts.id || role, name: v || opts.name || '' }; }
@@ -2217,7 +1857,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       back.appendChild(dlg);
       root.appendChild(back);
       document.addEventListener('keydown', onKey, true);
-      (code.value ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
+      (code.value && !badHash ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
     }
 
     /* ----- start ----- */
@@ -2225,11 +1865,13 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var saved = load(), hc = hashCode(), code = hc || saved.code || '';
     var info = who(saved);
     var identityKnown = !wantCrew || !!info.id;
-    if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
+    if (hashBad()) openDialog(null);   // a broken code in the URL never falls back to the remembered room
+    else if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
     else openDialog(null);
 
     function onHash() {
       var c = hashCode();
+      if (!c && hashBad() && !dlg) { openDialog(null); return; }
       if (!c || (L.room && L.room.code === c && joined())) return;
       var sv = load(), inf = who(sv);
       if (!wantCrew || inf.id) { if (dlg) closeDialog(); joinNow(c, inf); }
@@ -2250,7 +1892,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
    Contract: docs/MULTIPAGE.md (world schema, commands). Models and limits: docs/SIMULATION.md.
    Everything here is scenario data: there is no real suit, radiation or vitals feed.
    Works in a browser (window.JdaSim) and in Node (module.exports) for tests.
-   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid). */
+   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid),
+   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s). */
 (function (root) {
   'use strict';
 
@@ -2260,14 +1903,27 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     SOL_S: 88775.244,                  // length of a Mars solar day in seconds
     START_ISO: '2026-11-15T08:00:00Z', // mission clock at reset (this is a scenario clock, not a real date on Mars)
     START_LOCAL_H: 9,                  // local mean solar time at the start (hours, 0..24)
-    BASE: { lat: 18.4446, lon: 77.4509 },       // Octavia E. Butler landing site (from the Atlas data)
+    // Fallbacks, used only when web/data/mission-data.js / travel-speeds.js are not loaded (coordinates from the MissionGuide).
+    FALLBACK_BASE: { id: 'base', name: 'Base camp', lat: 18.447, lon: 77.408 },
+    FALLBACK_STOPS: [
+      { id: 'stop-1', name: 'Three Forks sample depot', lat: 18.4525, lon: 77.4015 },
+      { id: 'stop-2', name: 'Delta front mudstone', lat: 18.458, lon: 77.397 },
+      { id: 'stop-3', name: 'Delta top boulders', lat: 18.480, lon: 77.385 },
+      { id: 'stop-4', name: 'Western delta clay beds', lat: 18.502, lon: 77.369 },
+      { id: 'stop-5', name: 'Western Breach and Bright Angel', lat: 18.493, lon: 77.293 }
+    ],
+    FALLBACK_MPS: { rover: 2.8, foot: 1.4 },    // only if JEZERO_SPEEDS is absent
+    EVA_DEFAULT_MIN: 30,               // time on foot at a stop when the stop has no tasks in the data
     BASELINE_USVH: 26.67,              // MSL/RAD GCR dose equivalent 0.64 mSv/day (same as the science layer)
     SPE_MULT: 2.5,                     // solar particle event multiplier (same as the science layer)
-    WALK_MPS: 1.4,                     // default walking speed
     MAX_MPS: 30,                       // hard limit of the speed command
     O2_PER_H:  { rest: 4, walk: 9 },   // percent of a full tank per simulated hour (same as suit.js: resting 4, walking 9)
     BAT_PER_H: { rest: 3, walk: 6 },   // percent of a full battery per simulated hour (same as suit.js)
-    EFFORT_CAP: 3,                     // effort = speed / 1.4 m/s, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EFFORT_CAP: 3,                     // effort = speed / foot speed, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EVA_EFFORT: 1,                     // working on foot at a stop (sampling, photographing) costs the same as walking at foot speed
+    ROVER_O2_PER_H: 0,                 // pressurised rover: cabin air, the suit tank is not drawn on
+    ROVER_BAT_PER_H: 1,                // suit battery on standby while the rover supplies power (percent per hour)
+    HR_ROVER: 68,                      // seated in the rover cabin, close to resting
     HR_REST: 66, HR_IDLE: 72, HR_WALK_ADD: 28, HR_TAU_S: 45,
     SUIT_NOM_C: 21, SUIT_TAU_S: 600,
     AMB_MEAN_C: -48, AMB_AMP_C: 38, AMB_PEAK_H: 14,   // clear-sky day: about -86 C at 02:00 to -10 C at 14:00 local
@@ -2279,6 +1935,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var M_PER_DEG = Math.PI / 180 * C.R_MARS_M;   // metres per degree of latitude (and of longitude at the equator)
 
   function num(v, fb) { v = Number(v); return isFinite(v) ? v : fb; }
+  var RESERVED_IDS = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];   // same list as link-ui.js
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function round(v, d) { var k = Math.pow(10, d); return Math.round(v * k) / k; }
   function norm360(a) { a = a % 360; return a < 0 ? a + 360 : a; }
@@ -2330,22 +1987,21 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     return g.min + (top * (1 - fy) + bot * fy) / 255 * (g.max - g.min);
   }
 
-  /* ---------------- places and the demo path ----------------
-     The atlas draws its place names on an older, larger canvas (1990 x 1848 px = 77.10-77.80 E, 18.10-18.75 N, see o2n in atlas-map.js).
-     The conversion to lat/lon is replicated here. Several places lie outside the current map image; they still have valid lat/lon. */
-  function o2ll(px, py) { return { lat: round(18.75 - py / 1848 * 0.65, 5), lon: round(77.1 + px / 1990 * 0.7, 5) }; }
-  function place(label, px, py) { var p = o2ll(px, py); p.label = label; return p; }
-  var PLACES = {
-    landing: { label: 'Octavia E. Butler Landing', lat: C.BASE.lat, lon: C.BASE.lon },
-    three:   place('Three Forks', 932, 862),
-    hawks:   place('Hawksbill Gap', 850, 772),
-    fan:     place('Upper Fan', 700, 655),
-    neretva: place('Neretva Vallis', 430, 470),
-    whh:     place('Witch Hazel Hill', 455, 1005),
-    seitah:  place('Seitah', 890, 975)
-  };
-  function demoPath() {   // landing -> Three Forks -> Hawksbill Gap -> Upper Fan -> Neretva -> Witch Hazel Hill -> Seitah (then the caller sends "return")
-    return ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah'].map(function (k) { var p = PLACES[k]; return { lat: p.lat, lon: p.lon, label: p.label }; });
+  /* ---------------- mission data and speeds (read lazily; fall back to the MissionGuide values) ---------------- */
+  function pt(o) { return o && isFinite(Number(o.lat)) && isFinite(Number(o.lon)) && o.lat !== null && o.lon !== null; }
+  function missionInfo() {
+    var M = root.JEZERO_MISSION || {};
+    var b = pt(M.base) ? M.base : C.FALLBACK_BASE;
+    var base = { id: 'base', name: String(b.name || 'Base camp'), lat: Number(b.lat), lon: Number(b.lon) };
+    var raw = Array.isArray(M.stops) && M.stops.length ? M.stops : C.FALLBACK_STOPS;
+    var stops = raw.filter(pt).map(function (st, i) { return { id: String(st.id || 'stop-' + (i + 1)), n: i + 1, name: String(st.name || 'Stop ' + (i + 1)), lat: Number(st.lat), lon: Number(st.lon) }; });
+    var tasks = (Array.isArray(M.tasks) ? M.tasks : []).filter(function (t) { return t && t.id && t.stopId; })
+      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
+    return { base: base, stops: stops, tasks: tasks };
+  }
+  function speeds() {
+    var S = root.JEZERO_SPEEDS || {};
+    return { rover: num(S.rover && S.rover.mps, C.FALLBACK_MPS.rover), foot: num(S.foot && S.foot.mps, C.FALLBACK_MPS.foot) };
   }
 
   /* ---------------- geometry on the sphere (local flat approximation, fine for kilometres) ---------------- */
@@ -2379,7 +2035,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var initCrew = (opts.crew && opts.crew.length ? opts.crew : [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }]).map(function (c) { return copyCrewInit(c); });
     var initClock = clamp(num(opts.clockSpeed, 1), 0.01, 100000);
 
+    var info = missionInfo(), SPD = speeds(), BASE = info.base;
     var elapsedMs, clock, events, crew, order;
+    function tasksOf(stopId) { return info.tasks.filter(function (t) { return t.stopId === stopId; }); }
+    function speedOf(c) { return c.speedOverride !== null ? c.speedOverride : SPD[c.travel]; }
 
     function copyCrewInit(c) {
       var id = slug(c.id || c.name) || 'crew';
@@ -2388,12 +2047,12 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     function makeCrew(c, index) {
       // crew without a position start around the base, a few metres apart (deterministic, not random)
       var a = index * 2.4, r = 6 + 4 * index;
-      var lat = c.lat !== null ? c.lat : C.BASE.lat + Math.cos(a) * r / M_PER_DEG;
-      var lon = c.lon !== null ? c.lon : C.BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(C.BASE.lat * Math.PI / 180));
+      var lat = c.lat !== null ? c.lat : BASE.lat + Math.cos(a) * r / M_PER_DEG;
+      var lon = c.lon !== null ? c.lon : BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(BASE.lat * Math.PI / 180));
       return {
         id: c.id, name: c.name, lat: clamp(lat, -90, 90), lon: lon, zM: C.Z0_M, headingDeg: 0,
         o2: 100, bat: 100, hr: C.HR_IDLE, hrNoise: 0, hrOverride: null, suitT: C.SUIT_NOM_C, dose: 0,
-        mode: 'idle', thenReturn: false, walkSpeed: C.WALK_MPS, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
+        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, stopId: null, taskId: null, tasksDone: 0, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
       };
     }
     function reset() {
@@ -2414,6 +2073,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
     function addCrew(spec) {
       var c = copyCrewInit(spec || {});
+      if (RESERVED_IDS.indexOf(c.id) >= 0) c.id = c.id + '-crew';   // 'all', 'earth', 'control'... would clash with message targets
       if (crew[c.id]) { var n = 2; while (crew[c.id + '-' + n]) n++; c.id = c.id + '-' + n; }
       if (order.length >= 12) return { ok: false, error: 'crew limit (12) reached' };
       initCrew.push(c);
@@ -2428,12 +2088,53 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       return { ok: true };
     }
 
+    /* ---- mission run: base -> stop 1 .. stop 5 -> base. Drive legs by rover, on foot (EVA) at each stop for its tasks ---- */
+    function startDrive(c, i) {
+      var st = info.stops[i], r = c.run;
+      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: st.lat, lon: st.lon, label: st.name }; c.path = []; c.headingWalk = false; c.mode = 'walking';
+    }
+    function startHome(c) {
+      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.mode = 'returning';
+    }
+    function startEva(c) {
+      var r = c.run, st = info.stops[r.i];
+      r.phase = 'eva'; r.evaT = 0; r.tasks = tasksOf(st.id); r.doneBase = c.tasksDone;
+      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : C.EVA_DEFAULT_MIN * 60;
+      c.travel = 'foot'; c.stopId = st.id; c.taskId = r.tasks.length ? r.tasks[0].id : null; c.target = null; c.path = []; c.mode = 'walking';
+    }
+    function evaStep(c, ds) {   // time on foot at a stop; tasks complete one after the other
+      var r = c.run, acc = 0, n = 0;
+      r.evaT += ds;
+      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc) n++; }
+      if (r.evaT >= r.evaTotal) {
+        c.tasksDone = r.doneBase + r.tasks.length;
+        if (r.i + 1 < info.stops.length) startDrive(c, r.i + 1); else startHome(c);
+        return false;
+      }
+      c.tasksDone = r.doneBase + n; c.taskId = r.tasks.length ? r.tasks[Math.min(n, r.tasks.length - 1)].id : null;
+      return true;
+    }
+    function arriveRun(c) {
+      if (c.run.phase === 'drive') startEva(c);
+      else { c.run = null; c.target = null; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
+    }
+    function startRun(c, speed) {
+      if (!info.stops.length) return 'no mission stops';
+      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], doneBase: 0, evaTotal: 0 };
+      c.tasksDone = 0; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
+      startDrive(c, 0);
+      return null;
+    }
+
     /* ---- one physics step of ds simulated seconds ---- */
     function stepCrew(c, ds) {
-      // 1. movement
-      var moving = false, remaining = 0, startLat = c.lat, startLon = c.lon;
-      if (c.mode === 'walking' || c.mode === 'returning') {
-        remaining = c.walkSpeed * ds;
+      // 1. movement (or time on foot at a stop)
+      var moving = false, working = false, remaining = 0, startLat = c.lat, startLon = c.lon;
+      if (c.run && c.run.phase === 'eva') working = evaStep(c, ds);
+      if (!working && (c.mode === 'walking' || c.mode === 'returning')) {
+        remaining = speedOf(c) * ds;
         var guard = 0;
         while (remaining > 1e-6 && guard++ < 64) {
           if (c.headingWalk && !c.target) {
@@ -2447,9 +2148,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           if (d > 0.01) c.headingDeg = bearing(c, c.target);
           if (d <= remaining) {
             c.lat = c.target.lat; c.lon = c.target.lon; remaining -= d;
+            if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             if (c.path.length) c.target = c.path.shift();
             else if (c.thenReturn && c.mode === 'walking') {   // end of an excursion: head home
-              c.thenReturn = false; c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.mode = 'returning';
+              c.thenReturn = false; c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.mode = 'returning';
             } else {
               c.target = null;
               if (c.mode === 'returning') { c.mode = 'resting'; } else { c.mode = 'idle'; }
@@ -2461,24 +2163,32 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
             remaining = 0;
           }
         }
-        moving = c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01;
+        moving = !working && (c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01);
       }
-      c.speed = moving ? c.walkSpeed : 0;
+      c.speed = moving ? speedOf(c) : 0;
       var dH = ds / 3600;
-      // 2. consumption: standing/resting uses the base rate, walking adds in proportion to speed
-      var effort = moving ? Math.min(c.walkSpeed / C.WALK_MPS, C.EFFORT_CAP) : 0;
+      // 2. consumption. In the pressurised rover (travel 'rover', also while parked) the crew breathes cabin air: no suit oxygen is used,
+      //    the suit battery only idles, effort is zero. On foot (EVA or a manual walk): standing/resting uses the base rate and walking
+      //    adds in proportion to speed (working at a stop counts as EVA_EFFORT).
+      var inRover = c.travel === 'rover' && !working;
+      var effort = inRover ? 0 : working ? C.EVA_EFFORT : moving ? Math.min(speedOf(c) / SPD.foot, C.EFFORT_CAP) : 0;
       var jitter = 1 + (rand() - 0.5) * 0.1;
       var restO2 = c.mode === 'resting' ? C.O2_PER_H.rest * 0.9 : C.O2_PER_H.rest;
       var restBat = c.mode === 'resting' ? C.BAT_PER_H.rest * 0.9 : C.BAT_PER_H.rest;
-      c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
-      c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      if (inRover) {
+        c.o2 = clamp(c.o2 - C.ROVER_O2_PER_H * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - C.ROVER_BAT_PER_H * jitter * dH, 0, 100);
+      } else {
+        c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      }
       // 3. environment at the new position
       var p = xy(c.lat, c.lon);
       c.amb = ambientC(elapsedMs, events.dust);
       c.rad = radiationAt(p[0], p[1]) * (events.solar ? C.SPE_MULT : 1);
       c.dose += c.rad * dH / 1000;   // uSv/h * h = uSv; / 1000 = mSv
       // 4. heart rate: first-order lag towards a target (unless the operator pinned it)
-      var tHr = (c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
+      var tHr = (inRover ? C.HR_ROVER : c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving || working ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
       c.hr += (tHr - c.hr) * (1 - Math.exp(-ds / C.HR_TAU_S));
       c.hrNoise = (rand() - 0.5) * 4;
       // 5. suit temperature: life support holds ~21 C; walking adds heat, a cold exterior leaks a little in; with a dead battery it drifts to ambient
@@ -2509,7 +2219,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (id === 'all' || id === '*') return order.map(function (k) { return crew[k]; });
       return crew[id] ? [crew[id]] : [];
     }
-    function setSpeed(c, mps) { c.walkSpeed = clamp(mps, 0.1, C.MAX_MPS); }
+    function setSpeed(c, mps) { c.speedOverride = clamp(mps, 0.1, C.MAX_MPS); }
+    function setTravel(c, mode) { if (mode !== 'rover' && mode !== 'foot') return false; c.travel = mode; c.speedOverride = null; return true; }
+    function endRun(c) { c.run = null; c.stopId = null; c.taskId = null; }
 
     function command(cmd) {
       if (!cmd || typeof cmd !== 'object') return { ok: false, error: 'no command' };
@@ -2527,7 +2239,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           refreshEnv(); return { ok: true };
         case 'addCrew': return addCrew(cmd);
         case 'removeCrew': return removeCrew(String(cmd.crew || ''));
-        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'set':
+        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'setTravel': case 'runMission': case 'set':
           list = targets(cmd);
           if (!list.length) return { ok: false, error: 'unknown crew ' + cmd.crew };
           break;
@@ -2537,23 +2249,28 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       list.forEach(function (c) {
         if (name === 'walk') {
           var wps = [];
+          if (cmd.travel !== undefined && !setTravel(c, cmd.travel)) { err = 'travel must be rover or foot'; return; }
           if (cmd.to) { var p = pointOf(cmd.to); if (!p) { err = 'bad target'; return; } wps.push(p); }
           if (Array.isArray(cmd.path)) {   // optional extension: further waypoints, visited in order
             for (var i = 0; i < cmd.path.length && i < 64; i++) { var q = pointOf(cmd.path[i]); if (!q) { err = 'bad path point ' + i; return; } wps.push(q); }
           }
           if (cmd.speed !== undefined && isFinite(Number(cmd.speed))) setSpeed(c, Number(cmd.speed));
-          if (wps.length) { c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
-          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
+          if (wps.length) { endRun(c); c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
+          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { endRun(c); c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
           else err = 'walk needs to {lat,lon}, path or heading';
         } else if (name === 'stop') {
-          c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
+          endRun(c); c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
         } else if (name === 'return') {
-          c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.path = []; c.headingWalk = false; c.thenReturn = false;
+          endRun(c); c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.headingWalk = false; c.thenReturn = false;
           if (distM(c, c.target) < 1) { c.target = null; c.mode = 'resting'; } else c.mode = 'returning';
         } else if (name === 'setSpeed') {
           var m = Number(cmd.mps);
           if (!isFinite(m) || m <= 0) { err = 'mps must be positive'; return; }
           setSpeed(c, m);
+        } else if (name === 'setTravel') {
+          if (!setTravel(c, cmd.mode)) err = 'mode must be rover or foot';
+        } else if (name === 'runMission') {
+          err = startRun(c, cmd.speed);
         } else if (name === 'set') {
           err = setField(c, String(cmd.field || ''), cmd.value);
         }
@@ -2565,7 +2282,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (C.FIELDS.indexOf(field) < 0) return 'cannot set ' + field;
       if (field === 'mode') {
         if (['idle', 'resting'].indexOf(value) < 0) return 'mode can be set to idle or resting';
-        c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
+        endRun(c); c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
       }
       if (field === 'hr' && (value === null || value === 'auto')) { c.hrOverride = null; return null; }
       var v = Number(value);
@@ -2574,10 +2291,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       else if (field === 'batPct') c.bat = clamp(v, 0, 100);
       else if (field === 'hr') { c.hrOverride = clamp(v, 0, 250); c.hr = c.hrOverride; }
       else if (field === 'suitTempC') c.suitT = clamp(v, -120, 80);
-      else if (field === 'doseMsv') c.dose = Math.max(0, v);
+      else if (field === 'doseMsv') c.dose = clamp(v, 0, 1e5);
       else if (field === 'headingDeg') c.headingDeg = norm360(v);
       else if (field === 'lat') { if (Math.abs(v) > 90) return 'lat out of range'; c.lat = v; }
-      else if (field === 'lon') c.lon = v;
+      else if (field === 'lon') c.lon = ((v + 180) % 360 + 360) % 360 - 180;   // wrapped into [-180, 180)
       return null;
     }
 
@@ -2590,13 +2307,16 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         hr: Math.round(c.hrOverride !== null ? c.hrOverride + c.hrNoise * 0.5 : c.hr + c.hrNoise),
         suitTempC: round(c.suitT, 1), ambientTempC: round(c.amb, 1), radUsvH: round(c.rad, 2), doseMsv: round(c.dose, 4),
         mode: c.mode, speedMps: round(c.speed, 2),
-        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null
+        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null,
+        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: { done: c.tasksDone, total: info.tasks.length },
+        distM: c.target ? round(distM(c, c.target), 1) : null,
+        etaS: c.run && c.run.phase === 'eva' ? Math.max(0, Math.round(c.run.evaTotal - c.run.evaT)) : c.target && speedOf(c) > 0 ? Math.round(distM(c, c.target) / speedOf(c)) : null
       };
     }
     function world() {
       var out = {};
       order.forEach(function (id) { out[id] = record(crew[id]); });
-      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: C.BASE.lat, lon: C.BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
+      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: BASE.lat, lon: BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
     }
 
     /* Continue from a world snapshot (used by world-client when the authority disappears). Unknown crew are added. */
@@ -2613,8 +2333,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         c.lat = num(r.lat, c.lat); c.lon = num(r.lon, c.lon); c.headingDeg = num(r.headingDeg, 0);
         c.o2 = clamp(num(r.o2Pct, 100), 0, 100); c.bat = clamp(num(r.batPct, 100), 0, 100); c.hr = num(r.hr, c.hr);
         c.suitT = num(r.suitTempC, c.suitT); c.dose = Math.max(0, num(r.doseMsv, 0)); c.speed = 0;
+        c.travel = r.travel === 'rover' ? 'rover' : 'foot'; c.run = null; c.stopId = null; c.taskId = null;   // a mission run in progress is not part of the world: it stops at its current target
+        c.tasksDone = r.progress && isFinite(Number(r.progress.done)) ? Math.max(0, Number(r.progress.done)) : 0;
         c.mode = ['idle', 'walking', 'returning', 'resting'].indexOf(r.mode) >= 0 ? r.mode : 'idle';
-        c.walkSpeed = clamp(num(r.speedMps, 0) || c.walkSpeed, 0.1, C.MAX_MPS);
+        var sp = num(r.speedMps, 0); c.speedOverride = sp > 0 && Math.abs(sp - SPD[c.travel]) > 0.01 ? clamp(sp, 0.1, C.MAX_MPS) : null;
         c.target = pointOf(r.target); c.path = [];
         if (!c.target && (c.mode === 'walking' || c.mode === 'returning')) c.mode = 'idle';
       });
@@ -2624,11 +2346,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
     reset();
     return { tick: tick, world: world, command: command, reset: reset, load: load, addCrew: addCrew, removeCrew: removeCrew,
-             crewIds: function () { return order.slice(); }, clockSpeed: function () { return clock; } };
+             crewIds: function () { return order.slice(); }, mission: function () { return info; }, speeds: function () { return { rover: SPD.rover, foot: SPD.foot }; }, clockSpeed: function () { return clock; } };
   }
 
   var api = {
-    create: create, C: C, PLACES: PLACES, demoPath: demoPath, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
+    create: create, C: C, missionInfo: missionInfo, speeds: speeds, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
     localHour: localHour, localMarsTime: localMarsTime, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -2646,7 +2368,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var STALE_MS = 4000, LOCAL_TICK_MS = 200;
   var DEFAULT_CREW = [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }];
 
-  var listeners = [], world = null, lastAuthMs = 0, source = 'local';
+  var listeners = [], world = null, authWorld = null, lastAuthMs = 0, source = 'local';
   var local = null, localTimer = null, lastLocalMs = 0, meOverride = null, offState = null, offLink = null, lastLinkRoom = null;
 
   function emit() {
@@ -2669,11 +2391,24 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
 
   /* ---- local fallback ---- */
+  function inRoom() {
+    var L = root.JdaLink, r = L && L.room;
+    return !!(r && !r.implicit && r.code !== 'LOCAL' && r.role !== 'legacy');
+  }
+  /* Crew simulated by the local fallback. Stand-alone (no room): this page's crew plus the two default crew members.
+     In a joined room: only this page's crew plus crew that really exist there (the last real world, presence); no invented teammates. */
   function localCrewList() {
     var id = meId(), list = [];
     var mine = DEFAULT_CREW.filter(function (c) { return c.id === id; })[0] || { id: id, name: id.charAt(0).toUpperCase() + id.slice(1) };
     list.push(mine);
-    DEFAULT_CREW.forEach(function (c) { if (c.id !== mine.id) list.push(c); });
+    function add(cid, name) {
+      cid = String(cid || '').toLowerCase();
+      if (!cid || list.some(function (c) { return c.id === cid; })) return;
+      list.push({ id: cid, name: name || cid.charAt(0).toUpperCase() + cid.slice(1) });
+    }
+    if (!inRoom()) { DEFAULT_CREW.forEach(function (c) { add(c.id, c.name); }); return list; }
+    if (authWorld && authWorld.crew) Object.keys(authWorld.crew).forEach(function (k) { add(k, authWorld.crew[k] && authWorld.crew[k].name); });
+    try { ((root.JdaLink.presence && root.JdaLink.presence()) || []).forEach(function (p) { if (p && ['crew', 'helmet', 'tablet'].indexOf(p.role) >= 0) add(p.id, p.name); }); } catch (e) { /* no presence */ }
     return list;
   }
   function startLocal() {
@@ -2700,7 +2435,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
   function onWorldState(value) {
     if (!validWorld(value)) return;
-    world = value;
+    world = value; authWorld = value;
     if (value.stale) {   // the authority announced it is going away: fall back at once, continuing from this world
       lastAuthMs = 0; source = 'local';
       if (localTimer) stopLocal();
@@ -2717,6 +2452,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var L = root.JdaLink;
     if (L && L.room && lastLinkRoom !== L.room.code && typeof L.onState === 'function') {
       lastLinkRoom = L.room.code;
+      world = null; if (localTimer) stopLocal();   // a fallback started before joining simulated the stand-alone crew: restart it for this room
+      authWorld = null;
       if (offState) { try { offState(); } catch (e) { /* ignore */ } }
       offState = L.onState('world', function (v) { onWorldState(v); });
       if (L.getState) { var cur = L.getState('world'); if (cur && cur.value) onWorldState(cur.value); }
@@ -2738,6 +2475,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     time: function () { return world ? new Date(world.t) : new Date(); },
     world: function () { return world; },
     id: meId,
+    _localCrewList: localCrewList,   // for tests
     setMe: function (id) {
       meOverride = id ? String(id).toLowerCase() : null;
       if (local && meOverride && local.crewIds().indexOf(meOverride) < 0) local.addCrew({ id: meOverride, name: meOverride.charAt(0).toUpperCase() + meOverride.slice(1) });
@@ -2758,7 +2496,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     command: function (cmd) {
       if (!cmd) return { ok: false, error: 'no command' };
       if (source === 'authority' && root.JdaLink && root.JdaLink.send) {
-        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed });
+        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed, travel: cmd.travel, mode: cmd.mode, thenReturn: cmd.thenReturn });
         return { ok: true, sent: true };
       }
       if (local) { var c = {}; for (var k in cmd) c[k] = cmd[k]; if (!c.crew) c.crew = meId(); return local.command(c); }
@@ -2892,6 +2630,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     }
     function renderLog() {
       log.textContent = '';
+      log.setAttribute('aria-live', 'off');   // switching conversation must not make a screen reader read the whole history
+      setTimeout(function () { log.setAttribute('aria-live', 'polite'); }, 100);
       var list = msgs.filter(function (m) { return m.conv === active; });
       if (!list.length) log.appendChild(el('p', 'jc-empty', roomOk() ? 'No messages yet.' : 'Join a room to chat with the crew and Earth control.'));
       list.forEach(function (m) { log.appendChild(renderMsg(m)); });
@@ -2925,6 +2665,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         var e = log.querySelector('.jc-empty'); if (e) log.removeChild(e);
         var stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 40 || rec.mine;
         log.appendChild(renderMsg(rec));
+        while (log.children.length > KEEP) log.removeChild(log.firstChild);
         if (stick) log.scrollTop = log.scrollHeight;
       }
       return true;
@@ -2953,6 +2694,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       var to = active;
       var out = { type: 'chat', to: to, text: text, fromName: meName }, sent = null;
       try { sent = link.send(out); } catch (e) { sent = null; }
+      if (!sent) { state.textContent = 'Message not sent (too large or the link is not ready). Your text is kept, try again.'; return false; }
       var id = sent && typeof sent.id === 'string' ? sent.id : 'loc' + Date.now().toString(36) + (++seq);
       add({ id: id, conv: to, mine: true, fromId: meId, fromName: meName, text: text, t: (sent && sent.t) || new Date().toISOString() }, false);
       input.value = ''; autosize(); updateForm();
@@ -2978,7 +2720,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       h.slice().sort(function (a, b) { return String(a && a.t).localeCompare(String(b && b.t)); }).forEach(function (m) { fromLink(m, false); });
     }
     if (link && link.on) {
-      var off = link.on(function (m) { if (!destroyed) fromLink(m, true); });
+      var off = link.on(function (m) { if (!destroyed) fromLink(m, !(m && m.replay)); });
       offLink = typeof off === 'function' ? off : null;
     }
     syncConvs();
@@ -3140,13 +2882,12 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     mapData: core.mapData, store: store, bus: bus, clock: clock, now: clock.now
   };
 
-  // The landing site lies just east of this map (see the note in atlas-map.js), so for the start position of the
-  // user we take the nearest point on the map, 24 px inside the edge. Atlas.landing keeps the true page point.
-  Atlas.landing = { x: core.landing[0], y: core.landing[1], onMap: core.landing[0] >= 0 && core.landing[0] <= core.W && core.landing[1] >= 0 && core.landing[1] <= core.H };
-  Atlas.me = {
-    x: Math.min(core.W - 24, Math.max(24, core.landing[0])),
-    y: Math.min(core.H - 24, Math.max(24, core.landing[1]))
-  };
+  // Base camp (start and end of the drive, from data/mission-data.js) replaces the old landing site. It lies inside the map, so
+  // Atlas.me starts exactly there (no clamping). Atlas.landing is kept as an alias of the base camp point for older code.
+  var BASE = core.mapData.base;
+  Atlas.base = { id: BASE.id, name: BASE.name, x: BASE.x, y: BASE.y };
+  Atlas.landing = { x: BASE.x, y: BASE.y, onMap: true };
+  Atlas.me = { x: BASE.x, y: BASE.y };
 
   /* map clicks that were not drags */
   var clickFns = [];
@@ -3175,7 +2916,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     core.map.classList.toggle('picking', !!o);
     if (pickBar) {
       pickBar.hidden = !o;
-      if (o) pickBar.querySelector('.pk-t').textContent = 'Click the map: ' + (activePick.label || o) + ' (Esc cancels)';
+      if (o) pickBar.querySelector('.pk-t').textContent = 'Click the map: ' + (activePick.label || o) + ' (keyboard: pan with arrows, Enter picks the centre; Esc cancels)';
     }
     bus.emit('pick:changed', { owner: o });
   }
@@ -3207,6 +2948,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   Atlas.toast = function (text, level) {
     var t = h('div', { class: 'toast ' + (level === 'warn' || level === 'danger' ? level : 'info'), text: String(text) });
     if (level === 'danger') t.setAttribute('role', 'alert');
+    var last = toasts.lastChild;
+    if (last && last.textContent === t.textContent) return;                       // same message twice in a row: show it once
+    while (toasts.childNodes.length >= 4) toasts.removeChild(toasts.firstChild);   // fast clock or many alerts: never a wall of toasts
     toasts.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, level === 'danger' ? 7000 : 4500);
   };
@@ -3216,7 +2960,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var panelsEl = h('div', { id: 'panels', class: 'ui' });
   var tabs = {};                                  // id -> {def, btn, panel, body, rendered}
   var openState = store.get('tabs.open', null);   // {id: bool}; null on the very first visit
-  var firstVisit = openState === null;
+  var firstVisit = openState === null || typeof openState !== 'object' || Array.isArray(openState);   // missing or corrupt saved value: start fresh
   if (firstVisit) openState = {};
   var phone = window.matchMedia ? window.matchMedia('(max-width:640px)') : { matches: false };
 
@@ -3268,7 +3012,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       ]),
       body
     ]);
-    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented) { setOpen(def.id, false); btn.focus(); } });
+    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.defaultPrevented && !activePick) { setOpen(def.id, false); btn.focus(); } });   // during a map pick, Esc only cancels the pick
     var btn = h('button', { type: 'button', class: 'dock-tab', attrs: { 'aria-pressed': 'false', 'aria-label': def.title + ' tab' }, onclick: function () { openTab(def.id); } }, [
       h('span', { class: 'ic', attrs: { 'aria-hidden': 'true' } }, [icon(def.icon, 18) || (def.icon || '')]),
       h('span', { class: 'tt', text: def.title })
@@ -3276,18 +3020,29 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     tabs[def.id] = { def: def, btn: btn, panel: panel, body: body, rendered: false };
     layoutDock();
     var want = Object.prototype.hasOwnProperty.call(openState, def.id) ? openState[def.id] : (firstVisit && def.id === 'map' && !phone.matches);
+    if (want && phone.matches && Object.keys(tabs).some(function (k) { return k !== def.id && !tabs[k].panel.hidden; })) want = false;   // phone: one panel at a time, also for a saved desktop layout
     if (want) setOpen(def.id, true);
   };
+  function phoneOnePanel() {   // the window became phone-sized: keep a single open panel
+    var first = null;
+    Object.keys(tabs).forEach(function (k) {
+      if (tabs[k].panel.hidden) return;
+      if (first === null) first = k; else setOpen(k, false);
+    });
+  }
+  if (phone.addEventListener) phone.addEventListener('change', function (e) { if (e.matches) phoneOnePanel(); });
+  else if (phone.addListener) phone.addListener(function (e) { if (e.matches) phoneOnePanel(); });
 
   /* ---------- layers ---------- */
   var layerStore = store.get('layers', {});       // {id: {on, opacity}}
+  if (!layerStore || typeof layerStore !== 'object' || Array.isArray(layerStore)) layerStore = {};   // corrupt saved value
   var layers = {};                                // id -> {def, raster, cb, op}
   var groupOrder = [];
   var stage = core.stage, ov = document.getElementById('ov');
   var lsMenu, lsBody;
 
   function saveLayers() {
-    var o = store.get('layers', {}); if (!o || typeof o !== 'object') o = {};
+    var o = store.get('layers', {}); if (!o || typeof o !== 'object' || Array.isArray(o)) o = {};
     Object.keys(layers).forEach(function (id) { o[id] = { on: layers[id].on, opacity: layers[id].opacity }; });
     store.set('layers', o);
   }
@@ -3301,11 +3056,12 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   function addLayer(def, raster) {
     if (!def || !def.id) throw new Error('layer needs an id');
     if (layers[def.id]) return;
-    var saved = layerStore[def.id] || {};
+    var saved = layerStore[def.id]; if (!saved || typeof saved !== 'object') saved = {};
+    var op = Number(saved.opacity); if (saved.opacity === null || saved.opacity === '' || typeof saved.opacity === 'boolean' || !isFinite(op)) op = def.opacity !== undefined ? def.opacity : 0.7;
     var L = layers[def.id] = {
       def: def, raster: raster,
-      on: saved.on !== undefined ? !!saved.on : !!def.on,
-      opacity: saved.opacity !== undefined ? saved.opacity : (def.opacity !== undefined ? def.opacity : 0.7)
+      on: typeof saved.on === 'boolean' ? saved.on : !!def.on,
+      opacity: Math.min(1, Math.max(0, op))
     };
     if (raster) {
       var c = def.canvas;
@@ -3461,10 +3217,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   buildLayerSelector();
   layoutDock();
 
-  // layers of atlas-map.js (craters, delta, channel, route, samples, places, grid)
+  // layers of atlas-map.js (craters, delta, channel, grid)
   core.layers.forEach(function (l) { Atlas.registerLayer(l); });
 
-  // Map tab: route planner, selected card, sample list. atlas-map.js bound to their ids at load time, so we move the nodes.
+  // Map tab: route planner and selected card. atlas-map.js bound to their ids at load time, so we move the nodes.
   Atlas.registerTab({
     id: 'map', title: 'Map', icon: 'map', order: 5,
     render: function (container) {
@@ -3659,7 +3415,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       var id = o.id !== undefined ? String(o.id) : 'o' + items.length;
       var est = Math.round(num(o.remainingMin !== undefined ? o.remainingMin : o.estMin, cfg.work.missionObjectiveMinutes, 0, 1440));
       if (done['mission:' + id]) est = Math.max(0, est - done['mission:' + id]);
-      items.push({ key: 'mission:' + id, type: 'mission', refId: id, src: o, title: String(o.title || 'Mission objective'), est: est,
+      items.push({ key: 'mission:' + id, type: 'mission', seq: items.length, refId: id, src: o, title: String(o.title || 'Mission task'), est: est,
         deadline: toMs(o.deadline), importance: Math.round(num(o.importance, cfg.work.missionObjectiveImportance, 1, 5)) });
     });
     return items.filter(function (it) { return it.est > 0; });
@@ -3676,12 +3432,14 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (a.importance !== b.importance) return b.importance - a.importance;
       var da = a.deadline === null ? Infinity : a.deadline, db = b.deadline === null ? Infinity : b.deadline;
       if (da !== db) return da < db ? -1 : 1;
+      if (a.type === 'mission' && b.type === 'mission') return a.seq - b.seq;   // mission tasks keep the order given (stop order)
       return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
     };
   }
   function byDeadline(a, b) {
     if (a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
     if (a.importance !== b.importance) return b.importance - a.importance;
+    if (a.type === 'mission' && b.type === 'mission') return a.seq - b.seq;
     return a.key < b.key ? -1 : 1;
   }
 
@@ -3856,7 +3614,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
 </script>
 <script>
-/* Mission feature: stops (from docs/mission-guide.md via data/mission-data.js), pin layer 'mission-stops',
+/* Mission feature: base camp, 5 stops and their 10 tasks (docs/mission-guide.md via data/mission-data.js), pin layer 'mission-stops',
    Mission tab, user-added missions, and the Atlas.missions API (see docs/ARCHITECTURE.md). */
 (function () {
   'use strict';
@@ -3893,43 +3651,60 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var MAX_TITLE = 80, MAX_DESC = 500, MAX_CUSTOM = 200;
   var NS = 'http://www.w3.org/2000/svg';
 
-  /* ---------- positions: taken from Atlas.mapData (the exact values the sample and place layers draw) ----------
-     mapData x,y are true page pixels even when onMap is false (outside the current map). */
-  var PLACE_KEY = { 'place-landing': 'landing', 'place-hawksbill-gap': 'hawks', 'place-three-forks': 'three',
-    'place-neretva-vallis': 'neretva', 'place-witch-hazel-hill': 'whh', 'place-seitah': 'seitah' };
-  var MD = A.mapData || { samples: [], places: [] };
-  function mdSample(n) { for (var i = 0; i < MD.samples.length; i++) if (MD.samples[i].n === n) return MD.samples[i]; return null; }
-  function mdPlace(key) { for (var i = 0; i < MD.places.length; i++) if (MD.places[i].id === key) return MD.places[i]; return null; }
   function inMap(x, y) { return x >= 0 && x <= A.W && y >= 0 && y <= A.H; }
 
   /* ---------- state ---------- */
   var objectives = D.objectives || [];
-  var objIndex = {}; objectives.forEach(function (o, i) { objIndex[o.id] = i + 1; });
+  var objById = {}; objectives.forEach(function (o) { objById[o.id] = o; });
   var done = A.store.get('mission.done', {}); if (!done || typeof done !== 'object' || Array.isArray(done)) done = {};
   var custom = A.store.get('mission.custom', []); if (!Array.isArray(custom)) custom = [];
-  custom = custom.filter(function (c) { return c && typeof c.id === 'string' && typeof c.title === 'string'; });
+  (function () {   // saved missions from older versions or a corrupt store: keep usable ones, drop duplicate ids and off-map positions
+    var seen = {};
+    custom = custom.filter(function (c) {
+      if (!c || typeof c !== 'object' || typeof c.id !== 'string' || typeof c.title !== 'string' || seen[c.id] || taskByIdEarly(c.id)) return false;
+      seen[c.id] = 1;
+      if (typeof c.description !== 'string') c.description = '';
+      if (typeof c.x !== 'number' || typeof c.y !== 'number' || !isFinite(c.x) || !isFinite(c.y) || !inMap(c.x, c.y)) { c.x = null; c.y = null; }
+      return true;
+    });
+    function taskByIdEarly(id) { return (D.tasks || []).some(function (t) { return t.id === id; }) || (D.stops || []).some(function (t) { return t.id === id; }) || id === 'base'; }
+  })();
   var seq = Number(A.store.get('mission.seq', 0)) || 0;
   custom.forEach(function (c) { var n = parseInt(String(c.id).replace('custom-', ''), 10); if (n > seq) seq = n; });
 
-  var stops = [];
-  (D.stops || []).forEach(function (s) {
-    var p = null, num = parseInt(s.id.replace('sample-', ''), 10) || s.no, md = null;
-    if (s.kind === 'sample') md = mdSample(num); else md = mdPlace(PLACE_KEY[s.id]);
-    if (md) p = [md.x, md.y];
-    else if (typeof s.lat === 'number' && typeof s.lon === 'number') p = A.xy(s.lon, s.lat);   // a stop added to the guide with its own position
-    var hasPos = !!p, on = hasPos && inMap(p[0], p[1]), q = hasPos ? A.ll(p[0], p[1]) : null;
-    var approx = s.kind === 'sample' || (s.id !== 'place-landing' && !(typeof s.lat === 'number'));
-    stops.push({
-      id: s.id, no: s.no, name: s.name, sub: s.kind, area: s.area, sol: s.sol, date: s.date, objectives: s.objectives || [],
-      title: s.kind === 'sample' ? 'Sample ' + num + ' · ' + s.name : s.name,
-      kind: 'stop', description: s.description, x: on ? p[0] : null, y: on ? p[1] : null, lat: q ? q[1] : null, lon: q ? q[0] : null,
-      source: SRC, onMap: on, hasPos: hasPos, approx: approx, px: hasPos ? p[0] : null, py: hasPos ? p[1] : null
-    });
+  /* Base camp, the 5 stops and the 10 tasks come from data/mission-data.js (generated from docs/mission-guide.md).
+     x,y are page px; lat/lon come back through Atlas.ll so they agree with the map readout. */
+  function place(o) {
+    var q = A.ll(o.x, o.y);
+    return { x: o.x, y: o.y, lat: q[1], lon: q[0], onMap: inMap(o.x, o.y) };
+  }
+  var base = (function () {
+    var b = D.base || { id: 'base', name: 'Base camp', x: A.W - 24, y: A.H / 2 };
+    var p = place(b);
+    return { id: 'base', name: b.name, title: b.name, kind: 'base', description: b.description || 'Start and end of the drive. Confirm the ground is flat and rock-free enough to live on.',
+      x: p.x, y: p.y, lat: p.lat, lon: p.lon, source: SRC, onMap: p.onMap };
+  })();
+  var stops = (D.stops || []).map(function (s) {
+    var p = place(s);
+    return { id: s.id, no: s.n, n: s.n, name: s.name, title: s.name, kind: 'stop', description: s.description, x: p.x, y: p.y, lat: p.lat, lon: p.lon,
+      source: SRC, onMap: p.onMap, objectives: objectives.map(function (o) { return o.id; }), taskIds: [] };
   });
+  var stopById = {}; stops.forEach(function (s) { stopById[s.id] = s; });
+  var tasks = (D.tasks || []).filter(function (t) { return stopById[t.stopId]; }).map(function (t) {
+    var s = stopById[t.stopId], o = objById[t.objective] || {};
+    s.taskIds.push(t.id);
+    return { id: t.id, kind: 'task', stopId: s.id, stopNo: s.n, stopName: s.name, objective: t.objective, objectiveShort: o.short || ('Objective ' + t.objective),
+      title: t.title, description: t.description, estMin: t.estMin, x: s.x, y: s.y, lat: s.lat, lon: s.lon, source: SRC, onMap: s.onMap };
+  });
+  var taskById = {}; tasks.forEach(function (t) { taskById[t.id] = t; });
 
   function save() { A.store.set('mission.done', done); A.store.set('mission.custom', custom); A.store.set('mission.seq', seq); }
   function changed(reason, id) { A.bus.emit('missions:changed', { reason: reason, id: id || null }); }
-  function isDone(id) { return !!done[id]; }
+  function isDone(id) {
+    var s = stopById[id];
+    if (s) return s.taskIds.length > 0 && s.taskIds.every(function (t) { return !!done[t]; });   // a stop is visited when both its tasks are done
+    return !!done[id];
+  }
 
   function customView(c, i) {
     var hasPos = typeof c.x === 'number' && typeof c.y === 'number', q = hasPos ? A.ll(c.x, c.y) : null;
@@ -3940,8 +3715,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function stopView(s) {
     var o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; });
-    o.objectives = s.objectives.slice(); o.done = isDone(s.id); return o;
+    o.objectives = s.objectives.slice(); o.taskIds = s.taskIds.slice(); o.done = isDone(s.id); return o;
   }
+  function taskView(t) { var o = {}; Object.keys(t).forEach(function (k) { o[k] = t[k]; }); o.done = isDone(t.id); return o; }
+  function baseView() { var o = {}; Object.keys(base).forEach(function (k) { o[k] = base[k]; }); return o; }
 
   /* ---------- validation and API ---------- */
   function validate(m) {
@@ -3964,14 +3741,18 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     return errs.length ? { errors: errs } : { value: { title: title, description: desc, x: x, y: y } };
   }
 
+  /* Atlas.missions.list(): objectives, stops, tasks, then user missions. kind is 'objective' | 'stop' | 'task' | 'custom'.
+     Base camp is not a stop: it is Atlas.missions.base(). setDone(id) accepts a task (one task), a stop (both its tasks) or a custom mission. */
   var API = A.missions = {
     list: function () {
       var out = objectives.map(function (o) {
-        return { id: o.id, title: o.title, kind: 'objective', description: o.text, x: null, y: null, lat: null, lon: null, source: SRC };
+        return { id: o.id, title: o.title, short: o.short, kind: 'objective', description: o.title, x: null, y: null, lat: null, lon: null, source: SRC };
       });
-      return out.concat(stops.map(stopView), custom.map(customView));
+      return out.concat(stops.map(stopView), tasks.map(taskView), custom.map(customView));
     },
     stops: function () { return stops.map(stopView); },
+    tasks: function () { return tasks.map(taskView); },
+    base: baseView,
     /* returns the new mission, or null when the input is invalid (use A.missions.validate for the reasons) */
     add: function (m) {
       var v = validate(m);
@@ -3987,34 +3768,78 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       custom.splice(i, 1); delete done[id]; save(); changed('remove', id); return true;
     },
     setDone: function (id, flag) {
-      var known = stops.some(function (s) { return s.id === id; }) || custom.some(function (c) { return c.id === id; });
-      if (!known) return false;
-      if (flag) done[id] = true; else delete done[id];
+      var s = stopById[id], ids = s ? s.taskIds : (taskById[id] || custom.some(function (c) { return c.id === id; })) ? [id] : null;
+      if (!ids) return false;
+      ids.forEach(function (k) { if (flag) done[k] = true; else delete done[k]; });
       save(); changed('done', id); return true;
     },
-    isDone: isDone
+    isDone: isDone,
+    /* testing hook: behave as if the world run reports n finished tasks (see 'mission run mirror' below) */
+    _applyRun: function (n) { applyRun(n); }
   };
+
+  /* ---------- mission run mirror ----------
+     While a world authority (control page) runs the mission, this crew member's record has progress:{done,total}. The first `done`
+     tasks (mission order, 2 per stop) are marked done here, so the Mission tab, Planner and schedule show them as done.
+     - Marked once per task (runHandled): a task the user un-ticks afterwards is NOT ticked again until the run restarts.
+     - A task ticked or un-ticked by hand leaves runMarked (the user owns it from then on).
+     - progress.done going down means the run restarted: tasks marked by the run (and still in runMarked) are re-opened, handling is reset.
+     - Nothing is published back to the world. Without an authority nothing here runs and manual ticking is unchanged. The run state (handled / marked / last) is kept in jda.mission.run so a reload does not forget which ticks came from the run. */
+  var runSaved = A.store.get('mission.run', null);
+  if (!runSaved || typeof runSaved !== 'object' || Array.isArray(runSaved)) runSaved = {};
+  function idMap(v) { var o = {}; if (v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function (k) { if (v[k] === true && taskById[k]) o[k] = true; }); return o; }
+  var runHandled = idMap(runSaved.handled), runMarked = idMap(runSaved.marked), runLast = isFinite(Number(runSaved.last)) ? Math.max(-1, Math.floor(Number(runSaved.last))) : -1;
+  function saveRun() { A.store.set('mission.run', { handled: runHandled, marked: runMarked, last: runLast }); }
+  function applyRun(n) {
+    n = Math.max(0, Math.min(tasks.length, Math.floor(Number(n)) || 0));
+    var chg = false;
+    if (n < runLast) {
+      tasks.forEach(function (t) { if (runMarked[t.id] && done[t.id]) { delete done[t.id]; chg = true; } });
+      runHandled = {}; runMarked = {};
+    }
+    runLast = n;
+    for (var i = 0; i < n; i++) {
+      var id = tasks[i].id;
+      if (runHandled[id]) continue;
+      runHandled[id] = true;
+      if (!done[id]) { done[id] = true; runMarked[id] = true; chg = true; }
+    }
+    saveRun();
+    if (chg) { save(); changed('run'); }
+  }
+  var setDoneUser = API.setDone;
+  API.setDone = function (id, flag) {
+    var s = stopById[id], ids = s ? s.taskIds : [id];
+    ids.forEach(function (k) { delete runMarked[k]; });
+    saveRun();
+    return setDoneUser(id, flag);
+  };
+  if (window.JdaWorld && typeof window.JdaWorld.on === 'function') window.JdaWorld.on(function () {
+    var W = window.JdaWorld, me = null;
+    if (W.source !== 'authority') return;
+    try { me = W.me(); } catch (e) { me = null; }
+    if (me && me.progress && isFinite(Number(me.progress.done))) applyRun(me.progress.done);
+  });
 
   /* ---------- pin layer ---------- */
   var layer = A.el('g', { class: 'ms-layer' });
   var pend = A.el('g', { class: 'ms-pending' }, layer);   // preview pin while picking a location
   var pinsG = A.el('g', {}, layer);
   var PIN = 'M0,0 C-3,-8 -11,-13 -11,-20 A11,11 0 1 1 11,-20 C11,-13 3,-8 0,0Z';
+  var HOME = 'M0,0 L-9,-9 L-9,-20 L0,-27 L9,-20 L9,-9Z';   // base camp: a house-shaped marker, the tip is the point
 
-  function objClass(s) {
-    if (s.kind === 'custom') return 'ms-custom';
-    var n = s.objectives.length;
-    return n === 0 ? 'ms-none' : n > 1 ? 'ms-multi' : 'ms-o' + (((objIndex[s.objectives[0]] || 1) - 1) % 4 + 1);
+  function pinLabel(s) {
+    if (s.kind === 'base') return s.title + ', start and end of the drive';
+    if (s.kind === 'custom') return s.title + ' (my mission)' + (isDone(s.id) ? ', done' : '');
+    return 'Stop ' + s.no + ': ' + s.title + ', 2 tasks' + (isDone(s.id) ? ', done' : '');
   }
-  function objNames(s) { return s.objectives.map(function (id) { return 'Objective ' + objIndex[id]; }).join(', '); }
-  function pinLabel(s) { return s.title + (s.kind === 'custom' ? ' (my mission)' : ' (' + (objNames(s) || 'no objective') + ')') + (s.approx ? ', approximate position' : '') + (isDone(s.id) ? ', visited' : ''); }
-
   function makePin(s, text, parent) {
-    var g = A.el('g', { class: 'ms-pin hit ' + objClass(s) + (isDone(s.id) ? ' ms-done' : '') + (s.approx ? ' ms-approx' : ''), transform: 'translate(' + s.x + ' ' + s.y + ')', tabindex: '0', role: 'button', 'aria-label': pinLabel(s), 'data-id': s.id }, parent);
+    var cls = s.kind === 'custom' ? 'ms-custom' : s.kind === 'base' ? 'ms-base' : 'ms-multi';
+    var g = A.el('g', { class: 'ms-pin hit ' + cls + (s.kind !== 'base' && isDone(s.id) ? ' ms-done' : ''), transform: 'translate(' + s.x + ' ' + s.y + ')', tabindex: '0', role: 'button', 'aria-label': pinLabel(s), 'data-id': s.id }, parent);
     var k = A.el('g', { class: 'ms-s' }, g);
-    A.el('path', { class: 'ms-body', d: PIN }, k);
-    var t = A.el('text', { class: 'ms-num', x: 0, y: -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
-    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
+    A.el('path', { class: 'ms-body', d: s.kind === 'base' ? HOME : PIN }, k);
+    var t = A.el('text', { class: 'ms-num', x: 0, y: s.kind === 'base' ? -12.5 : -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
+    if (s.kind !== 'base' && isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
     var lab = A.el('text', { class: 'ms-lab', x: 15, y: -14 }, k); lab.textContent = s.title;
     g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); select(s.id); });
     g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); select(s.id); } });
@@ -4022,96 +3847,38 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function drawPins() {
     while (pinsG.firstChild) pinsG.removeChild(pinsG.firstChild);
-    var n = 0;
+    makePin(base, 'B', pinsG);
     stops.forEach(function (s) { if (s.onMap) makePin(s, String(s.no), pinsG); });
     custom.forEach(function (c, i) { var v = customView(c, i); if (v.onMap) makePin(v, 'C' + (i + 1), pinsG); });
   }
 
-  /* ---------- edge markers for stops outside the map ---------- */
-  var KM_PER_DEG = 59.27;   // Mars, 3396 km radius (same constant atlas-map.js uses for its scale bar)
-  var DIRS = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast'];
-  function dirName(dx, dy) { var a = Math.atan2(dy, dx), i = Math.round(a / (Math.PI / 4)); return DIRS[(i + 8) % 8]; }
-  function kmBetween(x1, y1, x2, y2) {
-    var a = A.ll(x1, y1), b = A.ll(x2, y2), dl = (b[0] - a[0]) * Math.cos((a[1] + b[1]) / 2 * Math.PI / 180) * KM_PER_DEG, dp = (b[1] - a[1]) * KM_PER_DEG;
-    return Math.sqrt(dl * dl + dp * dp);
-  }
-  function fmtKm(k) { return k < 10 ? (Math.round(k * 10) / 10) + '' : Math.round(k) + ''; }
-  var EDGE_INSET = 30, CLUSTER = 70;   // page px
-  function edgePoint(px, py) {   // where the line from the map centre to the stop leaves the map, pulled EDGE_INSET inside
-    var cx = A.W / 2, cy = A.H / 2, dx = px - cx, dy = py - cy;
-    var t = Math.min(dx ? (A.W / 2 - EDGE_INSET) / Math.abs(dx) : Infinity, dy ? (A.H / 2 - EDGE_INSET) / Math.abs(dy) : Infinity);
-    return { x: cx + dx * t, y: cy + dy * t, ang: Math.atan2(dy, dx), dir: dirName(dx, dy) };
-  }
-  var edges = [];   // [{x,y,ang,dir,members:[stop]}]
-  (function () {
-    stops.forEach(function (s) {
-      if (s.onMap || !s.hasPos) return;
-      var e = edgePoint(s.px, s.py), hit = null;
-      edges.forEach(function (c) { if (!hit && Math.hypot(c.x - e.x, c.y - e.y) < CLUSTER) hit = c; });
-      if (hit) { hit.members.push(s); if (hit.dir !== e.dir) hit.dir = dirName(hit.mx, hit.my); } else { e.members = [s]; e.mx = s.px - A.W / 2; e.my = s.py - A.H / 2; edges.push(e); }
-    });
-    edges.forEach(function (c) {
-      var d = c.members.map(function (m) { return kmBetween(c.x, c.y, m.px, m.py); });
-      c.minKm = Math.min.apply(null, d); c.maxKm = Math.max.apply(null, d); c.i = -1;
-    });
-  })();
-  function edgeLabel(c) {
-    var n = c.members.length, km = n === 1 ? 'about ' + fmtKm(c.minKm) + ' km' : 'about ' + fmtKm(c.minKm) + ' to ' + fmtKm(c.maxKm) + ' km';
-    return (n === 1 ? c.members[0].title : n + ' stops (' + c.members.map(function (m) { return m.no; }).join(', ') + ')') + ', outside the map, ' + km + ' ' + c.dir + ' of the map edge';
-  }
-  function selectEdge(c) {
-    if (A.pick.busy()) return;
-    c.i = (c.i + 1) % c.members.length;
-    var m = c.members[c.i];
-    select(m.id);
-    if (c.members.length > 1) {
-      var meta = document.querySelector('#info .meta');
-      A.setInfo(m.title, document.querySelector('#info p').textContent, 'Marker ' + (c.i + 1) + ' of ' + c.members.length + ': ' + c.members.length + ' stops outside the map to the ' + c.dir + '. Click the marker again for the next one. ' + (meta ? meta.textContent : ''));
-    }
-  }
-  function drawEdges() {
-    while (edgeG.firstChild) edgeG.removeChild(edgeG.firstChild);
-    edges.forEach(function (c) {
-      var n = c.members.length, g = A.el('g', { class: 'ms-edge hit', transform: 'translate(' + c.x + ' ' + c.y + ')', tabindex: '0', role: 'button', 'aria-label': edgeLabel(c) }, edgeG);
-      var k = A.el('g', { class: 'ms-s' }, g);
-      A.el('polygon', { class: 'ms-arrow', points: '19,0 11,-7 11,7', transform: 'rotate(' + (c.ang * 180 / Math.PI) + ')' }, k);
-      A.el('circle', { class: 'ms-edgec', r: 11 }, k);
-      var t = A.el('text', { class: 'ms-num', x: 0, y: 4, 'text-anchor': 'middle' }, k); t.textContent = n === 1 ? String(c.members[0].no) : String(n);
-      var lab = A.el('text', { class: 'ms-lab', x: 0, y: -16, 'text-anchor': 'middle' }, k); lab.textContent = n === 1 ? c.members[0].title : n + ' stops ' + c.dir;
-      g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); selectEdge(c); });
-      g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); selectEdge(c); } });
-    });
-  }
-  var edgeG = A.el('g', { class: 'ms-edges' }, layer);
-  drawEdges();
-
   A.registerLayer({
-    id: 'mission-stops', label: 'Mission stops', group: 'Mission', color: '#c4501b', node: layer, on: true,
-    count: stops.filter(function (s) { return s.hasPos; }).length
+    id: 'mission-stops', label: 'Base camp and mission stops', group: 'Mission', color: '#c4501b', node: layer, on: true,
+    count: stops.length
   });
 
-  /* ---------- selecting a stop ---------- */
+  /* ---------- selecting a stop, a task or base camp ---------- */
   function find(id) {
+    if (id === 'base') return baseView();
     var l = API.list(), r = null; l.forEach(function (m) { if (m.id === id && m.kind !== 'objective') r = m; }); return r;
   }
+  function taskLine(t) { return t.objectiveShort + ': ' + t.title + ' (about ' + t.estMin + ' min)'; }
   function select(id) {
     var m = find(id); if (!m) return;
-    var text = m.description || '(no description)';
+    var text = m.description || '(no description)', meta;
     if (m.kind === 'stop') {
-      if (m.sol !== null) text += ' Sealed on sol ' + m.sol + (m.date ? ' (' + m.date + ')' : '') + '.';
-      text += ' Area: ' + m.area + '. Serves: ' + (objNames(m) || 'no listed objective') + '.';
-      if (m.approx) text += m.sub === 'sample' ? ' Position approximate: placed by area, not the true sample location.' : ' Position approximate.';
-    }
-    var meta = m.kind === 'custom' ? 'My mission' : 'Mission stop ' + m.no;
+      var ts = tasks.filter(function (t) { return t.stopId === m.id; });
+      text += ' Tasks: ' + ts.map(taskLine).join('. ') + '.';
+      meta = 'Mission stop ' + m.no;
+    } else if (m.kind === 'task') {
+      text = m.description + ' About ' + m.estMin + ' min.';
+      meta = 'Stop ' + m.stopNo + ', ' + m.stopName + ' · ' + m.objectiveShort;
+    } else if (m.kind === 'base') meta = 'Base camp, start and end of the drive';
+    else meta = 'My mission';
     if (m.onMap) meta += ' · ' + m.lat.toFixed(4) + '°N  ' + m.lon.toFixed(4) + '°E';
     else if (m.kind === 'custom') meta += ' · no location';
-    else {
-      meta += ' · outside current map';
-      if (m.hasPos) { var e = edgePoint(m.px, m.py); meta += ' (about ' + fmtKm(kmBetween(e.x, e.y, m.px, m.py)) + ' km ' + e.dir + ' of the map edge)'; }
-    }
-    if (m.approx && m.onMap) meta += ' · approximate';
-    meta += isDone(m.id) ? ' · visited' : '';
-    A.setInfo(m.title, text, meta);
+    meta += m.kind !== 'base' && isDone(m.id) ? ' · done' : '';
+    A.setInfo(m.kind === 'stop' ? 'Stop ' + m.no + ' · ' + m.title : m.title, text, meta);
     if (m.onMap) A.focus(m.x, m.y, 2.6);
   }
 
@@ -4119,12 +3886,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var ui = { list: null, prog: null, bar: null, q: '', filter: 'all', open: {}, custIds: {} };
   var form = {};
 
-  function stopMatches(s, q) {
-    if (ui.filter === 'todo' && isDone(s.id)) return false;
-    if (ui.filter === 'done' && !isDone(s.id)) return false;
+  function taskMatches(t, q) {
+    if (ui.filter === 'todo' && isDone(t.id)) return false;
+    if (ui.filter === 'done' && !isDone(t.id)) return false;
     if (!q) return true;
-    var hay = [s.title, s.name, s.area, s.description, s.date || '', s.sol !== null ? 'sol ' + s.sol : '', s.onMap ? '' : 'outside current map'].join(' ').toLowerCase();
-    return hay.indexOf(q) >= 0;
+    return [t.title, t.description, t.stopName, t.objectiveShort, 'stop ' + t.stopNo].join(' ').toLowerCase().indexOf(q) >= 0;
   }
   function customMatches(c, q) {
     if (ui.filter === 'todo' && c.done) return false;
@@ -4132,22 +3898,29 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     return !q || (c.title + ' ' + c.description).toLowerCase().indexOf(q) >= 0;
   }
 
-  function row(m, isCustom) {
-    var cb = h('input', { type: 'checkbox', checked: m.done, attrs: { 'aria-label': 'Mark ' + m.title + ' as visited', 'data-key': 'cb:' + m.id }, onchange: function () { API.setDone(m.id, cb.checked); } });
-    var sub = [];
-    if (isCustom) sub.push(m.onMap ? 'on the map' : 'no location');
-    else {
-      sub.push(m.area);
-      if (m.sol !== null) sub.push('sol ' + m.sol);
-      if (!m.onMap) sub.push('outside current map');
-    }
-    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + m.id, 'aria-label': 'Show ' + m.title + ' on the map' }, onclick: function () { select(m.id); } }, [
-      h('span', { class: 'ms-badge ' + objClass(m) + (m.onMap ? '' : ' ms-off'), text: isCustom ? 'C' + m.no : String(m.no), attrs: { 'aria-hidden': 'true' } }),
-      h('span', { class: 'ms-t' }, [h('b', { text: m.title }), h('small', { text: sub.join(' · ') })])
+  function taskRow(t) {
+    var cb = h('input', { type: 'checkbox', checked: t.done, attrs: { 'aria-label': 'Mark ' + t.title + ' as done', 'data-key': 'cb:' + t.id }, onchange: function () { API.setDone(t.id, cb.checked); } });
+    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + t.id, 'aria-label': 'Show the task ' + t.title + ' on the map' }, onclick: function () { select(t.id); } }, [
+      h('span', { class: 'ms-badge ms-obj ms-o' + t.objective, text: 'O' + t.objective, attrs: { title: t.objectiveShort } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: t.title }), h('small', { text: t.objectiveShort + ' · about ' + t.estMin + ' min' })])
     ]);
-    var kids = [h('label', { class: 'ms-chk' }, [cb]), go];
-    if (isCustom) kids.push(delButton(m));
-    return h('div', { class: 'ms-row' + (m.done ? ' is-done' : '') }, kids);
+    return h('div', { class: 'ms-row ms-task' + (t.done ? ' is-done' : '') }, [h('label', { class: 'ms-chk' }, [cb]), go]);
+  }
+  function stopBlock(s, ts) {
+    var d = isDone(s.id), nd = ts.filter(function (t) { return t.done; }).length;
+    var head = h('button', { type: 'button', class: 'ms-go ms-stophead', attrs: { 'data-key': 'go:' + s.id, 'aria-label': 'Show stop ' + s.no + ', ' + s.title + ', on the map' }, onclick: function () { select(s.id); } }, [
+      h('span', { class: 'ms-badge ms-multi', text: String(s.no), attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: s.title }), h('small', { text: nd + ' of ' + s.taskIds.length + ' tasks done' + (d ? ' · stop done' : '') })])
+    ]);
+    return h('div', { class: 'ms-stop' + (d ? ' is-done' : '') }, [head].concat(ts.map(taskRow)));
+  }
+  function customRow(m) {
+    var cb = h('input', { type: 'checkbox', checked: m.done, attrs: { 'aria-label': 'Mark ' + m.title + ' as done', 'data-key': 'cb:' + m.id }, onchange: function () { API.setDone(m.id, cb.checked); } });
+    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + m.id, 'aria-label': 'Show ' + m.title + ' on the map' }, onclick: function () { select(m.id); } }, [
+      h('span', { class: 'ms-badge ms-custom', text: 'C' + m.no, attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: m.title }), h('small', { text: m.onMap ? 'on the map' : 'no location' })])
+    ]);
+    return h('div', { class: 'ms-row' + (m.done ? ' is-done' : '') }, [h('label', { class: 'ms-chk' }, [cb]), go, delButton(m)]);
   }
   function delButton(m) {
     var armed = false, timer = null;
@@ -4162,46 +3935,50 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     };
     return b;
   }
-
-  function section(key, head, text, items, doneN, totalN, builder, emptyText) {
-    var q = ui.q, forced = !!q || ui.filter !== 'all';
-    var det = h('details', { class: 'ms-det', attrs: { 'data-sec': key } }, [
-      h('summary', {}, ['Stops ', h('span', { class: 'ms-n', text: items.length === totalN ? String(totalN) : items.length + ' of ' + totalN })])
-    ]);
-    det.open = forced || !!ui.open[key];
-    det.addEventListener('toggle', function () { if (!forced) ui.open[key] = det.open; });
-    if (!items.length) det.appendChild(h('p', { class: 'ms-empty', text: emptyText }));
-    items.forEach(function (it) { det.appendChild(builder(it)); });
+  function bar(doneN, totalN, label) {
     var pct = totalN ? Math.round(doneN / totalN * 100) : 0;
-    return h('section', { class: 'ms-sec' }, [
-      h('h3', {}, [head, h('span', { class: 'ms-n', text: doneN + ' / ' + totalN + ' visited' })]),
-      text ? h('p', { class: 'ms-text', text: text }) : null,
-      h('div', { class: 'ms-bar', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(totalN), 'aria-valuenow': String(doneN), 'aria-label': head + ' progress' } }, h('i', { style: 'width:' + pct + '%' })),
-      det
-    ]);
+    return h('div', { class: 'ms-bar', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(totalN), 'aria-valuenow': String(doneN), 'aria-label': label } }, h('i', { style: 'width:' + pct + '%' }));
   }
 
   function refresh() {
     if (!ui.list) return;
     var focusKey = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-key') : null;
-    var q = ui.q.trim().toLowerCase(), views = stops.map(stopView);
+    var q = ui.q.trim().toLowerCase(), tv = tasks.map(taskView);
     while (ui.list.firstChild) ui.list.removeChild(ui.list.firstChild);
+    // the two objectives, with progress over their 5 tasks
+    var objSec = h('section', { class: 'ms-sec' }, [h('h3', { text: 'Objectives' })]);
     objectives.forEach(function (o) {
-      var all = views.filter(function (s) { return s.objectives.indexOf(o.id) >= 0; });
-      var d = all.filter(function (s) { return s.done; }).length;
-      ui.list.appendChild(section(o.id, o.title, o.text, all.filter(function (s) { return stopMatches(s, q); }), d, all.length, function (s) { return row(s, false); }, 'No stops match.'));
+      var mine = tv.filter(function (t) { return t.objective === o.id; }), d = mine.filter(function (t) { return t.done; }).length;
+      objSec.appendChild(h('div', { class: 'ms-obj-row' }, [
+        h('p', { class: 'ms-objt' }, [h('span', { class: 'ms-badge ms-obj ms-o' + o.id, text: 'O' + o.id }), h('b', { text: ' ' + o.title }), h('span', { class: 'ms-n', text: d + ' / ' + mine.length + ' tasks' })]),
+        bar(d, mine.length, o.short + ' progress')
+      ]));
     });
-    var loose = views.filter(function (s) { return !s.objectives.length; });
-    if (loose.length) {
-      var dl = loose.filter(function (s) { return s.done; }).length;
-      ui.list.appendChild(section('other', 'Other stops', 'Stops with no listed objective.', loose.filter(function (s) { return stopMatches(s, q); }), dl, loose.length, function (s) { return row(s, false); }, 'No stops match.'));
-    }
+    ui.list.appendChild(objSec);
+    // base camp, then the stops with their tasks
+    var stopSec = h('section', { class: 'ms-sec' }, [h('h3', {}, ['Route', h('span', { class: 'ms-n', text: 'base camp + ' + stops.length + ' stops' })])]);
+    stopSec.appendChild(h('div', { class: 'ms-row ms-basefix' }, [h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:base', 'aria-label': 'Show base camp on the map' }, onclick: function () { select('base'); } }, [
+      h('span', { class: 'ms-badge ms-base', text: 'B', attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: base.title }), h('small', { text: 'Start and end of the drive' })])])]));
+    var shown = 0;
+    stops.forEach(function (s) {
+      var ts = tv.filter(function (t) { return t.stopId === s.id; }), vis = ts.filter(function (t) { return taskMatches(t, q); });
+      if (!vis.length) return;
+      shown++; stopSec.appendChild(stopBlock(stopView(s), vis));
+    });
+    if (!shown) stopSec.appendChild(h('p', { class: 'ms-empty', text: 'No tasks match.' }));
+    ui.list.appendChild(stopSec);
     var cv = custom.map(customView), cd = cv.filter(function (c) { return c.done; }).length;
-    ui.list.appendChild(section('custom', 'My missions', 'Missions you added. They are stored only in this browser.', cv.filter(function (c) { return customMatches(c, q); }), cd, cv.length, function (c) { return row(c, true); }, cv.length ? 'No missions match.' : 'None yet. Add one below.'));
-    var nd = views.filter(function (s) { return s.done; }).length;
-    ui.prog.textContent = 'Visited ' + nd + ' of ' + views.length + ' stops' + (cv.length ? ' · ' + cd + ' of ' + cv.length + ' of my missions' : '');
-    ui.progBar.style.width = (views.length ? Math.round(nd / views.length * 100) : 0) + '%';
-    ui.progBox.setAttribute('aria-valuenow', String(nd)); ui.progBox.setAttribute('aria-valuemax', String(views.length));
+    var cs = h('section', { class: 'ms-sec' }, [h('h3', {}, ['My missions', h('span', { class: 'ms-n', text: cd + ' / ' + cv.length + ' done' })]),
+      h('p', { class: 'ms-text', text: 'Missions you added. They are stored only in this browser.' })]);
+    var cshow = cv.filter(function (c) { return customMatches(c, q); });
+    if (!cshow.length) cs.appendChild(h('p', { class: 'ms-empty', text: cv.length ? 'No missions match.' : 'None yet. Add one below.' }));
+    cshow.forEach(function (c) { cs.appendChild(customRow(c)); });
+    ui.list.appendChild(cs);
+    var nd = tv.filter(function (t) { return t.done; }).length, sd = stops.filter(function (s) { return isDone(s.id); }).length;
+    ui.prog.textContent = nd + ' of ' + tv.length + ' tasks done · ' + sd + ' of ' + stops.length + ' stops done' + (cv.length ? ' · ' + cd + ' of ' + cv.length + ' of my missions' : '');
+    ui.progBar.style.width = (tv.length ? Math.round(nd / tv.length * 100) : 0) + '%';
+    ui.progBox.setAttribute('aria-valuenow', String(nd)); ui.progBox.setAttribute('aria-valuemax', String(tv.length));
     if (focusKey) { var f = ui.root.querySelector('[data-key="' + focusKey.replace(/["\\]/g, '') + '"]'); if (f) f.focus(); }
   }
 
@@ -4305,17 +4082,14 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       ui.prog = h('p', { class: 'ms-prog' });
       ui.progBar = h('i');
       ui.progBox = h('div', { class: 'ms-bar big', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuenow': '0', 'aria-valuemax': '0', 'aria-label': 'Visited stops' } }, ui.progBar);
-      var search = h('input', { type: 'search', class: 'ms-search', placeholder: 'Search stops (name, area, sol, date)', attrs: { 'aria-label': 'Search stops' }, oninput: function () { ui.q = search.value; refresh(); } });
-      var filt = h('select', { class: 'ms-filter', attrs: { 'aria-label': 'Filter stops by status' }, onchange: function () { ui.filter = filt.value; refresh(); } }, [
-        h('option', { value: 'all', text: 'All' }), h('option', { value: 'todo', text: 'Not visited' }), h('option', { value: 'done', text: 'Visited' })]);
+      var search = h('input', { type: 'search', class: 'ms-search', placeholder: 'Search tasks (title, stop, objective)', attrs: { 'aria-label': 'Search tasks' }, oninput: function () { ui.q = search.value; refresh(); } });
+      var filt = h('select', { class: 'ms-filter', attrs: { 'aria-label': 'Filter tasks by status' }, onchange: function () { ui.filter = filt.value; refresh(); } }, [
+        h('option', { value: 'all', text: 'All' }), h('option', { value: 'todo', text: 'Not done' }), h('option', { value: 'done', text: 'Done' })]);
       ui.list = h('div', { class: 'ms-list' });
-      var legend = h('p', { class: 'ms-legend' }, objectives.map(function (o, i) { return h('span', {}, [h('i', { class: 'ms-sw ms-o' + (i % 4 + 1) }), o.title]); })
-        .concat([h('span', {}, [h('i', { class: 'ms-sw ms-multi' }), 'Both']), h('span', {}, [h('i', { class: 'ms-sw ms-custom' }), 'Mine']),
-          h('span', {}, [h('i', { class: 'ms-sw ms-dash' }), 'Dashed outline: approximate position']),
-          h('span', {}, [h('i', { class: 'ms-sw ms-arrow-sw' }), 'Arrow marker: stop outside the map (number or count)'])]));
+      var legend = h('p', { class: 'ms-legend' }, [h('span', {}, [h('i', { class: 'ms-sw ms-multi' }), 'Stop (numbered 1 to 5)']), h('span', {}, [h('i', { class: 'ms-sw ms-base' }), 'Base camp']),
+        h('span', {}, [h('i', { class: 'ms-sw ms-custom' }), 'My mission'])]);
       container.appendChild(h('div', {}, [
-        h('p', { class: 'ms-intro', text: 'Stops from the mission guide. Sample positions are approximate (placed by area, not the true sample locations). Tick a stop when you have visited it.' }),
-        h('p', { class: 'ms-intro', text: 'Objective tags are a simplified editorial mapping (see docs/mission-guide.md), not an official science assignment.' }),
+        h('p', { class: 'ms-intro', text: 'Jezero Pathfinder: drive the pressurised rover from base camp to five stops, get out on foot at each one, then drive back. At every stop there are two tasks, one for each objective. Tick a task when it is done.' }),
         ui.prog, ui.progBox, legend,
         h('div', { class: 'ms-tools' }, [search, filt]),
         ui.list, buildForm()
@@ -4342,13 +4116,27 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var RAW = window.JEZERO_SCHEDULE_CONFIG || {};
 
   /* ---------------- persisted state ---------------- */
-  var todos = arr(Atlas.store.get('planner.todos', []));
-  var missionDone = obj(Atlas.store.get('planner.missionDone', {}));
-  var outbox = arr(Atlas.store.get('planner.outbox', []));
+  function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function okTime(v) { return typeof v === 'string' && isFinite(new Date(v).getTime()); }
+  /* saved lists come from older versions or a corrupt store: keep only entries the code can use */
+  var todos = arr(Atlas.store.get('planner.todos', [])).filter(function (t) {
+    if (!isObj(t) || typeof t.id !== 'string' || typeof t.title !== 'string') return false;
+    t.description = typeof t.description === 'string' ? t.description : '';
+    t.deadline = okTime(t.deadline) ? t.deadline : null;
+    var imp = Number(t.importance); t.importance = isFinite(imp) && imp >= 1 && imp <= 5 ? Math.round(imp) : 3;
+    var est = Number(t.estMin); t.estMin = isFinite(est) && est >= 1 ? Math.min(1440, Math.round(est)) : 60;
+    t.done = !!t.done; return true;
+  });
+  var outbox = arr(Atlas.store.get('planner.outbox', [])).filter(function (r) { return isObj(r) && typeof r.id === 'string' && typeof r.subject === 'string' && typeof r.body === 'string' && okTime(r.at); });
   var S = obj(Atlas.store.get('planner.sched', {}));
-  S.blocks = arr(S.blocks); S.unsched = arr(S.unsched); S.reasons = arr(S.reasons);
-  S.blockDone = obj(S.blockDone); S.missedLog = arr(S.missedLog); S.reminded = obj(S.reminded);
-  S.started = obj(S.started); S.misses = S.misses || 0; S.builtAt = S.builtAt || null;
+  S.blocks = arr(S.blocks).filter(function (b) { return isObj(b) && typeof b.id === 'string' && typeof b.type === 'string' && typeof b.title === 'string' && okTime(b.start) && okTime(b.end); });
+  S.unsched = arr(S.unsched).filter(isObj);
+  S.reasons = arr(S.reasons).filter(function (r) { return isObj(r) && typeof r.text === 'string' && okTime(r.at); });
+  S.blockDone = obj(S.blockDone);
+  Object.keys(S.blockDone).forEach(function (id) { var d = S.blockDone[id]; if (!isObj(d) || !okTime(d.start) || !okTime(d.end) || !isFinite(Number(d.min))) delete S.blockDone[id]; });
+  S.missedLog = arr(S.missedLog).filter(function (m) { return isObj(m) && typeof m.title === 'string' && okTime(m.planned); });
+  S.reminded = obj(S.reminded);
+  S.started = obj(S.started); S.misses = Number(S.misses) > 0 ? Math.floor(Number(S.misses)) : 0; S.builtAt = okTime(S.builtAt) ? S.builtAt : null;
 
   function arr(v) { return Array.isArray(v) ? v : []; }
   function obj(v) { return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
@@ -4408,11 +4196,15 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   function userItem(t) {
     return { id: t.id, title: t.title, description: t.description, deadline: t.deadline, importance: t.importance, estMin: t.estMin, done: !!t.done, missionId: null, kind: 'task' };
   }
+  /* The mission tasks (kind 'task' of Atlas.missions, from JEZERO_MISSION.tasks, in stop order: 2 per stop). They are what the planner
+     and the automatic schedule treat as "mission" work; each carries its own estimate (estMin). */
   function objectives() {
     var l = [];
-    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'objective'; }); } catch (e) { l = []; }
+    try { if (Atlas.missions && Atlas.missions.list) l = arr(Atlas.missions.list()).filter(function (m) { return m && m.kind === 'task'; }); } catch (e) { l = []; }
     return l;
   }
+  function taskDone(id) { try { return !!(Atlas.missions && Atlas.missions.isDone(id)); } catch (e) { return false; } }
+  function setTaskDone(id, flag) { try { return !!(Atlas.missions && Atlas.missions.setDone(id, flag)); } catch (e) { return false; } }
   function nextHealthBlock() {
     var best = null;
     S.blocks.forEach(function (b) { if (b.type === 'health' && !S.blockDone[b.id] && (!best || ms(b.start) < ms(best.start))) best = b; });
@@ -4424,8 +4216,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function missionItems() {
     return objectives().map(function (m) {
-      return { id: 'mission:' + m.id, title: m.title, description: m.description || '', deadline: null, importance: CFG.work.missionObjectiveImportance, estMin: CFG.work.missionObjectiveMinutes,
-        done: !!missionDone[m.id], missionId: m.id, kind: 'mission' };
+      return { id: 'mission:' + m.id, title: m.title, description: (m.stopName ? 'Stop ' + m.stopNo + ', ' + m.stopName + ' (' + m.objectiveShort + '). ' : '') + (m.description || ''),
+        deadline: null, importance: CFG.work.missionObjectiveImportance, estMin: m.estMin || CFG.work.missionObjectiveMinutes,
+        done: taskDone(m.id), missionId: m.id, kind: 'mission' };
     });
   }
   function sortTodos(list) {
@@ -4464,7 +4257,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     complete: function (id, done) {
       done = done === undefined ? true : !!done;
       if (id === 'health-next') { var hb = nextHealthBlock(); if (hb && done) scheduleApi.markDone(hb.id, true); return !!hb; }
-      if (String(id).indexOf('mission:') === 0) { var mid = String(id).slice(8); if (done) missionDone[mid] = true; else delete missionDone[mid]; Atlas.store.set('planner.missionDone', missionDone); changed(); return true; }
+      if (String(id).indexOf('mission:') === 0) { var mid = String(id).slice(8); var ok = setTaskDone(mid, done); changed(); return ok; }
       var t = findTodo(id); if (!t) return false;
       t.done = done; saveTodos(); changed(); return true;
     }
@@ -4495,7 +4288,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function engineInputs() {
     var td = todos.filter(function (t) { return !t.done; }).map(userItem);
-    var ob = objectives().filter(function (m) { return !missionDone[m.id]; });
+    var ob = objectives().filter(function (m) { return !taskDone(m.id); });
     return { todos: td, objectives: ob };
   }
   function keepDoneBlocks(list, n) {
@@ -4579,7 +4372,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   function remainingFor(type, refId) {
     var est = 0, found = false;
     if (type === 'task') { var t = findTodo(refId); if (t) { est = t.estMin; found = true; } }
-    else { objectives().forEach(function (m) { if (String(m.id) === String(refId)) { est = CFG.work.missionObjectiveMinutes; found = true; } }); }
+    else { objectives().forEach(function (m) { if (String(m.id) === String(refId)) { est = m.estMin || CFG.work.missionObjectiveMinutes; found = true; } }); }
     if (!found) return null;
     var done = 0; Object.keys(S.blockDone).forEach(function (id) { var d = S.blockDone[id]; if (d.type === type && String(d.refId) === String(refId)) done += d.min; });
     return est - done;
@@ -4588,7 +4381,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var rem = remainingFor(b.type, b.refId);
     if (rem !== null && rem <= 0) {
       if (b.type === 'task') { var t = findTodo(b.refId); if (t) { t.done = true; saveTodos(); } }
-      else { missionDone[b.refId] = true; Atlas.store.set('planner.missionDone', missionDone); }
+      else { missionGuard = true; setTaskDone(b.refId, true); missionGuard = false; }
       Atlas.bus.emit('todos:changed', {});
       S.blocks = S.blocks.filter(function (x) { return x.refId !== b.refId || x.type !== b.type || S.blockDone[x.id]; });
     }
@@ -4597,7 +4390,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var rem = remainingFor(b.type, b.refId);
     if (rem !== null && rem > 0) {
       if (b.type === 'task') { var t = findTodo(b.refId); if (t && t.done) { t.done = false; saveTodos(); rebuild('Re-opened "' + t.title + '".'); } }
-      else if (missionDone[b.refId]) { delete missionDone[b.refId]; Atlas.store.set('planner.missionDone', missionDone); rebuild('Re-opened a mission objective.'); }
+      else if (taskDone(b.refId)) { missionGuard = true; setTaskDone(b.refId, false); missionGuard = false; rebuild('Re-opened a mission task.'); }
     }
   }
   var healthGuard = false;
@@ -4613,7 +4406,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     S.blocks.forEach(function (b) { if (b.type === 'health' && !S.blockDone[b.id] && ms(b.start) <= n + 30 * MIN && (!best || ms(b.start) < ms(best.start))) best = b; });
     if (best) { S.blockDone[best.id] = { type: 'health', refId: 'health', start: best.start, end: best.end, title: best.title, min: 0 }; saveS(); Atlas.bus.emit('schedule:changed', { reason: 'health' }); }
   });
-  Atlas.bus.on('missions:changed', function () { rebuild(); });
+  var missionGuard = false;   // true while this file itself marks a mission task done/open (it rebuilds on its own)
+  Atlas.bus.on('missions:changed', function () { if (!missionGuard) rebuild(); });
 
   /* ---------------- monitor: reminders, misses, adaptation, report to Earth ---------------- */
   var lastCheck = 0, lastSig = '';
@@ -4667,7 +4461,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   function sendReport() {
     var n = Atlas.now(), lines = [];
     lines.push('REPORT FOR EARTH MISSION CONTROL');
-    lines.push('Mission time: ' + n.toISOString());
+    lines.push('Mission time: ' + n.toISOString().replace('T', ' ').replace(/:\d\d(\.\d+)?Z$/, ' UTC'));
     lines.push('');
     lines.push('Crew member has missed ' + S.misses + ' scheduled block' + (S.misses > 1 ? 's' : '') + ' (limit before reporting: ' + CFG.escalateAfterMisses + '):');
     S.missedLog.slice(-S.misses).forEach(function (m) { lines.push(' - ' + m.title + ' [' + m.type + '], planned ' + when(ms(m.planned))); });
@@ -4716,14 +4510,13 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var mealsTxt = CFG.meals.map(function (m) { return m.title + ' ' + hmStr(m.startMin) + ' (' + m.minutes + ' min)'; }).join(', ');
     function hmStr(x) { return pad(Math.floor(x / 60)) + ':' + pad(Math.round(x % 60)); }
     var note = h('details', { class: 'pl-howto' }, [
-      h('summary', { text: 'How to change these numbers' }),
-      h('p', {}, ['Edit ', h('code', { text: 'web/data/schedule-config.js' }), ', save, reload. Every key is explained in ', h('code', { text: 'docs/SCHEDULE.md' }), ' (in the repository).']),
-      h('p', { text: 'Current values read from the config:' }),
+      h('summary', { text: 'Schedule rules' }),
+      h('p', { text: 'How your day is planned:' }),
       h('ul', {}, [
-        h('li', { text: 'Day length: ' + (RAW.sol ? 'sol, 24 h 39.6 min' : '24 h') + ' (sol: ' + (RAW.sol ? 'true' : 'false') + '), planning ' + CFG.days + ' days' }),
-        h('li', { text: 'Sleep: ' + CFG.sleep.hours + ' h from ' + hmStr(CFG.sleep.startMin) + ' (sleep.hours, sleep.start)' }),
-        h('li', { text: 'Recreation: ' + CFG.recreation.minutes + ' min at ' + hmStr(CFG.recreation.startMin) + ' (recreation.minutes, recreation.start)' }),
-        h('li', { text: 'Meals: ' + mealsTxt + ' (meals)' }),
+        h('li', { text: 'Day length: ' + (RAW.sol ? 'sol, 24 h 39.6 min' : '24 h') + ', planning ' + CFG.days + ' days' }),
+        h('li', { text: 'Sleep: ' + CFG.sleep.hours + ' h from ' + hmStr(CFG.sleep.startMin) }),
+        h('li', { text: 'Recreation: ' + CFG.recreation.minutes + ' min at ' + hmStr(CFG.recreation.startMin) }),
+        h('li', { text: 'Meals: ' + mealsTxt }),
         h('li', { text: 'Health check: ' + (CFG.health.enabled ? 'from ' + hmStr(CFG.health.startMin) + ', every ' + CFG.health.intervalHours + ' h, ' + CFG.health.minutes + ' min' : 'off') }),
         h('li', { text: 'Reminders: missed after ' + CFG.graceMinutes + ' min; report to Earth after ' + CFG.escalateAfterMisses + ' misses' })
       ])
@@ -4848,10 +4641,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       frag.push(open.length ? h('ul', { class: 'pl-list' }, open.map(function (t) { return todoRow(t, 'task'); })) : h('p', { class: 'pl-empty', text: 'No goals yet. Use "+ Add your own goal" to add something you want to do besides the mission.' }));
       var hi = healthItem();
       frag.push(h('h3', { class: 'pl-h', text: 'Health check' }));
-      frag.push(hi ? h('ul', { class: 'pl-list' }, [todoRow(hi, 'health')]) : h('p', { class: 'pl-empty', text: CFG.health.enabled ? 'No health check in the plan yet.' : 'Health checks are switched off in schedule-config.js.' }));
-      frag.push(h('h3', { class: 'pl-h' }, ['Mission objectives ', h('span', { class: 'pl-sub', text: '(from the Mission tab, read-only)' })]));
+      frag.push(hi ? h('ul', { class: 'pl-list' }, [todoRow(hi, 'health')]) : h('p', { class: 'pl-empty', text: CFG.health.enabled ? 'No health check in the plan yet.' : 'Health checks are switched off.' }));
+      frag.push(h('h3', { class: 'pl-h' }, ['Mission tasks ', h('span', { class: 'pl-sub', text: '(from the Mission tab, in stop order)' })]));
       var mi = missionItems();
-      frag.push(mi.length ? h('ul', { class: 'pl-list' }, mi.map(function (t) { return todoRow(t, 'mission'); })) : h('p', { class: 'pl-empty', text: Atlas.missions ? 'The Mission tab has no objectives.' : 'Mission objectives appear here once the Mission tab has loaded.' }));
+      frag.push(mi.length ? h('ul', { class: 'pl-list' }, mi.map(function (t) { return todoRow(t, 'mission'); })) : h('p', { class: 'pl-empty', text: Atlas.missions ? 'The Mission tab has no tasks.' : 'Mission tasks appear here once the Mission tab has loaded.' }));
       if (doneL.length) frag.push(h('details', { class: 'pl-done' }, [h('summary', { text: 'Done (' + doneL.length + ')' }), h('ul', { class: 'pl-list' }, doneL.map(function (t) { return todoRow(t, 'task'); }))]));
       while (todoBox.firstChild) todoBox.removeChild(todoBox.firstChild);
       frag.forEach(function (x) { todoBox.appendChild(x); });
@@ -5241,7 +5034,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     O2_PER_H:   { resting: 4,  walking: 9, working: 12 },   // full tank lasts 25 h resting, ~11 h walking, ~8 h working
     BAT_PER_H:  { resting: 3,  walking: 6, working: 8 },    // battery: 33 h resting, ~17 h walking, 12.5 h working
     JITTER: 0.10,            // consumption varies +-5% per step (seeded, so repeatable)
-    WALK_MPS: 1.4,           // walking speed in metres per simulated second
+    WALK_MPS: (window.JEZERO_SPEEDS && window.JEZERO_SPEEDS.foot && window.JEZERO_SPEEDS.foot.mps) || 1.4,   // walking speed (m/s): data/travel-speeds.js is the source, 1.4 only if that file is not loaded
     CAUTION_PCT: 25,         // oxygen / battery caution below this
     CRITICAL_PCT: 10,        // oxygen / battery critical below this
     PCT_HYST: 3,             // a resource level is left only after recovering this many points above its threshold
@@ -5478,17 +5271,18 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var W = Atlas.W, H = Atlas.H;
 
   /* ---- persisted state ---- */
-  var START = { x: Atlas.me.x, y: Atlas.me.y };   // initial start point (nearest map edge to the landing site), before a saved position is restored
+  var START = { x: Atlas.me.x, y: Atlas.me.y };   // initial start point (base camp), before a saved position is restored
   var saved = store.get('suit.state', null);
   var S = saved ? sanitize(saved) : freshState(20260101);
   var working = !!store.get('suit.working', false);
   var meSaved = store.get('suit.me', null);
-  if (meSaved && isFinite(meSaved.x) && isFinite(meSaved.y) && meSaved.x >= 0 && meSaved.x <= W && meSaved.y >= 0 && meSaved.y <= H) {
+  // v:2 = saved since base camp replaced the old landing site; older saves (no v) would put the crew back at a place that no longer exists
+  if (meSaved && typeof meSaved === 'object' && meSaved.v === 2 && typeof meSaved.x === 'number' && typeof meSaved.y === 'number' && isFinite(meSaved.x) && isFinite(meSaved.y) && meSaved.x >= 0 && meSaved.x <= W && meSaved.y >= 0 && meSaved.y <= H) {
     Atlas.me.x = meSaved.x; Atlas.me.y = meSaved.y;
   }
   var history = store.get('health.history', []);
   if (!Array.isArray(history)) history = [];
-  history = history.slice(-20);
+  history = history.filter(function (e) { return e && typeof e === 'object' && !Array.isArray(e); }).slice(-20);
 
   var walk = null;               // {pts, i, note}
   var activity = 'resting';
@@ -5603,7 +5397,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (mv) { Atlas.bus.emit('me:moved', { x: Atlas.me.x, y: Atlas.me.y }); }
       drawMe();
       evalAlerts(nowMs);
-      store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
+      store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y, v: 2 });
       refreshSuit(nowMs); refreshPersonal(nowMs);
       return;
     }
@@ -5628,7 +5422,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     if (doneWalk) { Atlas.toast('You arrived', 'info'); drawMe(); }
     evalAlerts(nowMs);
     store.set('suit.state', S);
-    store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y });
+    store.set('suit.me', { x: Atlas.me.x, y: Atlas.me.y, v: 2 });
     refreshSuit(nowMs); refreshPersonal(nowMs);
   }
 
@@ -5879,13 +5673,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     ui.banner.className = 'su-banner ' + (worst === 'danger' ? 'bad' : worst === 'caution' ? 'warn' : 'ok');
     ui.banner.firstChild.textContent = ICON[worst];
     ui.banner.lastChild.textContent = msg;
-    // honest notes: start position is not the real landing site; marker may be hidden by the layer checkbox
-    var atStart = Math.hypot(Atlas.me.x - START.x, Atlas.me.y - START.y) < 1;
-    var L = Atlas.landing;
-    if (atStart && L && !L.onMap) {
-      var km = Math.hypot(L.x - START.x, L.y - START.y) * MPP / 1000;
-      ui.startNote.textContent = 'Start position: nearest map edge to the landing site, which lies about ' + km.toFixed(1) + ' km east of this map.';
-    } else ui.startNote.textContent = '';
+    // honest note: the marker may be hidden by the layer checkbox
+    ui.startNote.textContent = '';
     ui.markerNote.textContent = Atlas.layers.isOn('me') ? '' : 'Your marker is hidden on the map (layer "You" is off). Your position is still tracked.';
     if (walk) {
       var rest = 0, px = Atlas.me.x, py = Atlas.me.y;
@@ -6202,7 +5991,19 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     });
   }
 
+  /* Where a teammate is, in words: 'returning to base' | 'on traverse' (moving) | 'at base' (within AT_BASE_M of base camp) | 'at stop N' (record has stopId) | 'stopped'.
+     m = {mode, moving, x, y, stopId}; base = {x, y} in page px; mpp = metres per page px. Without a base position a stationary member is 'stopped'. */
+  var AT_BASE_M = 100;
+  function statusLabel(m, base, mpp) {
+    if (m.mode === 'return') return 'returning to base';
+    if (m.moving) return 'on traverse';
+    if (base && isFinite(base.x) && isFinite(base.y) && isFinite(m.x) && isFinite(m.y) && Math.hypot(m.x - base.x, m.y - base.y) * (mpp || MPP) <= AT_BASE_M) return 'at base';
+    var n = m.stopId ? /(\d+)$/.exec(String(m.stopId)) : null;
+    return n ? 'at stop ' + n[1] : 'stopped';
+  }
+
   var Logic = {
+    statusLabel: statusLabel, AT_BASE_M: AT_BASE_M,
     MPP: MPP, MAX_LEN: MAX_LEN, LIMITS: LIMITS, HR_MIN: HR_MIN, HR_MAX: HR_MAX, DEFAULTS: DEFAULTS,
     rand: rand, blockedCraters: blockedCraters, isBlocked: isBlocked, freePoint: freePoint, stepMember: stepMember,
     stepVitals: stepVitals, flags: flags, distBearing: distBearing, fmtDist: fmtDist, cleanText: cleanText,
@@ -6227,8 +6028,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var saved = Atlas.store.get('team.state', null);
     if (!saved || saved.v !== 2 || !Array.isArray(saved.members)) return;
     saved.members.forEach(function (s) {
+      if (!s || typeof s !== 'object') return;
       var m = members.filter(function (q) { return q.id === s.id; })[0];
-      if (!m || !s) return;
+      if (!m) return;
       var okNum = function (v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi; };
       if (okNum(s.x, 0, ctx.W) && okNum(s.y, 0, ctx.H) && !isBlocked(s.x, s.y, ctx) && okNum(s.o2, 0, 100) && okNum(s.bat, 0, 100) && okNum(s.hr, HR_MIN, HR_MAX) &&
         typeof s.rs === 'number' && isFinite(s.rs) && okNum(s.heading, -1e4, 1e4)) {
@@ -6244,6 +6046,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var t0 = Atlas.now();
   members.forEach(function (m, i) { snapshot(m, t0); m.nextTel = t0.getTime() + 10000 + i * 5000; });
 
+  function baseXY() { var b = Atlas.base; return b && isFinite(b.x) ? { x: b.x, y: b.y } : ctx.home; }
+  function statusOf(m) { return statusLabel(m, baseXY(), mpp); }
   function meOf() { return Atlas.me && isFinite(Atlas.me.x) && isFinite(Atlas.me.y) ? Atlas.me : null; }
   function relTo(m) {
     var me = meOf();
@@ -6257,7 +6061,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     members: function () {
       return members.map(function (m) {
         return { id: m.id, name: m.name, x: m.x, y: m.y, oxygenPct: m.tel.oxygenPct, batteryPct: m.tel.batteryPct, heartRate: m.tel.heartRate,
-          lastUpdate: m.tel.t, status: m.mode === 'return' ? 'returning to base' : 'on traverse', simulated: !worldOn };
+          lastUpdate: m.tel.t, status: statusOf(m), simulated: !worldOn };
       });
     },
     open: function (id) { return openChat(id); }
@@ -6301,7 +6105,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   /* ---------- tab UI ---------- */
   var root, listEl, chatBox, liveEl, cards = {}, selected = null, chatId = null, logEl, inputEl, sendBtn, countEl, chatTitle;
   var unread = Atlas.store.get('team.unread', {});
-  if (!unread || typeof unread !== 'object') unread = {};
+  if (!unread || typeof unread !== 'object' || Array.isArray(unread)) unread = {};
+  Object.keys(unread).forEach(function (k) { var n = unread[k]; if (typeof n !== 'number' || !isFinite(n) || n <= 0) delete unread[k]; else unread[k] = Math.min(999, Math.floor(n)); });
   var lastFlagKeys = {};
   var extraUnread = 0;   // unread real messages in conversations that are not a teammate card (All crew, Earth control)
 
@@ -6347,7 +6152,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     setMeter(c.o2, v.oxygenPct, v.oxygenPct.toFixed(0) + ' %', by.oxygen);
     setMeter(c.bat, v.batteryPct, v.batteryPct.toFixed(0) + ' %', by.battery);
     setMeter(c.hr, (v.heartRate - 40) / 1.4, v.heartRate + ' bpm', by.heart);
-    c.status.textContent = m.mode === 'return' ? '↩ returning to base' : (m.moving ? '→ on traverse' : '• at base');
+    var sl = statusOf(m); c.status.textContent = (sl === 'returning to base' ? '↩ ' : sl === 'on traverse' ? '→ ' : '• ') + sl;
     var rel = relTo(m);
     c.meta.textContent = 'Updated ' + hms(new Date(m.tel.t)) + ' · ' + (rel ? fmtDist(rel.m) + ' ' + rel.dir + ' (' + Math.round(rel.deg) + '°) from you' : 'distance unknown (your position is not available)');
     var n = unread[m.id] || 0;
@@ -6487,7 +6292,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       var m = wMembers[r.id] || (wMembers[r.id] = { id: String(r.id), name: String(r.id), x: ctx.home.x, y: ctx.home.y });
       m.name = String(r.name || r.id).replace(/\s+/g, ' ').trim().slice(0, 24) || m.id;
       m.x = numOr(r.x, m.x); m.y = numOr(r.y, m.y);
-      m.mode = r.mode === 'returning' ? 'return' : 'explore'; m.moving = r.mode === 'walking' || r.mode === 'returning';
+      m.mode = r.mode === 'returning' ? 'return' : 'explore'; m.moving = r.mode === 'walking' || r.mode === 'returning'; m.stopId = typeof r.stopId === 'string' ? r.stopId : null;
       m.tel = { t: when.toISOString(), oxygenPct: Math.round(clamp(numOr(r.o2Pct, 0), 0, 100) * 10) / 10,
         batteryPct: Math.round(clamp(numOr(r.batPct, 0), 0, 100) * 10) / 10, heartRate: Math.round(clamp(numOr(r.hr, 70), HR_MIN, HR_MAX)) };
       list.push(m);

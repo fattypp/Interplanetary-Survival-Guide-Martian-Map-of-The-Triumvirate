@@ -59,3 +59,17 @@ a labelled simulation. Each item says where it lives (paths are under `jezero-de
 
 - [ ] Replace the simulated radiation, suit, health and team data with real feeds when they exist
 - [ ] Extend the map imagery so every mission stop gets a real pin
+
+
+## Version 3.0 additions (this branch)
+
+- [x] Astronaut helmet page (sketch 1) and tablet page (sketch 2, side buttons, adaptive mission pop-up, chat, add location, distance)
+- [x] Operator control page: walk, speed, vitals, events, "Run mission"
+- [x] Rooms (room codes), relay server for devices on one network, real chat between people
+- [x] Earth page: after Acknowledge a "Next action" tab with suggested steps and a confirmed "Send to crew"
+- [x] Mission reduced to base camp + 5 stops + 10 tasks (1 microbial-life and 1 sustaining-human-life task per stop); sample sites removed
+- [x] Rover (2.8 m/s) faster than astronaut on foot (1.4 m/s), from `web/data/travel-speeds.js`
+- [x] Bug sweep by three review agents plus a supervising audit (see the commit history)
+- [ ] Task wording and time estimates in `docs/mission-guide.md` need the science owner's confirmation
+- [ ] Replace the generated radiation, suit, health and crew data with real feeds when they exist
+- [ ] Not tested on real phones or a second physical device; Supabase transport never run against a real project

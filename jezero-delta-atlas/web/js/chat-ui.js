@@ -121,6 +121,8 @@
     }
     function renderLog() {
       log.textContent = '';
+      log.setAttribute('aria-live', 'off');   // switching conversation must not make a screen reader read the whole history
+      setTimeout(function () { log.setAttribute('aria-live', 'polite'); }, 100);
       var list = msgs.filter(function (m) { return m.conv === active; });
       if (!list.length) log.appendChild(el('p', 'jc-empty', roomOk() ? 'No messages yet.' : 'Join a room to chat with the crew and Earth control.'));
       list.forEach(function (m) { log.appendChild(renderMsg(m)); });
@@ -154,6 +156,7 @@
         var e = log.querySelector('.jc-empty'); if (e) log.removeChild(e);
         var stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 40 || rec.mine;
         log.appendChild(renderMsg(rec));
+        while (log.children.length > KEEP) log.removeChild(log.firstChild);
         if (stick) log.scrollTop = log.scrollHeight;
       }
       return true;
@@ -182,6 +185,7 @@
       var to = active;
       var out = { type: 'chat', to: to, text: text, fromName: meName }, sent = null;
       try { sent = link.send(out); } catch (e) { sent = null; }
+      if (!sent) { state.textContent = 'Message not sent (too large or the link is not ready). Your text is kept, try again.'; return false; }
       var id = sent && typeof sent.id === 'string' ? sent.id : 'loc' + Date.now().toString(36) + (++seq);
       add({ id: id, conv: to, mine: true, fromId: meId, fromName: meName, text: text, t: (sent && sent.t) || new Date().toISOString() }, false);
       input.value = ''; autosize(); updateForm();
@@ -207,7 +211,7 @@
       h.slice().sort(function (a, b) { return String(a && a.t).localeCompare(String(b && b.t)); }).forEach(function (m) { fromLink(m, false); });
     }
     if (link && link.on) {
-      var off = link.on(function (m) { if (!destroyed) fromLink(m, true); });
+      var off = link.on(function (m) { if (!destroyed) fromLink(m, !(m && m.replay)); });
       offLink = typeof off === 'function' ? off : null;
     }
     syncConvs();

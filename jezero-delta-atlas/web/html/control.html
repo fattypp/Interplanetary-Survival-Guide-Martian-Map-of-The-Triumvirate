@@ -36,8 +36,8 @@
       <label class="field">Crew member
         <select id="heroCrew"></select>
       </label>
-      <button type="button" id="moveNow" class="btn big primary">Move now</button>
-      <p class="hint" id="moveHint">Sends the selected crew member on a walk past six mission stops (Three Forks, Hawksbill Gap, Upper Fan, Neretva Vallis, Witch Hazel Hill, Seitah), then back to base. Raises the clock to x60 if it is slower.</p>
+      <button type="button" id="runMission" class="btn big primary">Run mission</button>
+      <p class="hint" id="moveHint">Drives the selected crew member by rover from base camp to each of the five stops in order; at each stop the crew goes out on foot for the stop's tasks, then back in the rover, and finally back to base camp. Raises the clock to x600 if it is slower.</p>
     </div>
   </section>
 
@@ -77,7 +77,7 @@
       <table id="worldTable">
         <caption class="sr">Live values for every crew member</caption>
         <thead><tr>
-          <th scope="col">Crew</th><th scope="col">Mode</th><th scope="col">Lat</th><th scope="col">Lon</th><th scope="col">Map x,y</th>
+          <th scope="col">Crew</th><th scope="col">Mode</th><th scope="col">Travel</th><th scope="col">Stop / task</th><th scope="col">Tasks</th><th scope="col">Lat</th><th scope="col">Lon</th><th scope="col">Map x,y</th>
           <th scope="col">Speed m/s</th><th scope="col">Head</th><th scope="col">O2 %</th><th scope="col">Bat %</th><th scope="col">HR</th>
           <th scope="col">Suit C</th><th scope="col">Amb C</th><th scope="col">Rad uSv/h</th><th scope="col">Dose mSv</th>
         </tr></thead>
@@ -103,6 +103,8 @@
 <script src="../js/link-ui.js"></script>
 <script src="../data/craters-data.js"></script>
 <script src="../data/science-layers-data.js"></script>
+<script src="../data/mission-data.js"></script>
+<script src="../data/travel-speeds.js"></script>
 <script src="../js/sim-core.js"></script>
 <script src="../js/control.js"></script>
 </body>

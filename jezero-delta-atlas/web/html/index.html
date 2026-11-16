@@ -26,17 +26,17 @@
 
 <!-- Content of the "Map" tab. atlas-map.js binds to these ids at load; atlas-shell.js then moves this block into the tab panel. -->
 <div id="map-tab-src" hidden>
-  <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the layer selector (bottom-left) to show or hide each group.</p><div class="meta">model/crater_detector.py · <span id="ncr">36</span> marks</div></div>
+  <div class="card" id="info"><h2>Selected</h2><h3>Crater hazards</h3><p>Click a crater mark for its size and detector confidence. Use the layer selector (bottom-left) to show or hide each group.</p><div class="meta"><span id="ncr">36</span> crater marks detected</div></div>
   <div class="card" id="route-card"><h2>Route planner</h2>
     <p id="rt-help">Find the fastest safe route between two points, avoiding detected craters.</p>
-    <label class="rt-row" for="rt-speed"><span>Travel by</span><select id="rt-speed"><option value="0.042">Rover, 0.042 m/s</option><option value="1.4">Astronaut on foot, 1.4 m/s</option></select></label>
+    <label class="rt-row" for="rt-speed"><span>Travel by</span><select id="rt-speed"></select></label>
     <div class="rt-btns"><button type="button" id="rt-go">Pick start and destination</button><button type="button" id="rt-clear">Clear</button></div>
     <div id="rt-out" aria-live="polite"></div></div>
-  <div class="card"><h2>Sample sites <span style="font-weight:400;letter-spacing:0">(28 sealed)</span></h2><div class="list" id="samples"></div></div>
 </div>
 
 <script src="../data/craters-data.js"></script>
 <script src="../data/mission-data.js"></script>
+<script src="../data/travel-speeds.js"></script>
 <script src="../data/schedule-config.js"></script>
 <script src="../data/science-layers-data.js"></script>
 <script src="../js/route-planner.js"></script>

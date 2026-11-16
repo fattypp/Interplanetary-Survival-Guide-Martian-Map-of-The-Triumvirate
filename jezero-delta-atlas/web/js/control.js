@@ -4,10 +4,10 @@
   'use strict';
   var Sim = window.JdaSim;
   if (!Sim) { document.body.textContent = 'sim-core.js failed to load.'; return; }
-  var C = Sim.C;
+  var C = Sim.C, MI = Sim.missionInfo(), SPD = Sim.speeds();
   var sim = Sim.create({ seed: 20260101 });
   var $ = function (id) { return document.getElementById(id); };
-  var REMOTE_CMDS = ['walk', 'stop', 'return', 'setSpeed', 'setClockSpeed', 'set', 'event', 'reset'];
+  var REMOTE_CMDS = ['walk', 'stop', 'return', 'setSpeed', 'setTravel', 'runMission', 'setClockSpeed', 'set', 'event', 'reset'];
   var CLOCKS = [1, 10, 60, 600, 3600];
   var authorId = 'c' + Math.random().toString(36).slice(2, 8), epoch = Date.now();
   var role = 'authority', observeUntil = 0, otherEvents = 0, lastOther = null, otherEpoch = 0;   // role: 'observing' | 'authority' | 'blocked'
@@ -33,6 +33,35 @@
   }
   function nameOf(id) { return W.crew[id] ? W.crew[id].name : id; }
 
+  /* in-page confirmation (no browser dialogs): alertdialog with focus trap, Esc or Cancel closes, focus returns to the trigger */
+  function confirmStep(trigger, title, yesLabel, onYes) {
+    var back = h('div', { class: 'cf-back' }), yes, no, prevent = false;
+    function close(ok) {
+      if (prevent) return; prevent = true;
+      document.removeEventListener('keydown', onKey, true);
+      if (back.parentNode) back.parentNode.removeChild(back);
+      var t = trigger && document.contains(trigger) ? trigger : ($('addName') || document.body);
+      try { t.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+      if (ok) { onYes(); if (!document.contains(t) || document.activeElement === document.body) { try { $('addName').focus({ preventScroll: true }); } catch (e) { /* ignore */ } } }
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); }
+      else if (e.key === 'Tab') {
+        var f = [no, yes], i = f.indexOf(document.activeElement);
+        if (i < 0) { f[0].focus(); e.preventDefault(); }
+        else if (e.shiftKey && i === 0) { f[1].focus(); e.preventDefault(); }
+        else if (!e.shiftKey && i === 1) { f[0].focus(); e.preventDefault(); }
+      }
+    }
+    no = h('button', { type: 'button', class: 'btn', text: 'Cancel', onclick: function () { close(false); } });
+    yes = h('button', { type: 'button', class: 'btn danger', text: yesLabel, onclick: function () { close(true); } });
+    var dlg = h('div', { class: 'cf-dlg', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'cf-t' }, [h('p', { id: 'cf-t', text: title }), h('div', { class: 'btnrow' }, [no, yes])]);
+    back.appendChild(dlg);
+    back.addEventListener('mousedown', function (e) { if (e.target === back) close(false); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(back); no.focus();
+  }
+
   /* ---------- commands ---------- */
   function run(cmd, who) {
     var r = sim.command(cmd);
@@ -49,19 +78,39 @@
       case 'stop': return who + ' stops';
       case 'return': return who + ' returns to base';
       case 'setSpeed': return who + ' speed ' + c.mps + ' m/s';
+      case 'setTravel': return who + ' travels ' + (c.mode === 'rover' ? 'by rover' : 'on foot');
+      case 'runMission': return who + ' runs the mission: base camp, ' + MI.stops.length + ' stops, back to base camp';
       case 'setClockSpeed': return 'clock x' + c.n;
       case 'set': return who + ' ' + c.field + ' = ' + c.value;
       case 'event': return 'events ' + JSON.stringify({ solar: c.solar, dust: c.dust });
       default: return c.cmd;
     }
   }
-  function walkTo(id, p) { return run({ cmd: 'walk', crew: id, to: { lat: p.lat, lon: p.lon, label: p.label } }); }
+  function walkTo(id, p, travel) { return run({ cmd: 'walk', crew: id, to: { lat: p.lat, lon: p.lon, label: p.name }, travel: travel }); }
+  function destinations() { return [MI.base].concat(MI.stops); }
 
-  function moveNow() {
-    var id = $('heroCrew').value; if (!id || !W.crew[id]) return;
-    if (W.clockSpeed < 60) run({ cmd: 'setClockSpeed', n: 60 });
-    var path = Sim.demoPath(), first = path.shift();
-    run({ cmd: 'walk', crew: id, to: first, path: path, thenReturn: true });
+  function runMission() {
+    var id = $('heroCrew').value; if (!id || !W.crew[id]) { logLine('Run mission: no crew member selected (add one first).'); return; }
+    if (W.clockSpeed < 60) run({ cmd: 'setClockSpeed', n: 600 });
+    run({ cmd: 'runMission', crew: id });
+  }
+  /* simulated seconds as h/min, plus the real time it takes at the current clock multiplier */
+  function dur(s) {
+    if (!(s >= 0)) return '-';
+    var m = Math.round(s / 60);
+    return m >= 60 ? Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min' : m < 1 ? '< 1 min' : m + ' min';
+  }
+  function etaText(s) {
+    if (s === null || s === undefined) return '-';
+    var real = s / (W.clockSpeed || 1);
+    return dur(s) + ' (' + (real < 90 ? Math.round(real) + ' s' : Math.round(real / 60) + ' min') + ' real)';
+  }
+  function stopLabel(c) {
+    if (c.stopId) {
+      var st = MI.stops.filter(function (x) { return x.id === c.stopId; })[0], t = MI.tasks.filter(function (x) { return x.id === c.taskId; })[0];
+      return 'Stop ' + (st ? st.n + ', ' + st.name : c.stopId) + (t ? ' / ' + t.title : '');
+    }
+    return c.target && c.target.label ? 'En route to ' + c.target.label : '-';
   }
 
   function sendSos(id) {
@@ -80,12 +129,17 @@
     });
     $('evSolar').addEventListener('change', function () { run({ cmd: 'event', solar: this.checked }); });
     $('evDust').addEventListener('change', function () { run({ cmd: 'event', dust: this.checked }); });
-    $('resetBtn').addEventListener('click', function () { if (window.confirm('Reset the simulation (positions, vitals, dose, clock)?')) run({ cmd: 'reset' }); });
-    $('moveNow').addEventListener('click', moveNow);
+    $('resetBtn').addEventListener('click', function () { var b = this; confirmStep(b, 'Reset the simulation (positions, vitals, dose, clock)? A running mission stops.', 'Yes, reset', function () { run({ cmd: 'reset' }); }); });
+    $('runMission').addEventListener('click', runMission);
     $('addForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var name = $('addName').value.replace(/\s+/g, ' ').trim();
       if (!name) { $('addName').focus(); return; }
+      name = name.slice(0, 24);
+      var low = name.toLowerCase();
+      if (Object.keys(W.crew).some(function (k) { return String(W.crew[k].name).toLowerCase() === low; })) {   // two cards with the same name cannot be told apart
+        logLine('Add crew failed (a crew member named ' + name + ' already exists)'); $('addName').focus(); return;
+      }
       var r = sim.addCrew({ name: name });
       logLine(r.ok ? 'Operator: added crew ' + name : 'Add crew failed (' + r.error + ')');
       $('addName').value = ''; W = sim.world(); publish(); render();
@@ -112,37 +166,53 @@
   function buildCard(id) {
     var el = {}, hrAuto;
     var vit = h('dl', { class: 'vit' });
-    ['o2', 'bat', 'hr', 'suit', 'amb', 'rad', 'dose', 'speed', 'pos'].forEach(function (k) {
+    ['o2', 'bat', 'hr', 'suit', 'amb', 'rad', 'dose', 'speed', 'pos', 'travel', 'where', 'dist', 'eta'].forEach(function (k) {
       el[k] = h('dd', { text: '-' });
-      vit.appendChild(h('div', {}, [h('dt', { text: { o2: 'Oxygen', bat: 'Battery', hr: 'Heart rate', suit: 'Suit temp', amb: 'Ambient', rad: 'Radiation', dose: 'Dose', speed: 'Speed', pos: 'Map x,y' }[k] }), el[k]]));
+      vit.appendChild(h('div', {}, [h('dt', { text: { o2: 'Oxygen', bat: 'Battery', hr: 'Heart rate', suit: 'Suit temp', amb: 'Ambient', rad: 'Radiation', dose: 'Dose', speed: 'Speed', pos: 'Map x,y', travel: 'Travel', where: 'Stop / task', dist: 'Distance left', eta: 'ETA' }[k] }), el[k]]));
     });
     el.mode = h('span', { class: 'mode', text: 'idle' });
     el.name = h('span', { text: id });
     var dest = h('select', { 'aria-label': 'Destination for ' + id });
-    var keys = ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah', 'landing'];
-    keys.forEach(function (k) { dest.appendChild(h('option', { value: k, text: Sim.PLACES[k].label })); });
+    destinations().forEach(function (p, i) { dest.appendChild(h('option', { value: i, text: (p.n ? p.n + '. ' : '') + p.name })); });
     var head = h('input', { type: 'number', min: 0, max: 359, step: 1, value: 90, 'aria-label': 'Heading in degrees from north', style: 'width:5.5em' });
-    var spd = slider('Walking speed', 0.1, 10, 0.1, function (v) { run({ cmd: 'setSpeed', crew: id, mps: v }); }, ' m/s');
+    var spd = slider('Speed (rover ' + SPD.rover + ', foot ' + SPD.foot + ' m/s)', 0.1, 10, 0.1, function (v) { run({ cmd: 'setSpeed', crew: id, mps: v }); }, ' m/s');
     var o2 = slider('Oxygen', 0, 100, 1, function (v) { run({ cmd: 'set', crew: id, field: 'o2Pct', value: v }); }, ' %');
     var bat = slider('Battery', 0, 100, 1, function (v) { run({ cmd: 'set', crew: id, field: 'batPct', value: v }); }, ' %');
     var hr = slider('Heart rate', 40, 200, 1, function (v) { run({ cmd: 'set', crew: id, field: 'hr', value: v }); hr.row._auto.checked = false; }, ' bpm',
       function () { run({ cmd: 'set', crew: id, field: 'hr', value: null }); });
     hrAuto = hr.row._auto; hrAuto.checked = true;
     el.sliders = { speed: spd, o2: o2, bat: bat, hr: hr };
+    el.prog = h('progress', { max: Math.max(1, MI.tasks.length), value: 0, 'aria-label': 'Tasks done' });
+    el.progText = h('span', { class: 'progtext', text: '0 of ' + MI.tasks.length + ' tasks' });
+    el.travelBtns = {};
+    var tsw = h('div', { class: 'seg', role: 'group', 'aria-label': 'Travel mode for ' + id }, [['rover', 'Rover'], ['foot', 'On foot']].map(function (m) {
+      var b = h('button', { type: 'button', class: 'btn', 'aria-pressed': 'false', text: m[1], onclick: function () { run({ cmd: 'setTravel', crew: id, mode: m[0] }); } });
+      el.travelBtns[m[0]] = b; return b;
+    }));
     var card = h('article', { class: 'card', 'aria-label': id }, [
       h('h3', {}, [el.name, el.mode]),
       vit,
+      h('div', { class: 'progrow' }, [el.prog, el.progText]),
+      h('div', { class: 'btnrow' }, [h('span', { class: 'lbl', text: 'Travel' }), tsw,
+        h('button', { type: 'button', class: 'btn', text: 'Run mission', onclick: function () { run({ cmd: 'runMission', crew: id }); } })]),
       h('div', { class: 'btnrow' }, [
-        h('button', { type: 'button', class: 'btn primary', text: 'Walk', onclick: function () { walkTo(id, Sim.PLACES[dest.value]); } }),
+        h('button', { type: 'button', class: 'btn primary', text: 'Walk', onclick: function () { walkTo(id, destinations()[Number(dest.value)]); } }),
         h('button', { type: 'button', class: 'btn', text: 'Stop', onclick: function () { run({ cmd: 'stop', crew: id }); } }),
         h('button', { type: 'button', class: 'btn', text: 'Return', onclick: function () { run({ cmd: 'return', crew: id }); } }),
         h('button', { type: 'button', class: 'btn danger', text: 'SOS', onclick: function () { sendSos(id); } })
       ]),
       h('div', { class: 'btnrow' }, [h('label', { class: 'field inline' }, ['To ', dest]),
         h('label', { class: 'field inline' }, ['Heading ', head]),
-        h('button', { type: 'button', class: 'btn', text: 'Walk on heading', onclick: function () { run({ cmd: 'walk', crew: id, heading: Number(head.value) || 0 }); } })]),
+        h('button', { type: 'button', class: 'btn', text: 'Walk on heading', onclick: function () {
+          var hv = String(head.value).trim(), hn = Number(hv);
+          if (hv === '' || !isFinite(hn)) { logLine('Walk on heading needs a number of degrees from north (0 to 359).'); head.focus(); return; }
+          run({ cmd: 'walk', crew: id, heading: ((hn % 360) + 360) % 360 });
+        } })]),
       spd.row, o2.row, bat.row, hr.row,
-      h('div', { class: 'btnrow' }, [h('button', { type: 'button', class: 'btn', text: 'Remove', onclick: function () { if (window.confirm('Remove ' + nameOf(id) + '?')) { sim.removeCrew(id); W = sim.world(); publish(); render(); } } })])
+      h('div', { class: 'btnrow' }, [h('button', { type: 'button', class: 'btn', text: 'Remove', onclick: function (ev) {
+        if (Object.keys(W.crew).length <= 1) { logLine('Remove failed (at least one crew member must stay; Reset does not bring removed crew back)'); return; }
+        confirmStep(ev.currentTarget, 'Remove ' + nameOf(id) + ' from the simulation?', 'Yes, remove', function () { sim.removeCrew(id); W = sim.world(); publish(); render(); });
+      } })])
     ]);
     el.card = card;
     return el;
@@ -178,13 +248,22 @@
       e.hr.textContent = c.hr + ' bpm'; e.suit.textContent = fmt(c.suitTempC, 1) + ' C'; e.amb.textContent = fmt(c.ambientTempC, 0) + ' C';
       e.rad.textContent = fmt(c.radUsvH, 1) + ' uSv/h'; e.dose.textContent = fmt(c.doseMsv, 3) + ' mSv';
       e.speed.textContent = fmt(c.speedMps, 1) + ' m/s'; e.pos.textContent = fmt(c.x, 0) + ', ' + fmt(c.y, 0);
+      var trv = c.travel === 'rover' ? 'rover' : 'foot';
+      e.travel.textContent = trv === 'rover' ? 'Rover (cabin air)' : 'On foot (suit)';
+      e.where.textContent = stopLabel(c);
+      e.dist.textContent = c.distM === null || c.distM === undefined ? '-' : c.distM >= 1000 ? fmt(c.distM / 1000, 2) + ' km' : fmt(c.distM, 0) + ' m';
+      e.eta.textContent = etaText(c.etaS);
+      var pr = c.progress || { done: 0, total: MI.tasks.length };
+      e.prog.max = Math.max(1, pr.total); e.prog.value = pr.done; e.progText.textContent = pr.done + ' of ' + pr.total + ' tasks';
+      Object.keys(e.travelBtns).forEach(function (k) { e.travelBtns[k].setAttribute('aria-pressed', k === trv ? 'true' : 'false'); });
+      setSlider(e.sliders.speed, c.speedMps > 0 ? c.speedMps : SPD[trv]);
       setSlider(e.sliders.o2, Math.round(c.o2Pct)); setSlider(e.sliders.bat, Math.round(c.batPct));
       if (e.sliders.hr.row._auto.checked) setSlider(e.sliders.hr, c.hr);
     });
     // table
     ids.forEach(function (id) {
       var c = W.crew[id], r = rows[id]; if (!r) return;
-      var v = [c.name, c.mode, fmt(c.lat, 5), fmt(c.lon, 5), fmt(c.x, 0) + ', ' + fmt(c.y, 0), fmt(c.speedMps, 1), fmt(c.headingDeg, 0), fmt(c.o2Pct, 1), fmt(c.batPct, 1), c.hr, fmt(c.suitTempC, 1), fmt(c.ambientTempC, 1), fmt(c.radUsvH, 1), fmt(c.doseMsv, 3)];
+      var v = [c.name, c.mode, c.travel === 'rover' ? 'rover' : 'foot', c.stopId ? c.stopId + (c.taskId ? ' / ' + c.taskId : '') : '-', (c.progress ? c.progress.done + '/' + c.progress.total : '-'), fmt(c.lat, 5), fmt(c.lon, 5), fmt(c.x, 0) + ', ' + fmt(c.y, 0), fmt(c.speedMps, 1), fmt(c.headingDeg, 0), fmt(c.o2Pct, 1), fmt(c.batPct, 1), c.hr, fmt(c.suitTempC, 1), fmt(c.ambientTempC, 1), fmt(c.radUsvH, 1), fmt(c.doseMsv, 3)];
       v.forEach(function (t, i) { if (r[i].textContent !== String(t)) r[i].textContent = t; });
     });
     // header, clock, events
@@ -203,7 +282,7 @@
     rows = {};
     ids.forEach(function (id) {
       var tr = h('tr'), cells = [];
-      for (var i = 0; i < 14; i++) { var td = h(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row' } : {}); cells.push(td); tr.appendChild(td); }
+      for (var i = 0; i < 17; i++) { var td = h(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row' } : {}); cells.push(td); tr.appendChild(td); }
       rows[id] = cells; tb.appendChild(tr);
     });
   }
@@ -270,6 +349,17 @@
       setRole('blocked', 'Another control page took over this room. This page has stopped publishing.');
     }
   }
+  /* A reloaded (or re-opened) control page continues from the room's last published world (a closed control page leaves one, marked stale)
+     instead of rewinding every crew member to the start. Only worlds published within the last 30 minutes are used. */
+  var resumed = false;
+  function resumeRoomWorld() {
+    if (resumed) return; resumed = true;
+    var L = window.JdaLink, st = null;
+    try { st = L && L.getState ? L.getState('world') : null; } catch (e) { st = null; }
+    var v = st && st.value;
+    if (!v || typeof v !== 'object' || !v.crew || v.authorId === authorId || !(Date.now() - Number(v.hb) < 30 * 60000)) return;
+    if (sim.load(v)) { W = sim.world(); lastIds = ''; logLine('Resumed from the last world of this room (' + String(v.t).slice(11, 19) + ' mission time). Use Reset simulation to start over.'); }
+  }
   function takeOver() {
     if (lastOther && Date.now() - lastOther.ms < 15000) sim.load(lastOther.w);   // continue from its world, no jump back
     epoch = Math.max(Date.now(), (lastOther && Number(lastOther.w.epoch) || 0) + 1);
@@ -290,7 +380,7 @@
       var offMsg = L.on(onMessage), offSt = typeof L.onState === 'function' ? L.onState('world', onWorldState) : null;
       offLink = function () { try { offMsg(); } catch (e) { /* ignore */ } if (offSt) { try { offSt(); } catch (e) { /* ignore */ } } };
       logLine('Joined room ' + code);
-      otherEvents = 0; lastOther = null; observeUntil = Date.now() + 3000; setRole('observing');
+      otherEvents = 0; lastOther = null; resumed = false; observeUntil = Date.now() + 3000; setRole('observing');
     }
     if (!code) setRole('authority');
     buildLinks();
@@ -299,7 +389,7 @@
     if (!m || typeof m !== 'object') return;
     if (m.type === 'cmd' && role !== 'blocked' && REMOTE_CMDS.indexOf(m.cmd) >= 0) {
       var who = m.from && m.from.name ? m.from.name : 'Remote';
-      run({ cmd: m.cmd, crew: m.crew, to: m.to, heading: m.heading, path: m.path, mps: m.mps, n: m.n, field: m.field, value: m.value, solar: m.solar, dust: m.dust, speed: m.speed }, who);
+      run({ cmd: m.cmd, crew: m.crew, to: m.to, heading: m.heading, path: m.path, mps: m.mps, n: m.n, field: m.field, value: m.value, solar: m.solar, dust: m.dust, speed: m.speed, travel: m.travel, mode: m.mode, thenReturn: m.thenReturn }, who);
     } else if (m.type === 'sos') {
       logLine('SOS received from ' + String(m.from && m.from.name || m.from || 'unknown').slice(0, 30), 'sos');
     }
@@ -313,7 +403,7 @@
   function pump() {
     var now = Date.now(), dt = Math.min(now - lastTick, 600000); lastTick = now;
     while (dt > 0) { var d = Math.min(dt, 5000); sim.tick(d); dt -= d; }
-    if (role === 'observing' && now >= observeUntil) setRole('authority', 'No other control page found; this page is the simulation authority.');
+    if (role === 'observing' && now >= observeUntil) { resumeRoomWorld(); setRole('authority', 'No other control page found; this page is the simulation authority.'); }
     if (role === 'blocked' && lastOther && now - lastOther.ms > 8000) { takeOver(); logLine('The other control page stopped sending updates, so this page took over.'); }
     W = role === 'blocked' && lastOther ? lastOther.w : sim.world();
     if (++pubCount >= 10) { pubCount = 0; publish(); }
@@ -329,6 +419,6 @@
   setInterval(render, 250);
   setInterval(watchRoom, 500);
   render(); watchRoom();
-  logLine('Simulation ready. Press Move now to send a crew member on a walk.');
+  logLine('Simulation ready. Press Run mission to send a crew member from base camp through all stops and back.');
   window.JdaControl = { sim: sim, run: run, world: function () { return W; } };   // for tests and the console
 })();

@@ -55,6 +55,13 @@
     return wait(120).then(function () { c.close(); off(); eq(got.length, 1, 'delivered once'); eq(got[0].type, 'ping'); });
   });
 
+  test('message ids such as "constructor" or "toString" are not mistaken for already-seen ids', function () {
+    L.join('PRTP2', { role: 'earth' });
+    var got = [], off = L.on(function (m) { got.push(m.id); }), c = chan('PRTP2');
+    ['constructor', 'toString', '__proto__'].forEach(function (id) { c.postMessage({ k: 'msg', m: foreign('PRTP2', { id: id }) }); });
+    return wait(150).then(function () { c.close(); off(); eq(got.join(','), 'constructor,toString,__proto__'); });
+  });
+
   test('rooms are isolated: other room channel and wrong room field are ignored', function () {
     L.join('AAAA2', { role: 'earth' });
     var got = [], off = L.on(function (m) { got.push(m); });
@@ -81,7 +88,7 @@
 
   test('messages from this page (same cid) are never delivered back', function () {
     L.join('DDDD4', { role: 'earth' });
-    var got = [], off = L.on(function (m) { got.push(m); }), c = chan('DDDD4');
+    var got = [], off = L.on(function (m) { if (!m.replay) got.push(m); }), c = chan('DDDD4');   // backlog kept by a relay from an earlier run is not an echo
     c.postMessage({ k: 'msg', m: foreign('DDDD4', { from: { role: 'earth', id: 'earth', name: '', cid: L.clientId } }) });
     return wait(100).then(function () { c.close(); off(); eq(got.length, 0); });
   });
@@ -203,6 +210,61 @@
     }).then(function (r) { eq(r.status, 413); return api('/rooms/IIIII/msgs'); })
       .then(function (r) { eq(r.status, 404); var ps = []; for (var i = 0; i < 90; i++) ps.push(api('/rooms/RLY44/msg', 'POST', other('RLY44', { type: 'chat', text: 'f' + i }))); return Promise.all(ps); })
       .then(function (rs) { var n429 = rs.filter(function (r) { return r.status === 429; }).length; ok(n429 > 0, 'expected some 429, got 0'); ok(rs.some(function (r) { return r.status === 200; })); });
+  });
+
+  rtest('relay: a 500-emoji message and the restart epoch', function () {
+    var emo = new Array(251).join('\ud83d\ude80');
+    return api('/rooms/RLY55/msg', 'POST', other('RLY55', { type: 'chat', text: emo })).then(function (r) {
+      eq(r.status, 200, 'emoji text must not be inflated by \\u escapes'); return api('/rooms/RLY55/msgs?since=0');
+    }).then(function (r) { ok(typeof r.json.epoch === 'string' && r.json.epoch, 'epoch'); eq(r.json.msgs[0].text, emo); return api('/rooms/RLY55/msgs?since=999'); })
+      .then(function (r) { eq(r.json.reset, true, 'a cursor ahead of the room resets'); });
+  });
+  rtest('relay: a message that failed to post is retried (outbox), delivered once', function () {
+    L.join('RLY66', { role: 'crew', id: 'jayesh', name: 'Jayesh' });
+    var real = window.fetch, failed = 0, sentId = null;
+    return wait(400).then(function () {
+      window.fetch = function (u, o) { if (/\/msg$/.test(String(u)) && o && o.method === 'POST' && failed < 2) { failed++; return Promise.reject(new Error('offline')); } return real.apply(this, arguments); };
+      sentId = L.send({ type: 'chat', to: 'all', text: 'retry me' }).id;
+      return wait(3500);
+    }).then(function () { window.fetch = real; return api('/rooms/RLY66/msgs?since=0'); })
+      .then(function (r) { eq(r.json.msgs.filter(function (m) { return m.id === sentId; }).length, 1, 'arrived exactly once after ' + failed + ' failures'); eq(failed, 2); })
+      .then(function (x) { window.fetch = real; return x; }, function (e) { window.fetch = real; throw e; });
+  });
+  test('link-ui: malformed #room escape does not throw; #room&crew joins without a dialog; reserved names refused', function () {
+    if (!window.JdaLinkUI) return;
+    var keep = null, hash = location.hash, was = L.room;
+    try { keep = localStorage.getItem('jda.linkui.last'); localStorage.removeItem('jda.linkui.last'); } catch (e) { /* ignore */ }
+    var u1, u2, u3;
+    try {
+      location.hash = '#room=%E0%A4%A'; u1 = JdaLinkUI.mount({ role: 'earth', ask: ['code'] });
+      ok(document.querySelector('.lu-dlg'), 'dialog for a broken code'); u1.destroy();
+      try { localStorage.setItem('jda.linkui.last', JSON.stringify({ code: 'ABCDE', crewId: 'jayesh', crewName: 'Jayesh' })); } catch (e) { /* ignore */ }
+      location.hash = '#room=FOLLW'; var u0 = JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'] });
+      var d0 = document.querySelector('.lu-dlg'); ok(d0, 'dialog for an invalid code, not the remembered room');
+      ok(L.room.code !== 'ABCDE', 'must not join the remembered room'); eq(d0.querySelector('.lu-input').value, 'FOLLW');
+      ok(/no I or O/.test(d0.querySelector('.lu-err').textContent), 'clear error');
+      eq(JSON.parse(localStorage.getItem('jda.linkui.last')).code, 'ABCDE', 'remembered room untouched'); u0.destroy();
+      Array.prototype.forEach.call(document.querySelectorAll('.lu-back'), function (n) { n.parentNode.removeChild(n); });
+      location.hash = '#room=kjm2p&crew=jayesh'; var u4 = JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'] });
+      eq(L.room.code, 'KJM2P', 'lower case hash joins upper case'); u4.destroy();
+      location.hash = '#room=CREW2&crew=juhyeok'; u2 = JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'] });
+      eq(L.room.code, 'CREW2'); eq(L.room.id, 'juhyeok'); ok(!document.querySelector('.lu-dlg'), 'no dialog'); u2.destroy();
+      try { localStorage.removeItem('jda.linkui.last'); } catch (e) { /* ignore */ }
+      location.hash = ''; u3 = JdaLinkUI.mount({ role: 'crew', ask: ['code', 'crew'] });
+      var dlg = document.querySelector('.lu-dlg'); ok(dlg, 'first-run dialog');
+      var other = dlg.querySelector('input[value="__other"]'); other.checked = true; other.dispatchEvent(new Event('change'));
+      dlg.querySelector('#' + dlg.querySelector('.lu-text').id).value = 'All';
+      dlg.querySelector('.lu-input').value = 'K7M2P';
+      dlg.querySelector('form').dispatchEvent(new Event('submit', { cancelable: true }));
+      ok(/reserved/.test(dlg.querySelector('.lu-err').textContent), 'reserved: ' + dlg.querySelector('.lu-err').textContent);
+      u3.destroy();
+    } finally {
+      [u1, u2, u3].forEach(function (u) { try { u && u.destroy(); } catch (e) { /* ignore */ } });
+      Array.prototype.forEach.call(document.querySelectorAll('.lu-back'), function (n) { n.parentNode.removeChild(n); });
+      try { if (keep === null) localStorage.removeItem('jda.linkui.last'); else localStorage.setItem('jda.linkui.last', keep); } catch (e) { /* ignore */ }
+      history.replaceState(null, '', location.pathname + location.search + hash);
+      if (was && !was.implicit) L.join(was.code, { role: was.role, id: was.id, name: was.name });
+    }
   });
 
   var skipRelay = true;

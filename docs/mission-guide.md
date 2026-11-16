@@ -1,63 +1,63 @@
-# Mission Guide
+# Mission Guide: Jezero Pathfinder
+
+Source of truth for the mission shown in the atlas (Mission tab, pins, planner, automated schedule), the tablet and the helmet.
+`jezero-delta-atlas/web/data/mission-data.js` (`window.JEZERO_MISSION`) is generated from the tables below with
+`python3 integration/web_bridge.py missiondata`. The story, the stop positions and their accuracy are in the repo-root file `MissionGuide`.
+
+**Status of the wording.** The stop names, coordinates and the "What the crew does" text of the five stops come from `MissionGuide`.
+The task titles and descriptions below are editorial: for each stop the main objective uses the MissionGuide text, and the task for the
+other objective is a short, plausible complementary task written by the development team. They need the science owner's confirmation
+before they are treated as the official task list. Estimated minutes are rough planning values (20 to 60) and need the same confirmation.
+
+**Story.** A crew drives a pressurised rover west from flat ground at the foot of the delta, up and across the old river delta, to the
+ravine where the river once entered the crater. They get out on foot at five stops, then drive back. One day, about 15 km round trip.
+
+The rules of the format (checked by the generator, which refuses to write bad data):
+exactly 2 objectives, a base camp, exactly 5 stops and exactly 10 tasks (per stop one task for Objective 1 and one for Objective 2).
+Cells are separated by `|` (do not use the pipe character inside a cell). Positions are degrees and must lie inside the atlas map
+(18.44176 to 18.57188 N, 77.22318 to 77.41956 E). Page pixels are computed from them: `x = (lon - 77.22318) / 0.19638 * 1990`,
+`y = (18.57188 - lat) / 0.13012 * 1390`.
 
 ## Mission Objectives
 
-1. **Objective 1:** Find evidence of ancient microbial life.
-2. **Objective 2:** Assess whether the site can sustain life.
+| Id | Title | Short |
+|---|---|---|
+| 1 | Find evidence of ancient microbial life | Microbial life |
+| 2 | Assess whether the site can sustain human life | Sustaining human life |
+
+Objective 2 means: water, shelter from radiation, and safe ground.
 
 ## Mission Stops
 
-This section is the single source of truth for the stops shown in the atlas (the Mission tab and the pins on the map).
-`web/data/mission-data.js` is generated from it with `python3 integration/web_bridge.py missiondata`.
+The first row (`base`) is Base camp, the start and end of the drive; it is not a stop. The next five rows are the stops, in visiting order.
 
-Columns, in this order, separated by `|` (do not use the pipe character inside a cell):
+| Id | Name | Lat | Lon | Description |
+|---|---|---|---|---|
+| base | Base camp | 18.4470 | 77.4080 | Three Forks floor. Start and end of the drive. Confirm the ground is flat and rock-free enough to live on. |
+| stop-1 | Three Forks sample depot | 18.4525 | 77.4015 | Level ground close to the foot of the delta where the 10 sample tubes were left. |
+| stop-2 | Delta front mudstone | 18.4580 | 77.3970 | Fine-grained layers at the front of the delta, laid down in still water. |
+| stop-3 | Delta top boulders | 18.4800 | 77.3850 | Boulders on top of the delta that the river carried in. |
+| stop-4 | Western delta clay beds | 18.5020 | 77.3690 | Clay-rich beds in the western part of the delta. |
+| stop-5 | Western Breach and Bright Angel | 18.4930 | 77.2930 | The ravine where the river entered the crater, near the Bright Angel outcrops and the Cheyava Falls find. |
 
-- **Id**: unique, lower case, no spaces (`sample-N` or `place-name`). The pin number is the row order.
-- **Name**, **Kind** (`sample` or `place`), **Area**, **Description**.
-- **Sol** and **Date**: the sol and Earth date the sample was sealed; `-` for places with no single date.
-- **Objectives**: the objective numbers the stop serves (`1`, `2`, `1, 2`), or `-`. This tagging is an editorial,
-  simplified mapping: sedimentary and carbonate samples serve both objectives (biosignature search and habitability);
-  igneous, impactite, serpentinite, regolith and atmospheric samples serve Objective 2 (what the site could sustain).
-  Edit the column if the science team decides differently.
-- **Lat, Lon**: optional degrees (`18.4446, 77.4509`) or `-`. Where `-`, the map places the stop with the same rule the
-  sample and place layers use (samples are spread around their area, places sit at a fixed approximate position).
+## Mission Tasks
 
-Stops whose position falls outside the current map are still listed and flagged "outside current map" (no pin is drawn).
-The sample list (names, areas, sols, dates) comes from the sample table of the atlas map; place descriptions come from its place names.
+One task per stop and objective. Task id = `task-<stop number>-<objective>`.
 
-| Id | Name | Kind | Area | Description | Sol | Date | Objectives | Lat, Lon |
-|---|---|---|---|---|---|---|---|---|
-| sample-1 | Roubion | sample | Polygon Valley | Atmospheric sample. Target: Roubion. | 164 | 6 Aug 2021 | 2 | - |
-| sample-2 | Montdenier | sample | Artuby Ridge | Igneous sample. Target: Rochette. | 194 | 6 Sep 2021 | 2 | - |
-| sample-3 | Montagnac | sample | Artuby Ridge | Igneous sample. Target: Rochette. | 196 | 8 Sep 2021 | 2 | - |
-| sample-4 | Salette | sample | South Séítah | Igneous sample. Target: Brac. | 262 | 15 Nov 2021 | 2 | - |
-| sample-5 | Coulettes | sample | South Séítah | Igneous sample. Target: Brac. | 271 | 24 Nov 2021 | 2 | - |
-| sample-6 | Robine | sample | South Séítah | Igneous sample. Target: Issole. | 298 | 22 Dec 2021 | 2 | - |
-| sample-7 | Malay | sample | South Séítah | Igneous sample. Target: Issole. | 337 | 31 Jan 2022 | 2 | - |
-| sample-8 | Ha'ahóni | sample | Octavia E. Butler Landing / Ch'ał outcrop | Igneous sample. Target: Sid. | 371 | 7 Mar 2022 | 2 | - |
-| sample-9 | Atsá | sample | Octavia E. Butler Landing / Ch'ał outcrop | Igneous sample. Target: Sid. | 377 | 13 Mar 2022 | 2 | - |
-| sample-10 | Swift Run | sample | Delta Front | Sedimentary sample. Target: Skinner Ridge. | 490 | 7 Jul 2022 | 1, 2 | - |
-| sample-11 | Skyland | sample | Delta Front | Sedimentary sample. Target: Skinner Ridge. | 495 | 12 Jul 2022 | 1, 2 | - |
-| sample-12 | Hazeltop | sample | Delta Front | Sedimentary sample. Target: Wildcat Ridge. | 509 | 27 Jul 2022 | 1, 2 | - |
-| sample-13 | Bearwallow | sample | Delta Front | Sedimentary sample. Target: Wildcat Ridge. | 516 | 3 Aug 2022 | 1, 2 | - |
-| sample-14 | Shuyak | sample | Delta Front | Sedimentary sample. Target: Amalik. | 575 | 2 Oct 2022 | 1, 2 | - |
-| sample-15 | Mageik | sample | Delta Front | Sedimentary sample. Target: Amalik. | 619 | 16 Nov 2022 | 1, 2 | - |
-| sample-16 | Kukaklek | sample | Delta Front | Sedimentary sample. Target: Hidden Harbor. | 631 | 29 Nov 2022 | 1, 2 | - |
-| sample-17 | Atmo Mountain | sample | Delta Front | Regolith sample. Target: Observation Mountain. | 634 | 2 Dec 2022 | 2 | - |
-| sample-18 | Crosswind Lake | sample | Delta Front | Regolith sample. Target: Observation Mountain. | 639 | 7 Dec 2022 | 2 | - |
-| sample-19 | Melyn | sample | Upper Fan | Sedimentary sample. Target: Berea. | 749 | 30 Mar 2023 | 1, 2 | - |
-| sample-20 | Otis Peak | sample | Upper Fan | Sedimentary sample. Target: Emerald Lake. | 832 | 23 Jun 2023 | 1, 2 | - |
-| sample-21 | Pilot Mountain | sample | Upper Fan | Sedimentary sample. Target: Dream Lake. | 913 | 15 Sep 2023 | 1, 2 | - |
-| sample-22 | Pelican Point | sample | Margin Unit | Sedimentary sample. Target: Hans Amundsen Memorial Workspace. | 923 | 25 Sep 2023 | 1, 2 | - |
-| sample-23 | Lefroy Bay | sample | Margin Unit | Sedimentary sample. Target: Turquoise Bay. | 949 | 21 Oct 2023 | 1, 2 | - |
-| sample-24 | Comet Geyser | sample | Margin Unit | Silica-cemented carbonate sample. Target: Bunsen Peak. | 1088 | 12 Mar 2024 | 1, 2 | - |
-| sample-25 | Sapphire Canyon | sample | Neretva Vallis | Sedimentary sample. Target: Cheyava Falls. | 1215 | 21 Jul 2024 | 1, 2 | - |
-| sample-26 | Silver Mountain | sample | Crater Rim (Witch Hazel Hill) | Igneous / impactite sample. Target: Shallow Bay. | 1401 | 28 Jan 2025 | 2 | - |
-| sample-27 | Green Gardens | sample | Crater Rim (Witch Hazel Hill) | Serpentinite sample. Target: Tablelands. | 1433 | 2 Mar 2025 | 2 | - |
-| sample-28 | Main River | sample | Crater Rim (Witch Hazel Hill) | Igneous / impactite sample. Target: Broom Point. | 1441 | 10 Mar 2025 | 2 | - |
-| place-landing | Octavia E. Butler Landing | place | Octavia E. Butler Landing / Ch'ał outcrop | Landing site of Perseverance, 18 February 2021. | 0 | 18 Feb 2021 | 1, 2 | 18.4446, 77.4509 |
-| place-hawksbill-gap | Hawksbill Gap | place | Delta Front | Gap in the delta front that the rover climbed in 2022 to reach the top of the delta. Position approximate. | - | - | 1, 2 | - |
-| place-three-forks | Three Forks | place | Delta Front | Staging area where three route options to the delta merge, used to start the Delta Front campaign. Position approximate. | - | - | 1, 2 | - |
-| place-neretva-vallis | Neretva Vallis | place | Neretva Vallis | Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it. | - | - | 1, 2 | - |
-| place-witch-hazel-hill | Witch Hazel Hill | place | Crater Rim (Witch Hazel Hill) | Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate. | - | - | 2 | - |
-| place-seitah | Séítah | place | Séítah | Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate. | - | - | 2 | - |
+| Id | Stop | Objective | Title | Description | Est. min |
+|---|---|---|---|---|---|
+| task-1-1 | stop-1 | 1 | Recover the sample tubes | Recover the 10 sample tubes: photograph, check seal, log, stow. | 45 |
+| task-1-2 | stop-1 | 2 | Check ground and shelter at the depot | Check how firm and how level the ground is around the depot, and note rock overhangs or hollows that could shelter people from radiation. | 25 |
+| task-2-1 | stop-2 | 1 | Sample the finest mud layers | Find the finest mud layers, look for colour spots or rings, sample below the surface. | 60 |
+| task-2-2 | stop-2 | 2 | Look for water-bearing minerals in the mudstone | Check the mudstone for minerals that hold water, as a possible water source, and log whether the slope is stable enough to walk on. | 30 |
+| task-3-1 | stop-3 | 1 | Photograph and sample the boulders | Photograph and sample boulders the river carried in. | 40 |
+| task-3-2 | stop-3 | 2 | Judge boulder spacing for safe ground | Measure the size and spacing of the boulders to judge where the rover can drive safely and where a shelter could be placed. | 30 |
+| task-4-1 | stop-4 | 1 | Sample one intact clay layer | Photograph the layering and sample one intact clay layer; seal and log it. | 45 |
+| task-4-2 | stop-4 | 2 | Test how much water the clay holds | Test how much water the clay holds, as a possible water source for the crew. | 40 |
+| task-5-1 | stop-5 | 1 | Photograph the ravine walls and sample the channel floor | Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find. | 60 |
+| task-5-2 | stop-5 | 2 | Check shelter and safe passage in the ravine | Record how well the ravine walls shelter people from radiation and wind, and check whether the channel floor is safe to cross. | 30 |
+
+## Travel speeds
+
+Not part of this table format: `web/data/travel-speeds.js` (`window.JEZERO_SPEEDS`) is the single source. The pressurised rover
+drives at 2.8 m/s (about 10 km/h); a person on foot walks at 1.4 m/s (about 5 km/h).

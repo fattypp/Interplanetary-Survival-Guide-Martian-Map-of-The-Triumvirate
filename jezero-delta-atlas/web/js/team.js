@@ -209,7 +209,19 @@
     });
   }
 
+  /* Where a teammate is, in words: 'returning to base' | 'on traverse' (moving) | 'at base' (within AT_BASE_M of base camp) | 'at stop N' (record has stopId) | 'stopped'.
+     m = {mode, moving, x, y, stopId}; base = {x, y} in page px; mpp = metres per page px. Without a base position a stationary member is 'stopped'. */
+  var AT_BASE_M = 100;
+  function statusLabel(m, base, mpp) {
+    if (m.mode === 'return') return 'returning to base';
+    if (m.moving) return 'on traverse';
+    if (base && isFinite(base.x) && isFinite(base.y) && isFinite(m.x) && isFinite(m.y) && Math.hypot(m.x - base.x, m.y - base.y) * (mpp || MPP) <= AT_BASE_M) return 'at base';
+    var n = m.stopId ? /(\d+)$/.exec(String(m.stopId)) : null;
+    return n ? 'at stop ' + n[1] : 'stopped';
+  }
+
   var Logic = {
+    statusLabel: statusLabel, AT_BASE_M: AT_BASE_M,
     MPP: MPP, MAX_LEN: MAX_LEN, LIMITS: LIMITS, HR_MIN: HR_MIN, HR_MAX: HR_MAX, DEFAULTS: DEFAULTS,
     rand: rand, blockedCraters: blockedCraters, isBlocked: isBlocked, freePoint: freePoint, stepMember: stepMember,
     stepVitals: stepVitals, flags: flags, distBearing: distBearing, fmtDist: fmtDist, cleanText: cleanText,
@@ -234,8 +246,9 @@
     var saved = Atlas.store.get('team.state', null);
     if (!saved || saved.v !== 2 || !Array.isArray(saved.members)) return;
     saved.members.forEach(function (s) {
+      if (!s || typeof s !== 'object') return;
       var m = members.filter(function (q) { return q.id === s.id; })[0];
-      if (!m || !s) return;
+      if (!m) return;
       var okNum = function (v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi; };
       if (okNum(s.x, 0, ctx.W) && okNum(s.y, 0, ctx.H) && !isBlocked(s.x, s.y, ctx) && okNum(s.o2, 0, 100) && okNum(s.bat, 0, 100) && okNum(s.hr, HR_MIN, HR_MAX) &&
         typeof s.rs === 'number' && isFinite(s.rs) && okNum(s.heading, -1e4, 1e4)) {
@@ -251,6 +264,8 @@
   var t0 = Atlas.now();
   members.forEach(function (m, i) { snapshot(m, t0); m.nextTel = t0.getTime() + 10000 + i * 5000; });
 
+  function baseXY() { var b = Atlas.base; return b && isFinite(b.x) ? { x: b.x, y: b.y } : ctx.home; }
+  function statusOf(m) { return statusLabel(m, baseXY(), mpp); }
   function meOf() { return Atlas.me && isFinite(Atlas.me.x) && isFinite(Atlas.me.y) ? Atlas.me : null; }
   function relTo(m) {
     var me = meOf();
@@ -264,7 +279,7 @@
     members: function () {
       return members.map(function (m) {
         return { id: m.id, name: m.name, x: m.x, y: m.y, oxygenPct: m.tel.oxygenPct, batteryPct: m.tel.batteryPct, heartRate: m.tel.heartRate,
-          lastUpdate: m.tel.t, status: m.mode === 'return' ? 'returning to base' : 'on traverse', simulated: !worldOn };
+          lastUpdate: m.tel.t, status: statusOf(m), simulated: !worldOn };
       });
     },
     open: function (id) { return openChat(id); }
@@ -308,7 +323,8 @@
   /* ---------- tab UI ---------- */
   var root, listEl, chatBox, liveEl, cards = {}, selected = null, chatId = null, logEl, inputEl, sendBtn, countEl, chatTitle;
   var unread = Atlas.store.get('team.unread', {});
-  if (!unread || typeof unread !== 'object') unread = {};
+  if (!unread || typeof unread !== 'object' || Array.isArray(unread)) unread = {};
+  Object.keys(unread).forEach(function (k) { var n = unread[k]; if (typeof n !== 'number' || !isFinite(n) || n <= 0) delete unread[k]; else unread[k] = Math.min(999, Math.floor(n)); });
   var lastFlagKeys = {};
   var extraUnread = 0;   // unread real messages in conversations that are not a teammate card (All crew, Earth control)
 
@@ -354,7 +370,7 @@
     setMeter(c.o2, v.oxygenPct, v.oxygenPct.toFixed(0) + ' %', by.oxygen);
     setMeter(c.bat, v.batteryPct, v.batteryPct.toFixed(0) + ' %', by.battery);
     setMeter(c.hr, (v.heartRate - 40) / 1.4, v.heartRate + ' bpm', by.heart);
-    c.status.textContent = m.mode === 'return' ? '↩ returning to base' : (m.moving ? '→ on traverse' : '• at base');
+    var sl = statusOf(m); c.status.textContent = (sl === 'returning to base' ? '↩ ' : sl === 'on traverse' ? '→ ' : '• ') + sl;
     var rel = relTo(m);
     c.meta.textContent = 'Updated ' + hms(new Date(m.tel.t)) + ' · ' + (rel ? fmtDist(rel.m) + ' ' + rel.dir + ' (' + Math.round(rel.deg) + '°) from you' : 'distance unknown (your position is not available)');
     var n = unread[m.id] || 0;
@@ -494,7 +510,7 @@
       var m = wMembers[r.id] || (wMembers[r.id] = { id: String(r.id), name: String(r.id), x: ctx.home.x, y: ctx.home.y });
       m.name = String(r.name || r.id).replace(/\s+/g, ' ').trim().slice(0, 24) || m.id;
       m.x = numOr(r.x, m.x); m.y = numOr(r.y, m.y);
-      m.mode = r.mode === 'returning' ? 'return' : 'explore'; m.moving = r.mode === 'walking' || r.mode === 'returning';
+      m.mode = r.mode === 'returning' ? 'return' : 'explore'; m.moving = r.mode === 'walking' || r.mode === 'returning'; m.stopId = typeof r.stopId === 'string' ? r.stopId : null;
       m.tel = { t: when.toISOString(), oxygenPct: Math.round(clamp(numOr(r.o2Pct, 0), 0, 100) * 10) / 10,
         batteryPct: Math.round(clamp(numOr(r.batPct, 0), 0, 100) * 10) / 10, heartRate: Math.round(clamp(numOr(r.hr, 70), HR_MIN, HR_MAX)) };
       list.push(m);

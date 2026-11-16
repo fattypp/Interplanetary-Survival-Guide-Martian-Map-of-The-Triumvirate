@@ -58,8 +58,7 @@ button{cursor:pointer}
 .mk .tip{position:absolute;left:11px;top:30px;width:8px;height:8px}
 .mk .lab{left:50%;bottom:44px;transform:translateX(-50%);font-size:14px;color:var(--c)}
 .mk.you{--c:var(--you)} .mk.base{--c:var(--base)} .mk.task{--c:var(--acc)} .mk.loc{--c:#c9a7ff}
-.mk.near.base .lab{transform:translateX(calc(-100% - 6px));bottom:30px}
-.mk.near.you .lab{transform:none;left:20px;bottom:30px}
+.mk.base .lab{bottom:auto;top:42px}   /* BASE label under the tip, YOU label above: they never meet a stop dot or each other */
 .mk.chosen .drop{box-shadow:0 0 0 2px #fff,0 0 0 6px var(--acc)}
 .stopdot{width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#10151c;border:2px solid #fff;font-size:11px;font-weight:800;color:#fff;line-height:18px;text-align:center}
 .stopdot.done{background:#1f5f3a;border-color:var(--ok)}
@@ -132,12 +131,12 @@ button{cursor:pointer}
 .pop[data-dock=sheet] .dock{display:none}
 .pop[data-dock=sheet] .pop-detail{max-height:30%}
 .pop[data-dock=sheet] .pop-detail .acts button,.pop[data-dock=sheet] .pop-detail a.lnk{padding:6px 10px;font-size:13px}
-.pop-detail{padding:10px 12px;border-bottom:1px solid var(--line);background:#0e1218;font-size:14px;max-height:42%;overflow:auto}
+.pop-detail{padding:8px 12px;border-bottom:1px solid var(--line);background:#0e1218;font-size:13px;flex:none;max-height:22%;overflow:auto}
 .pop-detail h3{margin:0 0 2px;font-size:16px;color:var(--acc)}
 .pop-detail p{margin:4px 0;color:var(--dim)}
 .pop-detail .acts{justify-content:flex-start;margin-top:8px}
 .pop-detail a.lnk{display:inline-block;color:var(--ink);text-decoration:none}
-.pop-list{flex:1;min-height:0;overflow:auto;padding:4px 0 8px;overscroll-behavior:contain}
+.pop-list{flex:1;min-height:84px;overflow:auto;padding:4px 0 8px;overscroll-behavior:contain}
 .pop-list h3{margin:10px 12px 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .pop-list ul{list-style:none;margin:0;padding:0}
 .task{display:flex;align-items:stretch;border-left:4px solid transparent}
@@ -163,6 +162,12 @@ button{cursor:pointer}
 /* resolution note */
 .note{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:3;padding:6px 12px;border-radius:999px;background:rgba(8,10,14,.82);font-size:12px;color:var(--dim);white-space:nowrap;max-width:90%}
 .note a{color:var(--acc);font-weight:700}
+@media (min-width:901px){
+  .coords{max-width:calc(50% - 26px)}
+  .br{max-width:calc(50% - 26px)}
+  .dist{overflow-wrap:anywhere}
+  .note{bottom:96px}
+}
 @media (max-width:900px){
   .br{bottom:72px;right:68px}
   .coords{font-size:16px}
@@ -175,6 +180,25 @@ button{cursor:pointer}
   .side{width:12px;height:60px}.side-l{left:-11px;top:30px}.side-r{right:-11px;bottom:30px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* mission pop-up: grouping, stops, objective tags */
+.pop-view{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.pop-view button{padding:4px 10px;border:2px solid var(--line);border-radius:999px;background:#121821;font-size:12px;font-weight:700}
+.pop-view button[aria-pressed=true]{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.pop-list h3.stop-h{margin:8px 0 0;padding:0;letter-spacing:0;text-transform:none;font-size:14px}
+.grp{display:flex;align-items:center;gap:10px;width:100%;padding:7px 12px;background:#0e1218;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);font-weight:800;text-align:left}
+.grp b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid #fff;font-size:12px}
+.grp.sel{background:#1c2530;color:var(--acc)}.grp.sel b{background:var(--acc);color:var(--acc-ink)}
+.grp:hover{background:#18202b}
+.task.grp{background:#151c26;border-left-color:var(--acc)}
+.tag{display:inline-block;padding:0 7px;margin-right:4px;border-radius:999px;font-style:normal;font-weight:700;font-size:11px;letter-spacing:.04em;color:#05070a;background:#7fd1ff}
+.tag.o2{background:#ffd27f}
+.task .ttl small{white-space:normal}
+.mk.base .drop,.mk.base{--c:var(--base)}
+.pop-add{padding:6px 12px;gap:6px}
+.pop-add input[type=text]{min-width:110px;padding:7px 9px}
+.pop-add button{padding:7px 12px}
+.pop-hd{padding:8px 12px}
 
 </style>
 <style>
@@ -273,7 +297,7 @@ button{cursor:pointer}
     <button type="button" class="side side-r" id="btn-sos" aria-label="SOS emergency call: opens a confirmation" aria-haspopup="dialog" title="SOS"><span class="side-cap" aria-hidden="true">SOS</span></button>
 
     <div class="screen" id="screen">
-      <div class="map" id="map" tabindex="0" role="application" aria-label="Global Mars map. Drag to pan, scroll or pinch to zoom, arrow keys pan, plus and minus zoom.">
+      <div class="map" id="map" tabindex="0" role="application" aria-label="Mars map with the five stops. Drag to pan, scroll or pinch to zoom, arrow keys pan, plus and minus zoom.">
         <canvas id="cv" aria-hidden="true"></canvas>
         <div class="pins" id="pins"></div>
       </div>
@@ -331,6 +355,11 @@ button{cursor:pointer}
             <button type="button" id="pop-x" aria-label="Close mission panel (Escape)">Close</button>
           </span>
         </header>
+        <div class="pop-view" role="group" aria-label="Group tasks by">
+          <span>Group by</span>
+          <button type="button" id="grp-stop" aria-pressed="true">Stop</button>
+          <button type="button" id="grp-objective" aria-pressed="false">Objective</button>
+        </div>
         <div class="pop-detail" id="pop-detail" hidden></div>
         <div class="pop-list" id="pop-list"></div>
         <form class="pop-add" id="pop-add">
@@ -383,11 +412,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 (function () {
   'use strict';
   var CODE_RE = /^[A-HJ-NP-Z2-9]{5}$/, LEGACY = 'LOCAL', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 100;
+  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 200, OUTBOX_N = 100;
   var ROLES = ['crew', 'earth', 'control', 'helmet', 'tablet', 'legacy'];
   var cfg = window.JDA_LINK || {};
   var cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);   // this page load
-  var subs = [], statusSubs = [], presSubs = [], stateSubs = {};
+  var subs = [], statusSubs = [], presSubs = [], stateSubs = Object.create(null);
   var room = null, status = 'local', S = null, implicit = false, pendingOut = { msgs: [], state: {} };   // pendingOut: what an implicit (LOCAL) room sent, replayed into the first explicit room   // S = per-join session (timers, seen, log, state, presence)
 
   /* ---------- helpers ---------- */
@@ -403,7 +432,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function size(o) { try { return JSON.stringify(o).length; } catch (e) { return Infinity; } }
+  function size(o) {   // JSON size in UTF-8 bytes, the same measure the relay uses (emoji / CJK count by bytes, not UTF-16 units)
+    var j; try { j = JSON.stringify(o); } catch (e) { return Infinity; }
+    if (typeof j !== 'string') return Infinity;
+    try { return unescape(encodeURIComponent(j)).length; } catch (e) { return j.length * 3; }
+  }
   function isObj(o) { return o && typeof o === 'object' && !Array.isArray(o); }
   function safeKey(k) { return typeof k === 'string' && /^[A-Za-z0-9:_.-]{1,64}$/.test(k) && k !== '__proto__'; }
   function warn() { if (window.console) console.warn.apply(console, ['JdaLink'].concat([].slice.call(arguments))); }
@@ -440,7 +473,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
   /* ---------- session ---------- */
   function newSession(code) {
-    return { code: code, seen: {}, seenQ: [], log: [], state: {}, relayVer: {}, pres: {}, timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
+    var N = Object.create; return { code: code, seen: N(null), seenQ: [], log: [], state: N(null), mine: N(null), outbox: [], epoch: null, repub: false, relayVer: N(null), pres: N(null), timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
   }
   function markSeen(id) { S.seen[id] = 1; S.seenQ.push(id); if (S.seenQ.length > 3000) delete S.seen[S.seenQ.shift()]; }
   function setStatus(s) { if (s === status) return; status = s; statusSubs.slice().forEach(function (fn) { call(fn, s); }); }
@@ -530,31 +563,66 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     opt = opt || {};
     var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : 0;
     return fetch('/api' + path, { method: opt.method || 'GET', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, body: opt.body ? JSON.stringify(opt.body) : undefined, cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+      .then(function (r) { clearTimeout(tm); if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; } return r.json(); }, function (e) { clearTimeout(tm); throw e; });
   }
   function probeRelay() {
     if (!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
     return api('/ping').then(function (j) { return !!(j && j.ok); }, function () { return false; });
   }
   function relayOk() { var ses = S; if (ses && ses.relayFails) { ses.relayFails = 0; setStatus('relay'); } }
-  function relayFail(e) { var ses = S; if (!ses) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  function relayFail(e) { var ses = S; if (!ses || (e && e.status === 429)) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  /* messages wait in the outbox until the relay has accepted them (relay restarting, rate limit, brief outage) */
+  function postOut(ses, item) {
+    if (item.busy || ses.closed) return;
+    item.busy = true;
+    api('/rooms/' + ses.code + '/msg', { method: 'POST', body: item.m }).then(function () {
+      var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1);
+    }, function (e) {
+      item.busy = false;
+      if (e && (e.status === 400 || e.status === 403 || e.status === 404 || e.status === 411 || e.status === 413)) { var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1); warn('relay refused a message', e.message); }
+      else relayFail(e);
+    });
+  }
+  function queueOut(ses, m) {
+    var item = { m: m, busy: false };
+    ses.outbox.push(item);
+    if (ses.outbox.length > OUTBOX_N) ses.outbox.shift();
+    if (ses.relay) postOut(ses, item);
+  }
+  function flushOut(ses) { ses.outbox.slice().forEach(function (it) { postOut(ses, it); }); }
+  function republishAll(ses) {   // a relay that restarted (or was not reachable before) has none of this page's messages or state: send them again (the relay and readers dedupe by id)
+    ses.log.forEach(function (m) { if (m.from && m.from.cid === cid && !ses.outbox.some(function (it) { return it.m.id === m.id; })) queueOut(ses, m); });
+    ses.repub = true;
+  }
   function startRelay() {
-    var ses = S, base = '/rooms/' + ses.code;
+    var ses = S, base = '/rooms/' + ses.code, delay = POLL_MS;
     ses.relay = true; setStatus('relay');
+    republishAll(ses);
     function loop() {
       if (ses.closed) return;
+      delay = POLL_MS;
       Promise.all([api(base + '/msgs?since=' + ses.since), api(base + '/state?since=' + ses.stateVer)]).then(function (r) {
         if (ses.closed) return;
-        var first = !ses.synced;
+        var first = !ses.synced, restarted = !!(r[0].epoch && ses.epoch && r[0].epoch !== ses.epoch);
+        if (r[0].epoch) ses.epoch = r[0].epoch;
+        if (restarted) { ses.relayVer = {}; ses.since = 0; ses.stateVer = 0; republishAll(ses); }
         if (r[0].reset) ses.since = 0;
         (r[0].msgs || []).forEach(function (m) { deliver(m, first); });
-        if (isFinite(r[0].next)) ses.since = r[0].next;
+        if (isFinite(r[0].next) && !restarted) ses.since = r[0].next;
+        if (r[1].reset || restarted) ses.relayVer = {};
         var items = r[1].items || {};
         Object.keys(items).forEach(function (key) { applyState(key, items[key], true); });
-        if (isFinite(r[1].ver)) ses.stateVer = r[1].ver;
+        if (isFinite(r[1].ver) && !restarted) ses.stateVer = r[1].ver;
+        if (ses.repub && !restarted) {   // put back this page's own state values that the relay does not have
+          ses.repub = false;
+          Object.keys(ses.mine).forEach(function (key) {
+            if (!(key in items) && !(ses.state[key] && ses.state[key].from.cid !== cid)) api(base + '/state/' + encodeURIComponent(key), { method: 'PUT', body: ses.mine[key] }).catch(function (x) { relayFail(x); });
+          });
+        }
         ses.synced = true;
+        flushOut(ses);
         relayOk();
-      }).catch(relayFail).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, POLL_MS)); });
+      }).catch(function (e) { if (e && e.status === 429) delay = 2500; relayFail(e); }).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, delay)); });
     }
     loop();
   }
@@ -668,10 +736,18 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       Object.keys(carry.state).forEach(function (key) { try { setState(key, carry.state[key]); } catch (e) { /* ignore */ } });
       pendingOut = { msgs: [], state: {} };
     }
+    function reprobe(ses2) {   // relay not reachable at load: keep looking, so a relay started later (or restarted) is picked up without a reload
+      var tm = setTimeout(function () {
+        if (ses2.closed || ses2.relay) return;
+        probeRelay().then(function (ok2) { if (ses2.closed) return; if (ok2) { startRelay(); heartbeat(); } else reprobe(ses2); });
+      }, 4000);
+      ses2.timers.push(tm);
+    }
     if (c !== LEGACY) {   // the legacy default room never leaves this browser
       probeRelay().then(function (ok) {
         if (ses.closed) return;
         if (ok) startRelay();
+        else if (/^https?:$/.test(location.protocol)) reprobe(ses);
         if (online) startOnline();
         heartbeat();
         flushCarry();
@@ -700,7 +776,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     lsSet(k(ses.code, 'log'), JSON.stringify(ses.log.slice(-LOG_N)));
     try { if (ses.bc) ses.bc.postMessage({ k: 'msg', m: m }); } catch (e) { /* ignore */ }
     lsSet(k(ses.code, 'msg'), JSON.stringify(m));
-    if (ses.relay) api('/rooms/' + ses.code + '/msg', { method: 'POST', body: m }).catch(function (e) { warn('relay send failed', e && e.message); relayFail(e); });
+    queueOut(ses, m);
     if (ses.online) remoteUpsert({ id: m.id, room: ses.code, kind: 'msg', payload: m }).catch(function (e) { warn('online send failed', e && e.message); });
     return m;
   }
@@ -714,6 +790,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var wire = { value: e.value, t: e.t, from: e.from };
     lsSet(k(ses.code, 'state.' + key), JSON.stringify(wire));
     try { if (ses.bc) ses.bc.postMessage({ k: 'state', key: key, e: wire }); } catch (x) { /* ignore */ }
+    ses.mine[key] = wire;
     if (ses.relay) api('/rooms/' + ses.code + '/state/' + encodeURIComponent(key), { method: 'PUT', body: wire }).catch(function (x) { relayFail(x); });
     if (ses.online) remoteUpsert({ id: 'state:' + ses.code + ':' + key, room: ses.code, kind: 'state', payload: { key: key, entry: wire }, updated_at: new Date().toISOString() }).catch(function () { });
     return true;
@@ -772,12 +849,35 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function load() { try { var o = JSON.parse(localStorage.getItem(LAST) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
   function save(o) { try { localStorage.setItem(LAST, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function hashRaw() {   // the room text in the URL hash as typed (normalised), or null when there is none
+    var m = /[#&]room=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* use as typed */ }
+    return window.JdaLink.normCode(raw);
+  }
+  var BAD_CODE = 'Room codes have 5 letters or digits, no I or O. Check the code or create a new room.';
+  function hashBad() { var r = hashRaw(); return r !== null && !window.JdaLink.isValidCode(r); }
   function hashCode() {
     var m = /[#&]room=([^&]*)/.exec(location.hash || '');
     if (!m) return '';
-    var c = window.JdaLink.normCode(decodeURIComponent(m[1]));
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* malformed escape: use the text as typed */ }
+    var c = window.JdaLink.normCode(raw);
     return window.JdaLink.isValidCode(c) ? c : '';
   }
+  function hashCrew() {   // #room=CODE&crew=jayesh picks a known crew member without asking
+    var m = /[#&]crew=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var v = m[1];
+    try { v = decodeURIComponent(v); } catch (e) { return null; }
+    v = slug(v);
+    for (var i = 0; i < CREW.length; i++) if (CREW[i].id === v) return CREW[i];
+    // crew members added on the control page: any valid id that is not reserved
+    if (v && RESERVED.indexOf(v) < 0) return { id: v, name: v.charAt(0).toUpperCase() + v.slice(1) };
+    return null;
+  }
+  var RESERVED = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];
   function linkFor(code) {
     return location.origin + location.pathname + location.search + '#room=' + code;
   }
@@ -799,7 +899,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var offs = [];
 
     function who(saved) {
-      if (wantCrew) return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      if (wantCrew) {
+        var hc2 = hashCrew() || (saved.crewId ? null : CREW.filter(function (c) { return c.id === opts.defaultCrew; })[0]);
+        if (hc2 && hashCode()) return { role: role, id: hc2.id, name: hc2.name };
+        return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      }
       if (wantName) return { role: role, id: opts.id || role, name: saved.name || opts.name || '' };
       return { role: role, id: opts.id || role, name: opts.name || '' };
     }
@@ -905,7 +1009,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       opener = from || null;
       var saved = load(), n = ++uid, firstRun = !joined();
       var cur = joined() ? L.room : null;
-      var codeVal = hashCode() || (cur && cur.code) || saved.code || '';
+      var badHash = hashBad(), codeVal = badHash ? hashRaw().slice(0, 5) : (hashCode() || (cur && cur.code) || saved.code || '');
       back = el('div', 'lu-back');
       dlg = el('div', 'lu-dlg', null, { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'lu-t' + n, 'aria-describedby': 'lu-d' + n });
       dlg.appendChild(el('h2', null, firstRun ? 'Join a room' : 'Change room', { id: 'lu-t' + n }));
@@ -952,7 +1056,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         crewOther.parentNode.querySelector('#lu-otherl' + n).hidden = !other;
         crewOther.hidden = !other;
       }
-      var err = el('p', 'lu-err', '', { id: 'lu-e' + n, role: 'alert' });
+      var err = el('p', 'lu-err', badHash ? BAD_CODE : '', { id: 'lu-e' + n, role: 'alert' });
       form.appendChild(err);
       var act = el('div', 'lu-act');
       var joinBtn = el('button', 'lu-btn lu-primary', 'Join room', { type: 'submit' });
@@ -968,7 +1072,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           if (!r) return { error: 'Choose who you are.' };
           if (r.value !== '__other') { var c = CREW.filter(function (x) { return x.id === r.value; })[0]; return { role: role, id: c.id, name: c.name }; }
           var nm = crewOther.value.trim().slice(0, 24), sl = slug(nm);
-          if (!sl) return { error: 'Enter your name.' };
+          if (!nm) return { error: 'Enter your name.' };
+          if (!sl) return { error: 'Use at least one letter A-Z or digit in your name.' };
+          if (RESERVED.indexOf(sl) >= 0) return { error: 'That name is reserved. Choose another one.' };
           return { role: role, id: sl, name: nm };
         }
         if (wantName) { var v = nameIn.value.trim().slice(0, 24); return { role: role, id: opts.id || role, name: v || opts.name || '' }; }
@@ -989,7 +1095,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       back.appendChild(dlg);
       root.appendChild(back);
       document.addEventListener('keydown', onKey, true);
-      (code.value ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
+      (code.value && !badHash ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
     }
 
     /* ----- start ----- */
@@ -997,11 +1103,13 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var saved = load(), hc = hashCode(), code = hc || saved.code || '';
     var info = who(saved);
     var identityKnown = !wantCrew || !!info.id;
-    if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
+    if (hashBad()) openDialog(null);   // a broken code in the URL never falls back to the remembered room
+    else if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
     else openDialog(null);
 
     function onHash() {
       var c = hashCode();
+      if (!c && hashBad() && !dlg) { openDialog(null); return; }
       if (!c || (L.room && L.room.code === c && joined())) return;
       var sv = load(), inf = who(sv);
       if (!wantCrew || inf.id) { if (dlg) closeDialog(); joinNow(c, inf); }
@@ -1141,6 +1249,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     }
     function renderLog() {
       log.textContent = '';
+      log.setAttribute('aria-live', 'off');   // switching conversation must not make a screen reader read the whole history
+      setTimeout(function () { log.setAttribute('aria-live', 'polite'); }, 100);
       var list = msgs.filter(function (m) { return m.conv === active; });
       if (!list.length) log.appendChild(el('p', 'jc-empty', roomOk() ? 'No messages yet.' : 'Join a room to chat with the crew and Earth control.'));
       list.forEach(function (m) { log.appendChild(renderMsg(m)); });
@@ -1174,6 +1284,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         var e = log.querySelector('.jc-empty'); if (e) log.removeChild(e);
         var stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 40 || rec.mine;
         log.appendChild(renderMsg(rec));
+        while (log.children.length > KEEP) log.removeChild(log.firstChild);
         if (stick) log.scrollTop = log.scrollHeight;
       }
       return true;
@@ -1202,6 +1313,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       var to = active;
       var out = { type: 'chat', to: to, text: text, fromName: meName }, sent = null;
       try { sent = link.send(out); } catch (e) { sent = null; }
+      if (!sent) { state.textContent = 'Message not sent (too large or the link is not ready). Your text is kept, try again.'; return false; }
       var id = sent && typeof sent.id === 'string' ? sent.id : 'loc' + Date.now().toString(36) + (++seq);
       add({ id: id, conv: to, mine: true, fromId: meId, fromName: meName, text: text, t: (sent && sent.t) || new Date().toISOString() }, false);
       input.value = ''; autosize(); updateForm();
@@ -1227,7 +1339,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       h.slice().sort(function (a, b) { return String(a && a.t).localeCompare(String(b && b.t)); }).forEach(function (m) { fromLink(m, false); });
     }
     if (link && link.on) {
-      var off = link.on(function (m) { if (!destroyed) fromLink(m, true); });
+      var off = link.on(function (m) { if (!destroyed) fromLink(m, !(m && m.replay)); });
       offLink = typeof off === 'function' ? off : null;
     }
     syncConvs();
@@ -1276,11 +1388,21 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
 </script>
 <script>
+/* Travel speeds, single source for the atlas route planner, the simulation and the control page.
+   The crew drives a pressurised rover between stops (about 10 km/h) and walks at the stops (about 5 km/h). */
+window.JEZERO_SPEEDS = {
+  rover: { label: 'Pressurised rover', mps: 2.8 },
+  foot:  { label: 'Astronaut on foot', mps: 1.4 }
+};
+
+</script>
+<script>
 /* sim-core.js: window.JdaSim, the crew simulation engine (pure logic, no DOM, no network).
    Contract: docs/MULTIPAGE.md (world schema, commands). Models and limits: docs/SIMULATION.md.
    Everything here is scenario data: there is no real suit, radiation or vitals feed.
    Works in a browser (window.JdaSim) and in Node (module.exports) for tests.
-   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid). */
+   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid),
+   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s). */
 (function (root) {
   'use strict';
 
@@ -1290,14 +1412,27 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     SOL_S: 88775.244,                  // length of a Mars solar day in seconds
     START_ISO: '2026-11-15T08:00:00Z', // mission clock at reset (this is a scenario clock, not a real date on Mars)
     START_LOCAL_H: 9,                  // local mean solar time at the start (hours, 0..24)
-    BASE: { lat: 18.4446, lon: 77.4509 },       // Octavia E. Butler landing site (from the Atlas data)
+    // Fallbacks, used only when web/data/mission-data.js / travel-speeds.js are not loaded (coordinates from the MissionGuide).
+    FALLBACK_BASE: { id: 'base', name: 'Base camp', lat: 18.447, lon: 77.408 },
+    FALLBACK_STOPS: [
+      { id: 'stop-1', name: 'Three Forks sample depot', lat: 18.4525, lon: 77.4015 },
+      { id: 'stop-2', name: 'Delta front mudstone', lat: 18.458, lon: 77.397 },
+      { id: 'stop-3', name: 'Delta top boulders', lat: 18.480, lon: 77.385 },
+      { id: 'stop-4', name: 'Western delta clay beds', lat: 18.502, lon: 77.369 },
+      { id: 'stop-5', name: 'Western Breach and Bright Angel', lat: 18.493, lon: 77.293 }
+    ],
+    FALLBACK_MPS: { rover: 2.8, foot: 1.4 },    // only if JEZERO_SPEEDS is absent
+    EVA_DEFAULT_MIN: 30,               // time on foot at a stop when the stop has no tasks in the data
     BASELINE_USVH: 26.67,              // MSL/RAD GCR dose equivalent 0.64 mSv/day (same as the science layer)
     SPE_MULT: 2.5,                     // solar particle event multiplier (same as the science layer)
-    WALK_MPS: 1.4,                     // default walking speed
     MAX_MPS: 30,                       // hard limit of the speed command
     O2_PER_H:  { rest: 4, walk: 9 },   // percent of a full tank per simulated hour (same as suit.js: resting 4, walking 9)
     BAT_PER_H: { rest: 3, walk: 6 },   // percent of a full battery per simulated hour (same as suit.js)
-    EFFORT_CAP: 3,                     // effort = speed / 1.4 m/s, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EFFORT_CAP: 3,                     // effort = speed / foot speed, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EVA_EFFORT: 1,                     // working on foot at a stop (sampling, photographing) costs the same as walking at foot speed
+    ROVER_O2_PER_H: 0,                 // pressurised rover: cabin air, the suit tank is not drawn on
+    ROVER_BAT_PER_H: 1,                // suit battery on standby while the rover supplies power (percent per hour)
+    HR_ROVER: 68,                      // seated in the rover cabin, close to resting
     HR_REST: 66, HR_IDLE: 72, HR_WALK_ADD: 28, HR_TAU_S: 45,
     SUIT_NOM_C: 21, SUIT_TAU_S: 600,
     AMB_MEAN_C: -48, AMB_AMP_C: 38, AMB_PEAK_H: 14,   // clear-sky day: about -86 C at 02:00 to -10 C at 14:00 local
@@ -1309,6 +1444,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var M_PER_DEG = Math.PI / 180 * C.R_MARS_M;   // metres per degree of latitude (and of longitude at the equator)
 
   function num(v, fb) { v = Number(v); return isFinite(v) ? v : fb; }
+  var RESERVED_IDS = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];   // same list as link-ui.js
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function round(v, d) { var k = Math.pow(10, d); return Math.round(v * k) / k; }
   function norm360(a) { a = a % 360; return a < 0 ? a + 360 : a; }
@@ -1360,22 +1496,21 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     return g.min + (top * (1 - fy) + bot * fy) / 255 * (g.max - g.min);
   }
 
-  /* ---------------- places and the demo path ----------------
-     The atlas draws its place names on an older, larger canvas (1990 x 1848 px = 77.10-77.80 E, 18.10-18.75 N, see o2n in atlas-map.js).
-     The conversion to lat/lon is replicated here. Several places lie outside the current map image; they still have valid lat/lon. */
-  function o2ll(px, py) { return { lat: round(18.75 - py / 1848 * 0.65, 5), lon: round(77.1 + px / 1990 * 0.7, 5) }; }
-  function place(label, px, py) { var p = o2ll(px, py); p.label = label; return p; }
-  var PLACES = {
-    landing: { label: 'Octavia E. Butler Landing', lat: C.BASE.lat, lon: C.BASE.lon },
-    three:   place('Three Forks', 932, 862),
-    hawks:   place('Hawksbill Gap', 850, 772),
-    fan:     place('Upper Fan', 700, 655),
-    neretva: place('Neretva Vallis', 430, 470),
-    whh:     place('Witch Hazel Hill', 455, 1005),
-    seitah:  place('Seitah', 890, 975)
-  };
-  function demoPath() {   // landing -> Three Forks -> Hawksbill Gap -> Upper Fan -> Neretva -> Witch Hazel Hill -> Seitah (then the caller sends "return")
-    return ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah'].map(function (k) { var p = PLACES[k]; return { lat: p.lat, lon: p.lon, label: p.label }; });
+  /* ---------------- mission data and speeds (read lazily; fall back to the MissionGuide values) ---------------- */
+  function pt(o) { return o && isFinite(Number(o.lat)) && isFinite(Number(o.lon)) && o.lat !== null && o.lon !== null; }
+  function missionInfo() {
+    var M = root.JEZERO_MISSION || {};
+    var b = pt(M.base) ? M.base : C.FALLBACK_BASE;
+    var base = { id: 'base', name: String(b.name || 'Base camp'), lat: Number(b.lat), lon: Number(b.lon) };
+    var raw = Array.isArray(M.stops) && M.stops.length ? M.stops : C.FALLBACK_STOPS;
+    var stops = raw.filter(pt).map(function (st, i) { return { id: String(st.id || 'stop-' + (i + 1)), n: i + 1, name: String(st.name || 'Stop ' + (i + 1)), lat: Number(st.lat), lon: Number(st.lon) }; });
+    var tasks = (Array.isArray(M.tasks) ? M.tasks : []).filter(function (t) { return t && t.id && t.stopId; })
+      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
+    return { base: base, stops: stops, tasks: tasks };
+  }
+  function speeds() {
+    var S = root.JEZERO_SPEEDS || {};
+    return { rover: num(S.rover && S.rover.mps, C.FALLBACK_MPS.rover), foot: num(S.foot && S.foot.mps, C.FALLBACK_MPS.foot) };
   }
 
   /* ---------------- geometry on the sphere (local flat approximation, fine for kilometres) ---------------- */
@@ -1409,7 +1544,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var initCrew = (opts.crew && opts.crew.length ? opts.crew : [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }]).map(function (c) { return copyCrewInit(c); });
     var initClock = clamp(num(opts.clockSpeed, 1), 0.01, 100000);
 
+    var info = missionInfo(), SPD = speeds(), BASE = info.base;
     var elapsedMs, clock, events, crew, order;
+    function tasksOf(stopId) { return info.tasks.filter(function (t) { return t.stopId === stopId; }); }
+    function speedOf(c) { return c.speedOverride !== null ? c.speedOverride : SPD[c.travel]; }
 
     function copyCrewInit(c) {
       var id = slug(c.id || c.name) || 'crew';
@@ -1418,12 +1556,12 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     function makeCrew(c, index) {
       // crew without a position start around the base, a few metres apart (deterministic, not random)
       var a = index * 2.4, r = 6 + 4 * index;
-      var lat = c.lat !== null ? c.lat : C.BASE.lat + Math.cos(a) * r / M_PER_DEG;
-      var lon = c.lon !== null ? c.lon : C.BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(C.BASE.lat * Math.PI / 180));
+      var lat = c.lat !== null ? c.lat : BASE.lat + Math.cos(a) * r / M_PER_DEG;
+      var lon = c.lon !== null ? c.lon : BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(BASE.lat * Math.PI / 180));
       return {
         id: c.id, name: c.name, lat: clamp(lat, -90, 90), lon: lon, zM: C.Z0_M, headingDeg: 0,
         o2: 100, bat: 100, hr: C.HR_IDLE, hrNoise: 0, hrOverride: null, suitT: C.SUIT_NOM_C, dose: 0,
-        mode: 'idle', thenReturn: false, walkSpeed: C.WALK_MPS, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
+        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, stopId: null, taskId: null, tasksDone: 0, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
       };
     }
     function reset() {
@@ -1444,6 +1582,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
     function addCrew(spec) {
       var c = copyCrewInit(spec || {});
+      if (RESERVED_IDS.indexOf(c.id) >= 0) c.id = c.id + '-crew';   // 'all', 'earth', 'control'... would clash with message targets
       if (crew[c.id]) { var n = 2; while (crew[c.id + '-' + n]) n++; c.id = c.id + '-' + n; }
       if (order.length >= 12) return { ok: false, error: 'crew limit (12) reached' };
       initCrew.push(c);
@@ -1458,12 +1597,53 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       return { ok: true };
     }
 
+    /* ---- mission run: base -> stop 1 .. stop 5 -> base. Drive legs by rover, on foot (EVA) at each stop for its tasks ---- */
+    function startDrive(c, i) {
+      var st = info.stops[i], r = c.run;
+      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: st.lat, lon: st.lon, label: st.name }; c.path = []; c.headingWalk = false; c.mode = 'walking';
+    }
+    function startHome(c) {
+      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.mode = 'returning';
+    }
+    function startEva(c) {
+      var r = c.run, st = info.stops[r.i];
+      r.phase = 'eva'; r.evaT = 0; r.tasks = tasksOf(st.id); r.doneBase = c.tasksDone;
+      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : C.EVA_DEFAULT_MIN * 60;
+      c.travel = 'foot'; c.stopId = st.id; c.taskId = r.tasks.length ? r.tasks[0].id : null; c.target = null; c.path = []; c.mode = 'walking';
+    }
+    function evaStep(c, ds) {   // time on foot at a stop; tasks complete one after the other
+      var r = c.run, acc = 0, n = 0;
+      r.evaT += ds;
+      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc) n++; }
+      if (r.evaT >= r.evaTotal) {
+        c.tasksDone = r.doneBase + r.tasks.length;
+        if (r.i + 1 < info.stops.length) startDrive(c, r.i + 1); else startHome(c);
+        return false;
+      }
+      c.tasksDone = r.doneBase + n; c.taskId = r.tasks.length ? r.tasks[Math.min(n, r.tasks.length - 1)].id : null;
+      return true;
+    }
+    function arriveRun(c) {
+      if (c.run.phase === 'drive') startEva(c);
+      else { c.run = null; c.target = null; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
+    }
+    function startRun(c, speed) {
+      if (!info.stops.length) return 'no mission stops';
+      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], doneBase: 0, evaTotal: 0 };
+      c.tasksDone = 0; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
+      startDrive(c, 0);
+      return null;
+    }
+
     /* ---- one physics step of ds simulated seconds ---- */
     function stepCrew(c, ds) {
-      // 1. movement
-      var moving = false, remaining = 0, startLat = c.lat, startLon = c.lon;
-      if (c.mode === 'walking' || c.mode === 'returning') {
-        remaining = c.walkSpeed * ds;
+      // 1. movement (or time on foot at a stop)
+      var moving = false, working = false, remaining = 0, startLat = c.lat, startLon = c.lon;
+      if (c.run && c.run.phase === 'eva') working = evaStep(c, ds);
+      if (!working && (c.mode === 'walking' || c.mode === 'returning')) {
+        remaining = speedOf(c) * ds;
         var guard = 0;
         while (remaining > 1e-6 && guard++ < 64) {
           if (c.headingWalk && !c.target) {
@@ -1477,9 +1657,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           if (d > 0.01) c.headingDeg = bearing(c, c.target);
           if (d <= remaining) {
             c.lat = c.target.lat; c.lon = c.target.lon; remaining -= d;
+            if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             if (c.path.length) c.target = c.path.shift();
             else if (c.thenReturn && c.mode === 'walking') {   // end of an excursion: head home
-              c.thenReturn = false; c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.mode = 'returning';
+              c.thenReturn = false; c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.mode = 'returning';
             } else {
               c.target = null;
               if (c.mode === 'returning') { c.mode = 'resting'; } else { c.mode = 'idle'; }
@@ -1491,24 +1672,32 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
             remaining = 0;
           }
         }
-        moving = c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01;
+        moving = !working && (c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01);
       }
-      c.speed = moving ? c.walkSpeed : 0;
+      c.speed = moving ? speedOf(c) : 0;
       var dH = ds / 3600;
-      // 2. consumption: standing/resting uses the base rate, walking adds in proportion to speed
-      var effort = moving ? Math.min(c.walkSpeed / C.WALK_MPS, C.EFFORT_CAP) : 0;
+      // 2. consumption. In the pressurised rover (travel 'rover', also while parked) the crew breathes cabin air: no suit oxygen is used,
+      //    the suit battery only idles, effort is zero. On foot (EVA or a manual walk): standing/resting uses the base rate and walking
+      //    adds in proportion to speed (working at a stop counts as EVA_EFFORT).
+      var inRover = c.travel === 'rover' && !working;
+      var effort = inRover ? 0 : working ? C.EVA_EFFORT : moving ? Math.min(speedOf(c) / SPD.foot, C.EFFORT_CAP) : 0;
       var jitter = 1 + (rand() - 0.5) * 0.1;
       var restO2 = c.mode === 'resting' ? C.O2_PER_H.rest * 0.9 : C.O2_PER_H.rest;
       var restBat = c.mode === 'resting' ? C.BAT_PER_H.rest * 0.9 : C.BAT_PER_H.rest;
-      c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
-      c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      if (inRover) {
+        c.o2 = clamp(c.o2 - C.ROVER_O2_PER_H * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - C.ROVER_BAT_PER_H * jitter * dH, 0, 100);
+      } else {
+        c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      }
       // 3. environment at the new position
       var p = xy(c.lat, c.lon);
       c.amb = ambientC(elapsedMs, events.dust);
       c.rad = radiationAt(p[0], p[1]) * (events.solar ? C.SPE_MULT : 1);
       c.dose += c.rad * dH / 1000;   // uSv/h * h = uSv; / 1000 = mSv
       // 4. heart rate: first-order lag towards a target (unless the operator pinned it)
-      var tHr = (c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
+      var tHr = (inRover ? C.HR_ROVER : c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving || working ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
       c.hr += (tHr - c.hr) * (1 - Math.exp(-ds / C.HR_TAU_S));
       c.hrNoise = (rand() - 0.5) * 4;
       // 5. suit temperature: life support holds ~21 C; walking adds heat, a cold exterior leaks a little in; with a dead battery it drifts to ambient
@@ -1539,7 +1728,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (id === 'all' || id === '*') return order.map(function (k) { return crew[k]; });
       return crew[id] ? [crew[id]] : [];
     }
-    function setSpeed(c, mps) { c.walkSpeed = clamp(mps, 0.1, C.MAX_MPS); }
+    function setSpeed(c, mps) { c.speedOverride = clamp(mps, 0.1, C.MAX_MPS); }
+    function setTravel(c, mode) { if (mode !== 'rover' && mode !== 'foot') return false; c.travel = mode; c.speedOverride = null; return true; }
+    function endRun(c) { c.run = null; c.stopId = null; c.taskId = null; }
 
     function command(cmd) {
       if (!cmd || typeof cmd !== 'object') return { ok: false, error: 'no command' };
@@ -1557,7 +1748,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           refreshEnv(); return { ok: true };
         case 'addCrew': return addCrew(cmd);
         case 'removeCrew': return removeCrew(String(cmd.crew || ''));
-        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'set':
+        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'setTravel': case 'runMission': case 'set':
           list = targets(cmd);
           if (!list.length) return { ok: false, error: 'unknown crew ' + cmd.crew };
           break;
@@ -1567,23 +1758,28 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       list.forEach(function (c) {
         if (name === 'walk') {
           var wps = [];
+          if (cmd.travel !== undefined && !setTravel(c, cmd.travel)) { err = 'travel must be rover or foot'; return; }
           if (cmd.to) { var p = pointOf(cmd.to); if (!p) { err = 'bad target'; return; } wps.push(p); }
           if (Array.isArray(cmd.path)) {   // optional extension: further waypoints, visited in order
             for (var i = 0; i < cmd.path.length && i < 64; i++) { var q = pointOf(cmd.path[i]); if (!q) { err = 'bad path point ' + i; return; } wps.push(q); }
           }
           if (cmd.speed !== undefined && isFinite(Number(cmd.speed))) setSpeed(c, Number(cmd.speed));
-          if (wps.length) { c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
-          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
+          if (wps.length) { endRun(c); c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
+          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { endRun(c); c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
           else err = 'walk needs to {lat,lon}, path or heading';
         } else if (name === 'stop') {
-          c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
+          endRun(c); c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
         } else if (name === 'return') {
-          c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.path = []; c.headingWalk = false; c.thenReturn = false;
+          endRun(c); c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.headingWalk = false; c.thenReturn = false;
           if (distM(c, c.target) < 1) { c.target = null; c.mode = 'resting'; } else c.mode = 'returning';
         } else if (name === 'setSpeed') {
           var m = Number(cmd.mps);
           if (!isFinite(m) || m <= 0) { err = 'mps must be positive'; return; }
           setSpeed(c, m);
+        } else if (name === 'setTravel') {
+          if (!setTravel(c, cmd.mode)) err = 'mode must be rover or foot';
+        } else if (name === 'runMission') {
+          err = startRun(c, cmd.speed);
         } else if (name === 'set') {
           err = setField(c, String(cmd.field || ''), cmd.value);
         }
@@ -1595,7 +1791,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       if (C.FIELDS.indexOf(field) < 0) return 'cannot set ' + field;
       if (field === 'mode') {
         if (['idle', 'resting'].indexOf(value) < 0) return 'mode can be set to idle or resting';
-        c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
+        endRun(c); c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
       }
       if (field === 'hr' && (value === null || value === 'auto')) { c.hrOverride = null; return null; }
       var v = Number(value);
@@ -1604,10 +1800,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       else if (field === 'batPct') c.bat = clamp(v, 0, 100);
       else if (field === 'hr') { c.hrOverride = clamp(v, 0, 250); c.hr = c.hrOverride; }
       else if (field === 'suitTempC') c.suitT = clamp(v, -120, 80);
-      else if (field === 'doseMsv') c.dose = Math.max(0, v);
+      else if (field === 'doseMsv') c.dose = clamp(v, 0, 1e5);
       else if (field === 'headingDeg') c.headingDeg = norm360(v);
       else if (field === 'lat') { if (Math.abs(v) > 90) return 'lat out of range'; c.lat = v; }
-      else if (field === 'lon') c.lon = v;
+      else if (field === 'lon') c.lon = ((v + 180) % 360 + 360) % 360 - 180;   // wrapped into [-180, 180)
       return null;
     }
 
@@ -1620,13 +1816,16 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         hr: Math.round(c.hrOverride !== null ? c.hrOverride + c.hrNoise * 0.5 : c.hr + c.hrNoise),
         suitTempC: round(c.suitT, 1), ambientTempC: round(c.amb, 1), radUsvH: round(c.rad, 2), doseMsv: round(c.dose, 4),
         mode: c.mode, speedMps: round(c.speed, 2),
-        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null
+        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null,
+        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: { done: c.tasksDone, total: info.tasks.length },
+        distM: c.target ? round(distM(c, c.target), 1) : null,
+        etaS: c.run && c.run.phase === 'eva' ? Math.max(0, Math.round(c.run.evaTotal - c.run.evaT)) : c.target && speedOf(c) > 0 ? Math.round(distM(c, c.target) / speedOf(c)) : null
       };
     }
     function world() {
       var out = {};
       order.forEach(function (id) { out[id] = record(crew[id]); });
-      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: C.BASE.lat, lon: C.BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
+      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: BASE.lat, lon: BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
     }
 
     /* Continue from a world snapshot (used by world-client when the authority disappears). Unknown crew are added. */
@@ -1643,8 +1842,10 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         c.lat = num(r.lat, c.lat); c.lon = num(r.lon, c.lon); c.headingDeg = num(r.headingDeg, 0);
         c.o2 = clamp(num(r.o2Pct, 100), 0, 100); c.bat = clamp(num(r.batPct, 100), 0, 100); c.hr = num(r.hr, c.hr);
         c.suitT = num(r.suitTempC, c.suitT); c.dose = Math.max(0, num(r.doseMsv, 0)); c.speed = 0;
+        c.travel = r.travel === 'rover' ? 'rover' : 'foot'; c.run = null; c.stopId = null; c.taskId = null;   // a mission run in progress is not part of the world: it stops at its current target
+        c.tasksDone = r.progress && isFinite(Number(r.progress.done)) ? Math.max(0, Number(r.progress.done)) : 0;
         c.mode = ['idle', 'walking', 'returning', 'resting'].indexOf(r.mode) >= 0 ? r.mode : 'idle';
-        c.walkSpeed = clamp(num(r.speedMps, 0) || c.walkSpeed, 0.1, C.MAX_MPS);
+        var sp = num(r.speedMps, 0); c.speedOverride = sp > 0 && Math.abs(sp - SPD[c.travel]) > 0.01 ? clamp(sp, 0.1, C.MAX_MPS) : null;
         c.target = pointOf(r.target); c.path = [];
         if (!c.target && (c.mode === 'walking' || c.mode === 'returning')) c.mode = 'idle';
       });
@@ -1654,11 +1855,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
     reset();
     return { tick: tick, world: world, command: command, reset: reset, load: load, addCrew: addCrew, removeCrew: removeCrew,
-             crewIds: function () { return order.slice(); }, clockSpeed: function () { return clock; } };
+             crewIds: function () { return order.slice(); }, mission: function () { return info; }, speeds: function () { return { rover: SPD.rover, foot: SPD.foot }; }, clockSpeed: function () { return clock; } };
   }
 
   var api = {
-    create: create, C: C, PLACES: PLACES, demoPath: demoPath, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
+    create: create, C: C, missionInfo: missionInfo, speeds: speeds, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
     localHour: localHour, localMarsTime: localMarsTime, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -1676,7 +1877,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   var STALE_MS = 4000, LOCAL_TICK_MS = 200;
   var DEFAULT_CREW = [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }];
 
-  var listeners = [], world = null, lastAuthMs = 0, source = 'local';
+  var listeners = [], world = null, authWorld = null, lastAuthMs = 0, source = 'local';
   var local = null, localTimer = null, lastLocalMs = 0, meOverride = null, offState = null, offLink = null, lastLinkRoom = null;
 
   function emit() {
@@ -1699,11 +1900,24 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
 
   /* ---- local fallback ---- */
+  function inRoom() {
+    var L = root.JdaLink, r = L && L.room;
+    return !!(r && !r.implicit && r.code !== 'LOCAL' && r.role !== 'legacy');
+  }
+  /* Crew simulated by the local fallback. Stand-alone (no room): this page's crew plus the two default crew members.
+     In a joined room: only this page's crew plus crew that really exist there (the last real world, presence); no invented teammates. */
   function localCrewList() {
     var id = meId(), list = [];
     var mine = DEFAULT_CREW.filter(function (c) { return c.id === id; })[0] || { id: id, name: id.charAt(0).toUpperCase() + id.slice(1) };
     list.push(mine);
-    DEFAULT_CREW.forEach(function (c) { if (c.id !== mine.id) list.push(c); });
+    function add(cid, name) {
+      cid = String(cid || '').toLowerCase();
+      if (!cid || list.some(function (c) { return c.id === cid; })) return;
+      list.push({ id: cid, name: name || cid.charAt(0).toUpperCase() + cid.slice(1) });
+    }
+    if (!inRoom()) { DEFAULT_CREW.forEach(function (c) { add(c.id, c.name); }); return list; }
+    if (authWorld && authWorld.crew) Object.keys(authWorld.crew).forEach(function (k) { add(k, authWorld.crew[k] && authWorld.crew[k].name); });
+    try { ((root.JdaLink.presence && root.JdaLink.presence()) || []).forEach(function (p) { if (p && ['crew', 'helmet', 'tablet'].indexOf(p.role) >= 0) add(p.id, p.name); }); } catch (e) { /* no presence */ }
     return list;
   }
   function startLocal() {
@@ -1730,7 +1944,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
   function onWorldState(value) {
     if (!validWorld(value)) return;
-    world = value;
+    world = value; authWorld = value;
     if (value.stale) {   // the authority announced it is going away: fall back at once, continuing from this world
       lastAuthMs = 0; source = 'local';
       if (localTimer) stopLocal();
@@ -1747,6 +1961,8 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var L = root.JdaLink;
     if (L && L.room && lastLinkRoom !== L.room.code && typeof L.onState === 'function') {
       lastLinkRoom = L.room.code;
+      world = null; if (localTimer) stopLocal();   // a fallback started before joining simulated the stand-alone crew: restart it for this room
+      authWorld = null;
       if (offState) { try { offState(); } catch (e) { /* ignore */ } }
       offState = L.onState('world', function (v) { onWorldState(v); });
       if (L.getState) { var cur = L.getState('world'); if (cur && cur.value) onWorldState(cur.value); }
@@ -1768,6 +1984,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     time: function () { return world ? new Date(world.t) : new Date(); },
     world: function () { return world; },
     id: meId,
+    _localCrewList: localCrewList,   // for tests
     setMe: function (id) {
       meOverride = id ? String(id).toLowerCase() : null;
       if (local && meOverride && local.crewIds().indexOf(meOverride) < 0) local.addCrew({ id: meOverride, name: meOverride.charAt(0).toUpperCase() + meOverride.slice(1) });
@@ -1788,7 +2005,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     command: function (cmd) {
       if (!cmd) return { ok: false, error: 'no command' };
       if (source === 'authority' && root.JdaLink && root.JdaLink.send) {
-        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed });
+        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed, travel: cmd.travel, mode: cmd.mode, thenReturn: cmd.thenReturn });
         return { ok: true, sent: true };
       }
       if (local) { var c = {}; for (var k in cmd) c[k] = cmd[k]; if (!c.crew) c.crew = meId(); return local.command(c); }
@@ -1803,544 +2020,156 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 window.JEZERO_MISSION = {
  "objectives": [
   {
-   "id": "objective-1",
-   "title": "Objective 1",
-   "text": "Find evidence of ancient microbial life."
+   "id": 1,
+   "title": "Find evidence of ancient microbial life",
+   "short": "Microbial life"
   },
   {
-   "id": "objective-2",
-   "title": "Objective 2",
-   "text": "Assess whether the site can sustain life."
+   "id": 2,
+   "title": "Assess whether the site can sustain human life",
+   "short": "Sustaining human life"
   }
  ],
+ "base": {
+  "id": "base",
+  "name": "Base camp",
+  "lat": 18.447,
+  "lon": 77.408,
+  "x": 1872.9,
+  "y": 1334.0
+ },
  "stops": [
   {
-   "id": "sample-1",
-   "no": 1,
-   "name": "Roubion",
-   "kind": "sample",
-   "area": "Polygon Valley",
-   "description": "Atmospheric sample. Target: Roubion.",
-   "sol": 164,
-   "date": "6 Aug 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-1",
+   "n": 1,
+   "name": "Three Forks sample depot",
+   "lat": 18.4525,
+   "lon": 77.4015,
+   "x": 1807.0,
+   "y": 1275.3,
+   "description": "Level ground close to the foot of the delta where the 10 sample tubes were left."
   },
   {
-   "id": "sample-2",
-   "no": 2,
-   "name": "Montdenier",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 194,
-   "date": "6 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-2",
+   "n": 2,
+   "name": "Delta front mudstone",
+   "lat": 18.458,
+   "lon": 77.397,
+   "x": 1761.4,
+   "y": 1216.5,
+   "description": "Fine-grained layers at the front of the delta, laid down in still water."
   },
   {
-   "id": "sample-3",
-   "no": 3,
-   "name": "Montagnac",
-   "kind": "sample",
-   "area": "Artuby Ridge",
-   "description": "Igneous sample. Target: Rochette.",
-   "sol": 196,
-   "date": "8 Sep 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-3",
+   "n": 3,
+   "name": "Delta top boulders",
+   "lat": 18.48,
+   "lon": 77.385,
+   "x": 1639.8,
+   "y": 981.5,
+   "description": "Boulders on top of the delta that the river carried in."
   },
   {
-   "id": "sample-4",
-   "no": 4,
-   "name": "Salette",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 262,
-   "date": "15 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-4",
+   "n": 4,
+   "name": "Western delta clay beds",
+   "lat": 18.502,
+   "lon": 77.369,
+   "x": 1477.7,
+   "y": 746.5,
+   "description": "Clay-rich beds in the western part of the delta."
   },
   {
-   "id": "sample-5",
-   "no": 5,
-   "name": "Coulettes",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Brac.",
-   "sol": 271,
-   "date": "24 Nov 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "stop-5",
+   "n": 5,
+   "name": "Western Breach and Bright Angel",
+   "lat": 18.493,
+   "lon": 77.293,
+   "x": 707.5,
+   "y": 842.6,
+   "description": "The ravine where the river entered the crater, near the Bright Angel outcrops and the Cheyava Falls find."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "task-1-1",
+   "stopId": "stop-1",
+   "objective": 1,
+   "title": "Recover the sample tubes",
+   "description": "Recover the 10 sample tubes: photograph, check seal, log, stow.",
+   "estMin": 45
   },
   {
-   "id": "sample-6",
-   "no": 6,
-   "name": "Robine",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 298,
-   "date": "22 Dec 2021",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-1-2",
+   "stopId": "stop-1",
+   "objective": 2,
+   "title": "Check ground and shelter at the depot",
+   "description": "Check how firm and how level the ground is around the depot, and note rock overhangs or hollows that could shelter people from radiation.",
+   "estMin": 25
   },
   {
-   "id": "sample-7",
-   "no": 7,
-   "name": "Malay",
-   "kind": "sample",
-   "area": "South Séítah",
-   "description": "Igneous sample. Target: Issole.",
-   "sol": 337,
-   "date": "31 Jan 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-1",
+   "stopId": "stop-2",
+   "objective": 1,
+   "title": "Sample the finest mud layers",
+   "description": "Find the finest mud layers, look for colour spots or rings, sample below the surface.",
+   "estMin": 60
   },
   {
-   "id": "sample-8",
-   "no": 8,
-   "name": "Ha'ahóni",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 371,
-   "date": "7 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-2-2",
+   "stopId": "stop-2",
+   "objective": 2,
+   "title": "Look for water-bearing minerals in the mudstone",
+   "description": "Check the mudstone for minerals that hold water, as a possible water source, and log whether the slope is stable enough to walk on.",
+   "estMin": 30
   },
   {
-   "id": "sample-9",
-   "no": 9,
-   "name": "Atsá",
-   "kind": "sample",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Igneous sample. Target: Sid.",
-   "sol": 377,
-   "date": "13 Mar 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-1",
+   "stopId": "stop-3",
+   "objective": 1,
+   "title": "Photograph and sample the boulders",
+   "description": "Photograph and sample boulders the river carried in.",
+   "estMin": 40
   },
   {
-   "id": "sample-10",
-   "no": 10,
-   "name": "Swift Run",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 490,
-   "date": "7 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-3-2",
+   "stopId": "stop-3",
+   "objective": 2,
+   "title": "Judge boulder spacing for safe ground",
+   "description": "Measure the size and spacing of the boulders to judge where the rover can drive safely and where a shelter could be placed.",
+   "estMin": 30
   },
   {
-   "id": "sample-11",
-   "no": 11,
-   "name": "Skyland",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Skinner Ridge.",
-   "sol": 495,
-   "date": "12 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-1",
+   "stopId": "stop-4",
+   "objective": 1,
+   "title": "Sample one intact clay layer",
+   "description": "Photograph the layering and sample one intact clay layer; seal and log it.",
+   "estMin": 45
   },
   {
-   "id": "sample-12",
-   "no": 12,
-   "name": "Hazeltop",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 509,
-   "date": "27 Jul 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-4-2",
+   "stopId": "stop-4",
+   "objective": 2,
+   "title": "Test how much water the clay holds",
+   "description": "Test how much water the clay holds, as a possible water source for the crew.",
+   "estMin": 40
   },
   {
-   "id": "sample-13",
-   "no": 13,
-   "name": "Bearwallow",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Wildcat Ridge.",
-   "sol": 516,
-   "date": "3 Aug 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-1",
+   "stopId": "stop-5",
+   "objective": 1,
+   "title": "Photograph the ravine walls and sample the channel floor",
+   "description": "Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find.",
+   "estMin": 60
   },
   {
-   "id": "sample-14",
-   "no": 14,
-   "name": "Shuyak",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 575,
-   "date": "2 Oct 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-15",
-   "no": 15,
-   "name": "Mageik",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Amalik.",
-   "sol": 619,
-   "date": "16 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-16",
-   "no": 16,
-   "name": "Kukaklek",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Sedimentary sample. Target: Hidden Harbor.",
-   "sol": 631,
-   "date": "29 Nov 2022",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-17",
-   "no": 17,
-   "name": "Atmo Mountain",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 634,
-   "date": "2 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-18",
-   "no": 18,
-   "name": "Crosswind Lake",
-   "kind": "sample",
-   "area": "Delta Front",
-   "description": "Regolith sample. Target: Observation Mountain.",
-   "sol": 639,
-   "date": "7 Dec 2022",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-19",
-   "no": 19,
-   "name": "Melyn",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Berea.",
-   "sol": 749,
-   "date": "30 Mar 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-20",
-   "no": 20,
-   "name": "Otis Peak",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Emerald Lake.",
-   "sol": 832,
-   "date": "23 Jun 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-21",
-   "no": 21,
-   "name": "Pilot Mountain",
-   "kind": "sample",
-   "area": "Upper Fan",
-   "description": "Sedimentary sample. Target: Dream Lake.",
-   "sol": 913,
-   "date": "15 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-22",
-   "no": 22,
-   "name": "Pelican Point",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Hans Amundsen Memorial Workspace.",
-   "sol": 923,
-   "date": "25 Sep 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-23",
-   "no": 23,
-   "name": "Lefroy Bay",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Sedimentary sample. Target: Turquoise Bay.",
-   "sol": 949,
-   "date": "21 Oct 2023",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-24",
-   "no": 24,
-   "name": "Comet Geyser",
-   "kind": "sample",
-   "area": "Margin Unit",
-   "description": "Silica-cemented carbonate sample. Target: Bunsen Peak.",
-   "sol": 1088,
-   "date": "12 Mar 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-25",
-   "no": 25,
-   "name": "Sapphire Canyon",
-   "kind": "sample",
-   "area": "Neretva Vallis",
-   "description": "Sedimentary sample. Target: Cheyava Falls.",
-   "sol": 1215,
-   "date": "21 Jul 2024",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-26",
-   "no": 26,
-   "name": "Silver Mountain",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Shallow Bay.",
-   "sol": 1401,
-   "date": "28 Jan 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-27",
-   "no": 27,
-   "name": "Green Gardens",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Serpentinite sample. Target: Tablelands.",
-   "sol": 1433,
-   "date": "2 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "sample-28",
-   "no": 28,
-   "name": "Main River",
-   "kind": "sample",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Igneous / impactite sample. Target: Broom Point.",
-   "sol": 1441,
-   "date": "10 Mar 2025",
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-landing",
-   "no": 29,
-   "name": "Octavia E. Butler Landing",
-   "kind": "place",
-   "area": "Octavia E. Butler Landing / Ch'ał outcrop",
-   "description": "Landing site of Perseverance, 18 February 2021.",
-   "sol": 0,
-   "date": "18 Feb 2021",
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": 18.4446,
-   "lon": 77.4509
-  },
-  {
-   "id": "place-hawksbill-gap",
-   "no": 30,
-   "name": "Hawksbill Gap",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Gap in the delta front that the rover climbed in 2022 to reach the top of the delta. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-three-forks",
-   "no": 31,
-   "name": "Three Forks",
-   "kind": "place",
-   "area": "Delta Front",
-   "description": "Staging area where three route options to the delta merge, used to start the Delta Front campaign. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-neretva-vallis",
-   "no": 32,
-   "name": "Neretva Vallis",
-   "kind": "place",
-   "area": "Neretva Vallis",
-   "description": "Ancient river channel that fed the delta from the west. Cheyava Falls, the sample 25 target, lies along it.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-1",
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-witch-hazel-hill",
-   "no": 33,
-   "name": "Witch Hazel Hill",
-   "kind": "place",
-   "area": "Crater Rim (Witch Hazel Hill)",
-   "description": "Stop on the crater rim, where serpentinite and impact-related rocks were sampled in 2025. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
-  },
-  {
-   "id": "place-seitah",
-   "no": 34,
-   "name": "Séítah",
-   "kind": "place",
-   "area": "Séítah",
-   "description": "Crater-floor unit of igneous rock sampled in 2021 and early 2022. Position approximate.",
-   "sol": null,
-   "date": null,
-   "objectives": [
-    "objective-2"
-   ],
-   "lat": null,
-   "lon": null
+   "id": "task-5-2",
+   "stopId": "stop-5",
+   "objective": 2,
+   "title": "Check shelter and safe passage in the ravine",
+   "description": "Record how well the ravine walls shelter people from radiation and wind, and check whether the channel floor is safe to cross.",
+   "estMin": 30
   }
  ]
 };
@@ -2348,7 +2177,7 @@ window.JEZERO_MISSION = {
 </script>
 <script>
 /* Reference data for the tablet global map (web/js/tablet.js).
-   Landing sites: published lat / lon of the mission landing points (planetographic latitude, east-positive longitude).
+   Landing sites of OTHER missions (context only, unrelated to the crew's five stops): published lat / lon of the mission landing points (planetographic latitude, east-positive longitude).
    Map image: web/images/mars-global.jpg, equirectangular, -180..+180 E, 90 N at the top (see docs/IMAGE-CREDITS.md). */
 window.MARS_SITES = {
   radiusKm: 3389.5,
@@ -2374,57 +2203,19 @@ window.MARS_SITES = {
     { id: 'insight', name: 'InSight', lat: 4.5, lon: 135.62 },
     { id: 'perseverance', name: 'Perseverance', lat: 18.4446, lon: 77.4509 }
   ],
-  /* Jezero crater region used when a mission task is selected */
-  jezero: { lat: 18.485, lon: 77.355, ppd: 2800 },
-  /* lat, lon of the stops in docs/mission-guide.md (landing exact; the others are positions drawn on the detailed Jezero map, approximate) */
-  stopPos: {
-    "sample-1": [18.426, 77.4607],
-    "sample-2": [18.3998, 77.4325],
-    "sample-3": [18.3877, 77.4346],
-    "sample-4": [18.4029, 77.4078],
-    "sample-5": [18.4061, 77.396],
-    "sample-6": [18.3983, 77.4096],
-    "sample-7": [18.4118, 77.3959],
-    "sample-8": [18.4491, 77.4506],
-    "sample-9": [18.4381, 77.4558],
-    "sample-10": [18.4642, 77.4271],
-    "sample-11": [18.464, 77.4149],
-    "sample-12": [18.4603, 77.4301],
-    "sample-13": [18.4694, 77.4132],
-    "sample-14": [18.454, 77.4298],
-    "sample-15": [18.476, 77.4158],
-    "sample-16": [18.4478, 77.4248],
-    "sample-17": [18.4809, 77.4231],
-    "sample-18": [18.445, 77.4156],
-    "sample-19": [18.5167, 77.3419],
-    "sample-20": [18.5219, 77.3529],
-    "sample-21": [18.519, 77.3375],
-    "sample-22": [18.4159, 77.2939],
-    "sample-23": [18.4091, 77.2837],
-    "sample-24": [18.4142, 77.2985],
-    "sample-25": [18.556, 77.2479],
-    "sample-26": [18.3919, 77.2548],
-    "sample-27": [18.3886, 77.2666],
-    "sample-28": [18.3965, 77.253],
-    "place-landing": [18.4446, 77.4509],
-    "place-hawksbill-gap": [18.4785, 77.399],
-    "place-three-forks": [18.4468, 77.4278],
-    "place-neretva-vallis": [18.5847, 77.2513],
-    "place-witch-hazel-hill": [18.3965, 77.2601],
-    "place-seitah": [18.4071, 77.4131]
-  }
+  /* Fallback view of the Jezero CTX tile (centre of the mosaic); the tablet fits the view to base camp and the stops from JEZERO_MISSION */
+  jezero: { lat: 18.5068, lon: 77.3214, ppd: 2800 }
 };
 
 </script>
 <script>
-/* Astronaut tablet: global Mars map, BASE / YOU pins, mission task pop-up, Add Location, distance, SOS.
+/* Astronaut tablet: global Mars map, BASE (base camp) / YOU pins, five numbered stops with the route, mission task pop-up, Add Location, distance, SOS.
    Needs data/mars-sites.js and data/mission-data.js. Uses JdaLink, JdaLinkUI and JdaWorld when present (all guarded). */
 (function () {
   'use strict';
-  var SITES = window.MARS_SITES, MD = window.JEZERO_MISSION || { objectives: [], stops: [] };
+  var SITES = window.MARS_SITES, MD = window.JEZERO_MISSION || { objectives: [], stops: [], tasks: [], base: null };
   if (!SITES) { if (window.console) console.error('tablet.js needs data/mars-sites.js'); return; }
-  var RK = SITES.radiusKm, D2R = Math.PI / 180, MAX_PPD = 9000, JZ_PPD_MIN = 700;
-  var LANDING = { lat: 18.4446, lon: 77.4509 };
+  var RK = SITES.radiusKm, D2R = Math.PI / 180, MAX_PPD = 9000, JZ_PPD_MIN = 400;
 
   function $(id) { return document.getElementById(id); }
   function el(tag, props, kids) {
@@ -2442,7 +2233,7 @@ window.MARS_SITES = {
   function lsGet(k, f) { try { var v = localStorage.getItem('jda.' + k); return v == null ? f : JSON.parse(v); } catch (e) { return f; } }
   function lsSet(k, v) { try { localStorage.setItem('jda.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
   function link() { return window.JdaLink || null; }
-  function normLon(l) { l = ((l + 180) % 360 + 360) % 360 - 180; return l; }
+  function normLon(l) { l = ((l + 180) % 360 + 360) % 360 - 180; l = Math.round(l * 1e6) / 1e6; return l === 0 ? 0 : l; }   // rounded so 77.4 stays 77.4 (no 77.39999999999998), never -0
 
   /* ---------- identity and world ---------- */
   var lastWorld = null;
@@ -2451,10 +2242,11 @@ window.MARS_SITES = {
   function crewId() { var l = link(), r = l && l.room, m = me(); return (isJoined() && r.id) || (m && m.id) || 'crew'; }
   function crewName() { var l = link(), r = l && l.room, m = me(); return (m && m.name) || (isJoined() && r.name) || crewId(); }
   function baseLL() {
+    if (MD.base && isFinite(MD.base.lat) && isFinite(MD.base.lon)) return { lat: +MD.base.lat, lon: +MD.base.lon };
     var w = lastWorld;
     if (!w && link() && link().getState) { try { var s = link().getState('world'); w = s && s.value; } catch (e) { /* ignore */ } }
     if (w && w.base && isFinite(w.base.lat) && isFinite(w.base.lon)) return { lat: +w.base.lat, lon: +w.base.lon };
-    return LANDING;
+    return MD.base && isFinite(MD.base.lat) ? { lat: +MD.base.lat, lon: +MD.base.lon } : { lat: SITES.jezero.lat, lon: SITES.jezero.lon };
   }
   function youLL() {
     var m = me();
@@ -2468,8 +2260,9 @@ window.MARS_SITES = {
     var s = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
     return 2 * RK * Math.asin(Math.min(1, Math.sqrt(s)));
   }
-  function fmtLat(v) { return Math.abs(v).toFixed(4) + ' ' + (v >= 0 ? 'N' : 'S'); }
-  function fmtLon(v) { v = normLon(v); return Math.abs(v).toFixed(4) + ' ' + (v >= 0 ? 'E' : 'W'); }
+  function fmtDeg(v, pos, neg) { var r = Math.abs(v).toFixed(4); return r + ' ' + (v < 0 && Number(r) !== 0 ? neg : pos); }   // a value that rounds to zero is never shown as S or W
+  function fmtLat(v) { return fmtDeg(v, 'N', 'S'); }
+  function fmtLon(v) { return fmtDeg(normLon(v), 'E', 'W'); }
 
   /* ---------- map view ---------- */
   var map = $('map'), cv = $('cv'), pinsEl = $('pins'), screen = $('screen'), ctx = cv.getContext('2d');
@@ -2521,6 +2314,7 @@ window.MARS_SITES = {
       var cx0 = W / 2 + (CTX.lon0 - view.lon) * view.ppd, cy0 = H / 2 - (CTX.lat1 - view.lat) * view.ppd, cw = (CTX.lon1 - CTX.lon0) * view.ppd, ch = (CTX.lat1 - CTX.lat0) * view.ppd;
       if (cx0 < W && cy0 < H && cx0 + cw > 0 && cy0 + ch > 0) { ctx.globalAlpha = cA; ctx.drawImage(cimg, cx0, cy0, cw, ch); ctx.globalAlpha = 1; }
     }
+    drawRoute();
     // graticule
     var raw = 120 / view.ppd, step = STEPS[0], i;
     for (i = 0; i < STEPS.length; i++) if (STEPS[i] >= raw) step = STEPS[i];
@@ -2539,6 +2333,33 @@ window.MARS_SITES = {
     ctx.shadowBlur = 0;
     placePins();
     updateNote();
+  }
+
+  /* dashed route: base camp -> stops 1..5 -> base camp, from JEZERO_MISSION */
+  function routePts() {
+    var pts = [], b = MD.base;
+    if (!b || !isFinite(b.lat) || !(MD.stops || []).length) return pts;
+    pts.push(b); (MD.stops || []).forEach(function (s) { if (isFinite(s.lat) && isFinite(s.lon)) pts.push(s); }); pts.push(b);
+    return pts;
+  }
+  function drawRoute() {
+    if (view.ppd < 150) return;
+    var pts = routePts(); if (pts.length < 3) return;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash([9, 7]);
+    [['#000', 5], ['#ffd23f', 2.5]].forEach(function (st) {
+      ctx.strokeStyle = st[0]; ctx.lineWidth = st[1]; ctx.beginPath();
+      pts.forEach(function (q, i) { var p = project(q.lon, q.lat); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+  /* view that shows base camp and all five stops inside the free part of the screen */
+  function jezeroView() {
+    var pts = routePts(), j = SITES.jezero; if (!pts.length) return { lat: j.lat, lon: j.lon, ppd: j.ppd };
+    var la = pts.map(function (q) { return q.lat; }), lo = pts.map(function (q) { return q.lon; });
+    var la0 = Math.min.apply(null, la), la1 = Math.max.apply(null, la), lo0 = Math.min.apply(null, lo), lo1 = Math.max.apply(null, lo);
+    var a = bestFree() || { w: W, h: H }, ppd = Math.min(MAX_PPD, Math.max(JZ_PPD_MIN, Math.min((a.w - 320) / Math.max(1e-6, lo1 - lo0), (a.h - 300) / Math.max(1e-6, la1 - la0))));
+    return { lat: (la0 + la1) / 2, lon: (lo0 + lo1) / 2, ppd: ppd };
   }
 
   function animateTo(t, ms) {
@@ -2624,7 +2445,7 @@ window.MARS_SITES = {
     return { lon: lon - (cx - W / 2) / ppd, lat: lat + (cy - H / 2) / ppd, ppd: ppd };
   }
   function goGlobal() { var hv = homeView(); animateTo(hv, 450); }
-  function goJezero() { var j = SITES.jezero; animateTo(viewCenteredOn(j.lat, j.lon, j.ppd, bestFree()), 600); }
+  function goJezero() { var j = jezeroView(); animateTo(viewCenteredOn(j.lat, j.lon, j.ppd, bestFree()), 600); }
   function goMe() { var y = youLL(); animateTo(viewCenteredOn(y.lat, y.lon, Math.max(view.ppd, 300), bestFree()), 500); }
   $('v-global').addEventListener('click', goGlobal);
   $('v-jezero').addEventListener('click', goJezero);
@@ -2639,18 +2460,33 @@ window.MARS_SITES = {
 
   /* ---------- tasks ---------- */
   var tasks = [], byId = {}, doneMap = {}, ownTasks = [], locs = [], sel = null, chosen = null, boundCrew = null;
-  function isDone(t) { return Object.prototype.hasOwnProperty.call(doneMap, t.id) ? !!doneMap[t.id] : !!t.seedDone; }
+  var stopList = [], mtasks = [], groupBy = lsGet('tablet.group', 'stop') === 'objective' ? 'objective' : 'stop';
+  function objShort(n) { var o = (MD.objectives || []).filter(function (x) { return x.id === n; })[0]; return o ? (o.short || o.title) : 'Objective ' + n; }
+  /* what the shared world says is already done (by the crew's current task or its progress count); a manual check always wins */
+  function worldDoneSet() {
+    var m = me(), set = {}; if (!m) return set;
+    var idx = -1, i;
+    if (m.taskId) for (i = 0; i < mtasks.length; i++) if (mtasks[i].id === m.taskId) idx = i;
+    var n = idx >= 0 ? idx : (m.progress && isFinite(m.progress.done) ? Math.max(0, Math.min(mtasks.length, +m.progress.done)) : 0);
+    for (i = 0; i < n; i++) set[mtasks[i].id] = true;
+    return set;
+  }
+  var wDone = {};
+  function isDone(t) {
+    if (Object.prototype.hasOwnProperty.call(doneMap, t.id)) return !!doneMap[t.id];
+    return t.kind === 'mtask' ? !!wDone[t.id] : !!t.seedDone;
+  }
   function buildTasks() {
-    var out = [], sp = SITES.stopPos || {};
-    (MD.objectives || []).forEach(function (o) {
-      out.push({ id: o.id, title: o.title + ': ' + o.text, sub: 'Mission objective', kind: 'objective', desc: o.text, lat: null, lon: null });
+    var out = [];
+    stopList = (MD.stops || []).filter(function (s) { return s && isFinite(s.lat) && isFinite(s.lon); }).map(function (s) {
+      return { id: s.id, kind: 'stop', no: s.n, name: s.name, title: s.name, sub: 'Stop ' + s.n, desc: s.description || '', lat: +s.lat, lon: +s.lon };
     });
-    (MD.stops || []).forEach(function (s) {
-      var p = sp[s.id] || (isFinite(s.lat) && s.lat != null ? [s.lat, s.lon] : null);
-      var bits = [s.area]; if (s.sol != null) bits.push('Sol ' + s.sol); if (s.date) bits.push(s.date);
-      out.push({ id: s.id, no: s.no, title: s.kind === 'sample' ? 'Sample ' + s.no + ' - ' + s.name : s.name, sub: bits.join(' - '), kind: 'stop',
-        desc: s.description, lat: p ? p[0] : null, lon: p ? p[1] : null, approx: s.id !== 'place-landing' });
+    var stopBy = {}; stopList.forEach(function (s) { stopBy[s.id] = s; });
+    mtasks = (MD.tasks || []).filter(function (t) { return t && stopBy[t.stopId]; }).map(function (t) {
+      var st = stopBy[t.stopId];
+      return { id: t.id, kind: 'mtask', stop: st, stopId: t.stopId, obj: t.objective, tag: objShort(t.objective), title: t.title, desc: t.description || '', estMin: t.estMin, lat: st.lat, lon: st.lon };
     });
+    wDone = worldDoneSet();
     ownTasks.forEach(function (c) {
       out.push({ id: c.id, title: c.title, sub: 'My task', kind: 'task', desc: '', lat: c.lat == null ? null : c.lat, lon: c.lon == null ? null : c.lon, own: true });
     });
@@ -2659,7 +2495,7 @@ window.MARS_SITES = {
       if (t && typeof t.title === 'string' && t.title && t.id != null) out.push({ id: 'todo-' + String(t.id).slice(0, 40), title: t.title.slice(0, 80), sub: 'Planner to-do',
         kind: 'task', desc: typeof t.description === 'string' ? t.description.slice(0, 300) : '', lat: null, lon: null, seedDone: !!t.done });
     });
-    tasks = out; byId = {}; out.forEach(function (t) { byId[t.id] = t; });
+    tasks = out; byId = {}; stopList.concat(mtasks, out).forEach(function (t) { byId[t.id] = t; });
     if (sel && !byId[sel.id]) sel = null; else if (sel) sel = byId[sel.id];
   }
   function loadCrewData() {
@@ -2669,72 +2505,105 @@ window.MARS_SITES = {
     var l = lsGet('tablet.locs.' + c, []); locs = Array.isArray(l) ? l.filter(function (x) { return x && isFinite(x.lat) && isFinite(x.lon) && typeof x.name === 'string'; }) : [];
     buildTasks();
   }
-  function progress() { var d = 0; tasks.forEach(function (t) { if (isDone(t)) d++; }); return { done: d, total: tasks.length }; }
+  function progress() { var d = 0; mtasks.forEach(function (t) { if (isDone(t)) d++; }); return { done: d, total: mtasks.length }; }
   function updateProgress() {
     var p = progress(), pct = p.total ? Math.round(p.done / p.total * 100) : 0;
     $('bar-fill').style.width = pct + '%'; $('bar-txt').textContent = 'MISSION PROGRESS ' + p.done + ' / ' + p.total;
     var b = $('bar'); b.setAttribute('aria-valuenow', String(pct)); b.setAttribute('aria-valuetext', p.done + ' of ' + p.total + ' tasks done');
     $('pop-cnt').textContent = p.done + ' of ' + p.total + ' done';
   }
+  function refreshWorldDone() {
+    var n = worldDoneSet(), ch = Object.keys(n).length !== Object.keys(wDone).length;
+    if (!ch) return; wDone = n; updateProgress(); mtasks.forEach(refreshRow); refreshStopDots(); publish();
+  }
   var pubT = null;
   function publish() {
     clearTimeout(pubT);
     pubT = setTimeout(function () {
       var l = link(); if (!isJoined() || !l.setState) return;
-      var next = null, order = tasks.filter(function (t) { return t.kind === 'stop' || t.kind === 'task'; }).concat(tasks.filter(function (t) { return t.kind === 'objective'; }));
-      for (var i = 0; i < order.length; i++) if (!isDone(order[i])) { next = { title: order[i].title.slice(0, 80), startISO: null, kind: order[i].kind }; break; }
+      var next = null;
+      for (var i = 0; i < mtasks.length; i++) if (!isDone(mtasks[i])) {
+        var t = mtasks[i]; next = { title: t.title.slice(0, 80), startISO: null, kind: 'task', taskId: t.id, stopId: t.stopId, stopName: t.stop.name.slice(0, 60), objective: t.obj, estMin: t.estMin == null ? null : t.estMin }; break;
+      }
       try {
-        l.setState('tasks:' + crewId(), { next: next, missions: tasks.slice(0, 160).map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t) }; }), progress: progress() });
+        l.setState('tasks:' + crewId(), { next: next, missions: mtasks.map(function (t) { return { id: t.id, title: t.title.slice(0, 80), done: isDone(t), stopId: t.stopId, objective: t.obj }; }), progress: progress() });
       } catch (e) { if (window.console) console.warn('tasks state not published', e); }
     }, 120);
   }
   function setDone(t, flag) {
     doneMap[t.id] = !!flag; lsSet('tablet.done.' + crewId(), doneMap);
     updateProgress(); refreshRow(t); if (sel && sel.id === t.id) renderDetail(); refreshStopDots();
-    try { var l = link(); if (l && isJoined()) l.send({ type: 'task', crew: crewId(), taskId: t.id, done: !!flag }); } catch (e) { /* link not ready */ }
+    if (t.kind === 'mtask') try { var l = link(); if (l && isJoined()) l.send({ type: 'task', crew: crewId(), taskId: t.id, done: !!flag }); } catch (e) { /* link not ready */ }
     publish();
   }
 
   /* ---------- pop-up ---------- */
-  var pop = $('pop'), listEl = $('pop-list'), rows = {}, userPlaced = false, dock = 'left';
+  var pop = $('pop'), listEl = $('pop-list'), rows = {}, heads = {}, userPlaced = false, dock = 'left';
   function atlasHref() { return /\/web\/html\//.test(location.pathname) ? 'index.html' : 'jezero-delta-atlas.html'; }
   function isSheet() { return W < 640 || (H > W * 1.2 && W < 900); }
+  function setGroup(g) {
+    groupBy = g; lsSet('tablet.group', g); renderList();
+    ['stop', 'objective'].forEach(function (k) { var b = $('grp-' + k); b.setAttribute('aria-pressed', k === g ? 'true' : 'false'); });
+  }
   function renderList() {
-    var keep = listEl.scrollTop; listEl.textContent = ''; rows = {};
-    [['Objectives', 'objective'], ['Stops', 'stop'], ['My tasks', 'task']].forEach(function (g) {
-      var items = tasks.filter(function (t) { return t.kind === g[1]; });
-      if (!items.length && g[1] !== 'task') return;
-      listEl.appendChild(el('h3', { text: g[0] }));
-      if (!items.length) { listEl.appendChild(el('p', { class: 'hint', text: 'None yet. Add one below.', attrs: { style: 'margin:2px 12px' } })); return; }
-      var ul = el('ul'); items.forEach(function (t) { ul.appendChild(makeRow(t)); }); listEl.appendChild(ul);
-    });
+    var keep = listEl.scrollTop; listEl.textContent = ''; rows = {}; heads = {};
+    function list(items) { var ul = el('ul'); items.forEach(function (t) { ul.appendChild(makeRow(t)); }); listEl.appendChild(ul); }
+    if (groupBy === 'objective') {
+      (MD.objectives || []).forEach(function (o) {
+        var its = mtasks.filter(function (t) { return t.obj === o.id; }); if (!its.length) return;
+        listEl.appendChild(el('h3', { text: o.title })); list(its);
+      });
+    } else {
+      stopList.forEach(function (st) {
+        var h = el('button', { type: 'button', class: 'grp', attrs: { 'aria-pressed': 'false' } }, [el('b', { text: String(st.no) }), el('span', { text: st.name })]);
+        h.addEventListener('click', function () { selectTask(st.id); });
+        heads[st.id] = h; listEl.appendChild(el('h3', { class: 'stop-h' }, [h]));
+        list(mtasks.filter(function (t) { return t.stopId === st.id; }));
+      });
+    }
+    listEl.appendChild(el('h3', { text: 'My tasks' }));
+    if (!tasks.length) listEl.appendChild(el('p', { class: 'hint', text: 'None yet. Add one below.', attrs: { style: 'margin:2px 12px' } })); else list(tasks);
+    Object.keys(heads).forEach(refreshHead);
     listEl.scrollTop = keep; updateProgress();
+  }
+  function rowSub(t) {
+    if (t.kind !== 'mtask') return t.sub;
+    return groupBy === 'objective' ? 'Stop ' + t.stop.no + ': ' + t.stop.name : t.tag + (t.estMin ? ' - about ' + t.estMin + ' min' : '');
   }
   function makeRow(t) {
     var cb = el('input', { type: 'checkbox', checked: isDone(t), attrs: { 'aria-label': 'Done: ' + t.title } });
     cb.addEventListener('change', function () { setDone(t, cb.checked); });
-    var ttl = el('button', { type: 'button', class: 'ttl', attrs: { 'aria-pressed': 'false' } }, [el('span', { text: t.title }), el('small', { text: t.sub + (t.lat != null ? '' : '') })]);
+    var subKids = [];
+    if (t.kind === 'mtask' && groupBy === 'stop') subKids.push(el('i', { class: 'tag o' + t.obj, text: t.tag }), el('span', { text: t.estMin ? ' about ' + t.estMin + ' min' : '' }));
+    else subKids.push(el('span', { text: rowSub(t) }));
+    var ttl = el('button', { type: 'button', class: 'ttl', attrs: { 'aria-pressed': 'false' } }, [el('span', { text: t.title }), el('small', {}, subKids)]);
     ttl.addEventListener('click', function () { selectTask(t.id); });
     var li = el('li', { class: 'task' }, [el('label', {}, [cb]), ttl]);
     rows[t.id] = { li: li, cb: cb, ttl: ttl }; refreshRow(t); return li;
+  }
+  function refreshHead(id) {
+    var h = heads[id]; if (!h) return; var s = !!(sel && (sel.id === id || sel.stopId === id));
+    h.classList.toggle('sel', s); h.setAttribute('aria-pressed', sel && sel.id === id ? 'true' : 'false');
   }
   function refreshRow(t) {
     var r = rows[t.id]; if (!r) return;
     var d = isDone(t); r.cb.checked = d; r.li.classList.toggle('done', d);
     var s = !!(sel && sel.id === t.id); r.li.classList.toggle('sel', s); r.ttl.setAttribute('aria-pressed', s ? 'true' : 'false');
+    r.li.classList.toggle('grp', !!(sel && sel.kind === 'stop' && t.stopId === sel.id));
   }
   function renderDetail() {
     var d = $('pop-detail');
     if (!sel) { d.hidden = true; return; }
     d.hidden = false; d.textContent = '';
-    var t = sel, acts = el('div', { class: 'acts' });
-    d.appendChild(el('h3', { text: t.title })); d.appendChild(el('p', { text: t.sub }));
-    if (t.desc && t.kind !== 'objective') d.appendChild(el('p', { text: t.desc }));
-    if (t.lat != null) d.appendChild(el('p', { text: fmtLat(t.lat) + ', ' + fmtLon(t.lon) + (t.approx ? ' (approximate)' : '') }));
-    else d.appendChild(el('p', { text: t.kind === 'objective' ? 'Applies to the whole Jezero campaign: no single place on the map.' : 'No map location.' }));
+    var t = sel, acts = el('div', { class: 'acts' }), st = t.kind === 'mtask' ? t.stop : t.kind === 'stop' ? t : null;
+    d.appendChild(el('h3', { text: t.title }));
+    d.appendChild(el('p', { text: t.kind === 'mtask' ? 'Stop ' + st.no + ': ' + st.name + ' - ' + t.tag + (t.estMin ? ' - about ' + t.estMin + ' min' : '') : t.kind === 'stop' ? 'Stop ' + t.no + ' of ' + stopList.length + ': tasks below are highlighted' : t.sub }));
+    if (t.desc) d.appendChild(el('p', { text: t.desc }));
+    if (t.lat != null) d.appendChild(el('p', { text: fmtLat(t.lat) + ', ' + fmtLon(t.lon) }));
+    else d.appendChild(el('p', { text: 'No map location.' }));
     if (t.lat != null) acts.appendChild(el('button', { type: 'button', text: 'Show on map', onclick: function () { focusTask(t, true); } }));
-    acts.appendChild(el('button', { type: 'button', text: isDone(t) ? 'Mark not done' : 'Mark done', onclick: function () { setDone(t, !isDone(t)); } }));
-    if (t.kind === 'stop') acts.appendChild(el('a', { class: 'lnk', href: atlasHref(), text: 'Open detailed Jezero map', target: '_blank', rel: 'noopener' }));
+    if (t.kind !== 'stop') acts.appendChild(el('button', { type: 'button', text: isDone(t) ? 'Mark not done' : 'Mark done', onclick: function () { setDone(t, !isDone(t)); } }));
+    if (st) acts.appendChild(el('a', { class: 'lnk', href: atlasHref(), text: 'Open detailed Jezero map', target: '_blank', rel: 'noopener' }));
     d.appendChild(acts);
   }
   /* ---------- side panels (mission pop-up and chat): adaptive docking ---------- */
@@ -2756,7 +2625,7 @@ window.MARS_SITES = {
     var sheet = isSheet(), cap = $('coords'), br = document.querySelector('.br');
     screen.classList.toggle('sheet-open', sheet && vis.length > 0);
     if (!vis.length) return;
-    screen.style.setProperty('--sheet-h', Math.round(Math.min(H * 0.5, 480)) + 'px');
+    screen.style.setProperty('--sheet-h', Math.round(Math.min(H * 0.44, 440)) + 'px');
     if (sheet) { vis.forEach(function (p) { resetBox(p.el); p.el.dataset.dock = 'sheet'; }); return; }
     // keep the readouts (coordinates, distance) visible: docked panels end above them
     var rl = relRect(cap), rr = relRect(br);
@@ -2805,7 +2674,36 @@ window.MARS_SITES = {
     c.forEach(function (r) { var a = r.w * r.h; if (a > ba) { ba = a; best = r; } });
     return best;
   }
+  /* the always-visible controls at the top (mission box and chat button at the left, map buttons): a pin must not sit under them */
+  function hudRects() { return [relRect($('tl')), relRect(document.querySelector('.zoom'))]; }
+  function pinBox(x, y) { return { x: x - 20, y: y - 66, w: 40, h: 66 }; }   // marker body and label above its tip
+  function boxHits(b, r) { return b.x < r.x + r.w + 6 && b.x + b.w > r.x - 6 && b.y < r.y + r.h + 6 && b.y + b.h > r.y - 6; }
+  function boxHitsHud(b) { return hudRects().some(function (r) { return boxHits(b, r); }); }
+  /* view that puts the point in the free area, moved down when the marker would sit under the top controls */
+  /* bottom sheet (phones): the only free band for a marker lies between the top controls and the readouts that ride above the sheet */
+  function sheetBand() {
+    if (!isSheet()) return null;
+    var tl = relRect($('tl')), rd = [relRect($('coords')), relRect(document.querySelector('.br'))];
+    return { top: tl.y + tl.h + 6, bot: Math.min.apply(null, rd.map(function (r) { return r.y; })) - 6 };
+  }
+  function centeredClear(lat, lon, ppd) {
+    var band = sheetBand();
+    if (band && pop_visible_any()) {
+      var ty = Math.max(band.top + 66, Math.min(band.bot, (band.top + band.bot) / 2 + 33));
+      return { lon: lon, lat: lat + (ty - H / 2) / ppd, ppd: ppd };
+    }
+    var v = viewCenteredOn(lat, lon, ppd, bestFree()), x = W / 2 + (lon - v.lon) * ppd, y = H / 2 - (lat - v.lat) * ppd, dy = 0;
+    hudRects().forEach(function (r) {
+      if (boxHits(pinBox(x, y), r)) dy = Math.max(dy, r.y + r.h + 12 + 66 - y);
+    });
+    if (dy > 0) v.lat += dy / ppd;
+    return v;
+  }
+  function pop_visible_any() { return panels.some(pvis); }
   function pinVisibleInFree(pos) {
+    if (boxHitsHud(pinBox(pos.x, pos.y))) return false;
+    var band = sheetBand();
+    if (band) return pos.y <= band.bot + 1 && pos.y - 66 >= band.top - 1 && pos.x >= 24 && pos.x <= W - 24;
     return freeRects().some(function (r) { return pos.x >= r.x + 36 && pos.x <= r.x + r.w - 36 && pos.y >= r.y + 56 && pos.y <= r.y + r.h - 16; });
   }
   /* keep the selected task's pin visible and away from every panel */
@@ -2813,26 +2711,26 @@ window.MARS_SITES = {
     var t = sel; if (!t || t.lat == null) return;
     var pos = project(t.lon, t.lat);
     if (!anim && view.ppd >= JZ_PPD_MIN && pinVisibleInFree(pos)) return;
-    var ppd = view.ppd >= JZ_PPD_MIN ? view.ppd : Math.min(MAX_PPD, SITES.jezero.ppd);
-    animateTo(viewCenteredOn(t.lat, t.lon, ppd, bestFree()), ms == null ? 600 : ms);
+    var ppd = view.ppd >= JZ_PPD_MIN ? view.ppd : jezeroView().ppd;
+    animateTo(centeredClear(t.lat, t.lon, ppd), ms == null ? 600 : ms);
   }
   function focusTask(t, force) {
     if (!t || t.lat == null) return;
     if (!force) { ensureVisible(); return; }
-    animateTo(viewCenteredOn(t.lat, t.lon, Math.max(view.ppd, SITES.jezero.ppd), bestFree()), 600);
+    animateTo(centeredClear(t.lat, t.lon, Math.max(view.ppd, jezeroView().ppd)), 600);
   }
   function selectTask(id) {
     var t = byId[id]; if (!t) return;
     var prev = sel; sel = t;
     if (pop.hidden) openPop(true);
-    if (prev) refreshRow(prev);
-    refreshRow(t); renderDetail(); updateTaskPin();
+    if (prev && prev.kind !== 'stop') refreshRow(prev);
+    refreshRow(t); Object.keys(heads).forEach(refreshHead); mtasks.forEach(refreshRow); renderDetail(); updateTaskPin();
     if (t.lat != null) {
-      setChosen({ kind: 'task', id: t.id, name: t.title, lat: t.lat, lon: t.lon });
+      setChosen({ kind: 'task', id: t.id, name: t.kind === 'mtask' ? t.stop.name : t.title, lat: t.lat, lon: t.lon });
       if (!userPlaced && !isSheet() && view.ppd >= JZ_PPD_MIN) { var s = project(t.lon, t.lat); dock = s.x > W / 2 ? 'left' : 'right'; }
       applyLayout(); ensureVisible();
     } else { applyLayout(); }
-    var r = rows[t.id]; if (r && r.li.scrollIntoView) r.li.scrollIntoView({ block: 'nearest' });
+    var r = rows[t.id] || { li: heads[t.id] }; if (r.li && r.li.scrollIntoView) r.li.scrollIntoView({ block: 'nearest' });
   }
   function setExpanded() {
     var m = !pop.hidden, c = !chatPanel.hidden;
@@ -2951,16 +2849,15 @@ window.MARS_SITES = {
   function buildPins() {
     items = []; pinsEl.textContent = ''; stopDots = {}; taskPin = null; pendingPin = null; nearOn = false;
     SITES.sites.forEach(makeSite);
-    tasks.forEach(function (t) {
-      if (t.kind !== 'stop' || t.lat == null) return;
-      var b = el('button', { type: 'button', class: 'pin stopdot', text: String(t.no || ''), attrs: { 'aria-label': t.title } }, [el('span', { class: 'lab', text: t.title })]);
-      var it = { kind: 'stop', id: t.id, name: t.title, lat: t.lat, lon: t.lon, el: b, task: t, dot: true };
+    stopList.forEach(function (t) {
+      var b = el('button', { type: 'button', class: 'pin stopdot', text: String(t.no), attrs: { 'aria-label': 'Stop ' + t.no + ': ' + t.name } }, [el('span', { class: 'lab', text: t.name })]);
+      var it = { kind: 'stop', id: t.id, name: t.name, lat: t.lat, lon: t.lon, el: b, task: t, dot: true };
       b.addEventListener('click', function () { if (!suppress) selectTask(t.id); });
       stopDots[t.id] = it; addItem(it);
     });
     locs.forEach(addLocPin);
     var bl = baseLL(), yl = youLL();
-    baseItem = makeMarker('base', 'BASE', bl.lat, bl.lon, 'Base (landing site)');
+    baseItem = makeMarker('base', 'BASE', bl.lat, bl.lon, 'Base camp'); baseItem.name = 'Base camp';
     youItem = makeMarker('you', 'YOU', yl.lat, yl.lon, 'You, ' + crewName());
     refreshStopDots(); updateTaskPin(); markChosen(); queueDraw();
   }
@@ -2969,14 +2866,14 @@ window.MARS_SITES = {
   }
   function refreshStopDots() {
     Object.keys(stopDots).forEach(function (k) {
-      var it = stopDots[k]; it.el.classList.toggle('done', isDone(it.task)); it.el.classList.toggle('sel', !!(sel && sel.id === k));
+      var it = stopDots[k], ts = mtasks.filter(function (x) { return x.stopId === k; }); it.el.classList.toggle('done', ts.length > 0 && ts.every(isDone)); it.el.classList.toggle('sel', !!(sel && (sel.id === k || sel.stopId === k)));
     });
   }
   function updateTaskPin() {
     if (taskPin) { var i = items.indexOf(taskPin); if (i >= 0) items.splice(i, 1); taskPin.el.remove(); taskPin = null; }
     refreshStopDots();
     if (sel && sel.lat != null) {
-      taskPin = makeMarker('task', sel.title, sel.lat, sel.lon, 'Selected task: ' + sel.title); taskPin.isTask = true;
+      taskPin = makeMarker('task', sel.kind === 'stop' ? 'Stop ' + sel.no : sel.kind === 'mtask' ? 'Stop ' + sel.stop.no : sel.title, sel.lat, sel.lon, 'Selected: ' + sel.title); taskPin.isTask = true;
       taskPin.el.style.zIndex = '3';
     }
     queueDraw();
@@ -2992,7 +2889,7 @@ window.MARS_SITES = {
     var x, y, p, vis;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it.dot && view.ppd < JZ_PPD_MIN && !(sel && sel.id === it.id)) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
+      if (it.dot && view.ppd < 150 && !(sel && sel.id === it.id)) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
       p = project(it.lon, it.lat); x = p.x; y = p.y;
       vis = x > -80 && x < W + 80 && y > -60 && y < H + 100;
       if (!vis) { if (!it.hid) { it.el.style.display = 'none'; it.hid = true; } continue; }
@@ -3155,16 +3052,18 @@ window.MARS_SITES = {
   var joinedKey = null, offMsg = null;
   function onJoined() {
     var r = link().room; joinedKey = r.code + '|' + r.id;
-    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat();
+    loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords(); publish(); publishLocs(); mountChat(); setGroup(groupBy);
     if (offMsg) { try { offMsg(); } catch (e) { /* ignore */ } offMsg = null; }
     if (link().on) offMsg = link().on(onMsg);
   }
   resize(); loadCrewData(); buildPins(); renderList(); updateProgress(); updateCoords();
+  $('grp-stop').addEventListener('click', function () { setGroup('stop'); }); $('grp-objective').addEventListener('click', function () { setGroup('objective'); });
+  setGroup(groupBy);
   // mount the room dialog first; nothing is published or sent before the crew member has joined
   try {
     if (window.JdaLinkUI && window.JdaLinkUI.mount) window.JdaLinkUI.mount({ role: 'tablet', ask: ['code', 'crew'], position: 'top-right', onJoin: function () { if (isJoined()) onJoined(); } });
   } catch (e) { if (window.console) console.error('JdaLinkUI.mount failed', e); }
-  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); }); } catch (e) { /* world not ready */ }
+  try { if (window.JdaWorld && window.JdaWorld.on) window.JdaWorld.on(function (w) { lastWorld = w; updateCoords(); refreshWorldDone(); }); } catch (e) { /* world not ready */ }
   setInterval(function () {
     if (isJoined() && joinedKey !== link().room.code + '|' + link().room.id) onJoined();
     updateCoords();

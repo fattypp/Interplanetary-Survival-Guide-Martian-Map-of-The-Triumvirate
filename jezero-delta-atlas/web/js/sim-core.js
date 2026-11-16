@@ -2,7 +2,8 @@
    Contract: docs/MULTIPAGE.md (world schema, commands). Models and limits: docs/SIMULATION.md.
    Everything here is scenario data: there is no real suit, radiation or vitals feed.
    Works in a browser (window.JdaSim) and in Node (module.exports) for tests.
-   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid). */
+   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid),
+   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s). */
 (function (root) {
   'use strict';
 
@@ -12,14 +13,27 @@
     SOL_S: 88775.244,                  // length of a Mars solar day in seconds
     START_ISO: '2026-11-15T08:00:00Z', // mission clock at reset (this is a scenario clock, not a real date on Mars)
     START_LOCAL_H: 9,                  // local mean solar time at the start (hours, 0..24)
-    BASE: { lat: 18.4446, lon: 77.4509 },       // Octavia E. Butler landing site (from the Atlas data)
+    // Fallbacks, used only when web/data/mission-data.js / travel-speeds.js are not loaded (coordinates from the MissionGuide).
+    FALLBACK_BASE: { id: 'base', name: 'Base camp', lat: 18.447, lon: 77.408 },
+    FALLBACK_STOPS: [
+      { id: 'stop-1', name: 'Three Forks sample depot', lat: 18.4525, lon: 77.4015 },
+      { id: 'stop-2', name: 'Delta front mudstone', lat: 18.458, lon: 77.397 },
+      { id: 'stop-3', name: 'Delta top boulders', lat: 18.480, lon: 77.385 },
+      { id: 'stop-4', name: 'Western delta clay beds', lat: 18.502, lon: 77.369 },
+      { id: 'stop-5', name: 'Western Breach and Bright Angel', lat: 18.493, lon: 77.293 }
+    ],
+    FALLBACK_MPS: { rover: 2.8, foot: 1.4 },    // only if JEZERO_SPEEDS is absent
+    EVA_DEFAULT_MIN: 30,               // time on foot at a stop when the stop has no tasks in the data
     BASELINE_USVH: 26.67,              // MSL/RAD GCR dose equivalent 0.64 mSv/day (same as the science layer)
     SPE_MULT: 2.5,                     // solar particle event multiplier (same as the science layer)
-    WALK_MPS: 1.4,                     // default walking speed
     MAX_MPS: 30,                       // hard limit of the speed command
     O2_PER_H:  { rest: 4, walk: 9 },   // percent of a full tank per simulated hour (same as suit.js: resting 4, walking 9)
     BAT_PER_H: { rest: 3, walk: 6 },   // percent of a full battery per simulated hour (same as suit.js)
-    EFFORT_CAP: 3,                     // effort = speed / 1.4 m/s, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EFFORT_CAP: 3,                     // effort = speed / foot speed, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EVA_EFFORT: 1,                     // working on foot at a stop (sampling, photographing) costs the same as walking at foot speed
+    ROVER_O2_PER_H: 0,                 // pressurised rover: cabin air, the suit tank is not drawn on
+    ROVER_BAT_PER_H: 1,                // suit battery on standby while the rover supplies power (percent per hour)
+    HR_ROVER: 68,                      // seated in the rover cabin, close to resting
     HR_REST: 66, HR_IDLE: 72, HR_WALK_ADD: 28, HR_TAU_S: 45,
     SUIT_NOM_C: 21, SUIT_TAU_S: 600,
     AMB_MEAN_C: -48, AMB_AMP_C: 38, AMB_PEAK_H: 14,   // clear-sky day: about -86 C at 02:00 to -10 C at 14:00 local
@@ -31,6 +45,7 @@
   var M_PER_DEG = Math.PI / 180 * C.R_MARS_M;   // metres per degree of latitude (and of longitude at the equator)
 
   function num(v, fb) { v = Number(v); return isFinite(v) ? v : fb; }
+  var RESERVED_IDS = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];   // same list as link-ui.js
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function round(v, d) { var k = Math.pow(10, d); return Math.round(v * k) / k; }
   function norm360(a) { a = a % 360; return a < 0 ? a + 360 : a; }
@@ -82,22 +97,21 @@
     return g.min + (top * (1 - fy) + bot * fy) / 255 * (g.max - g.min);
   }
 
-  /* ---------------- places and the demo path ----------------
-     The atlas draws its place names on an older, larger canvas (1990 x 1848 px = 77.10-77.80 E, 18.10-18.75 N, see o2n in atlas-map.js).
-     The conversion to lat/lon is replicated here. Several places lie outside the current map image; they still have valid lat/lon. */
-  function o2ll(px, py) { return { lat: round(18.75 - py / 1848 * 0.65, 5), lon: round(77.1 + px / 1990 * 0.7, 5) }; }
-  function place(label, px, py) { var p = o2ll(px, py); p.label = label; return p; }
-  var PLACES = {
-    landing: { label: 'Octavia E. Butler Landing', lat: C.BASE.lat, lon: C.BASE.lon },
-    three:   place('Three Forks', 932, 862),
-    hawks:   place('Hawksbill Gap', 850, 772),
-    fan:     place('Upper Fan', 700, 655),
-    neretva: place('Neretva Vallis', 430, 470),
-    whh:     place('Witch Hazel Hill', 455, 1005),
-    seitah:  place('Seitah', 890, 975)
-  };
-  function demoPath() {   // landing -> Three Forks -> Hawksbill Gap -> Upper Fan -> Neretva -> Witch Hazel Hill -> Seitah (then the caller sends "return")
-    return ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah'].map(function (k) { var p = PLACES[k]; return { lat: p.lat, lon: p.lon, label: p.label }; });
+  /* ---------------- mission data and speeds (read lazily; fall back to the MissionGuide values) ---------------- */
+  function pt(o) { return o && isFinite(Number(o.lat)) && isFinite(Number(o.lon)) && o.lat !== null && o.lon !== null; }
+  function missionInfo() {
+    var M = root.JEZERO_MISSION || {};
+    var b = pt(M.base) ? M.base : C.FALLBACK_BASE;
+    var base = { id: 'base', name: String(b.name || 'Base camp'), lat: Number(b.lat), lon: Number(b.lon) };
+    var raw = Array.isArray(M.stops) && M.stops.length ? M.stops : C.FALLBACK_STOPS;
+    var stops = raw.filter(pt).map(function (st, i) { return { id: String(st.id || 'stop-' + (i + 1)), n: i + 1, name: String(st.name || 'Stop ' + (i + 1)), lat: Number(st.lat), lon: Number(st.lon) }; });
+    var tasks = (Array.isArray(M.tasks) ? M.tasks : []).filter(function (t) { return t && t.id && t.stopId; })
+      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
+    return { base: base, stops: stops, tasks: tasks };
+  }
+  function speeds() {
+    var S = root.JEZERO_SPEEDS || {};
+    return { rover: num(S.rover && S.rover.mps, C.FALLBACK_MPS.rover), foot: num(S.foot && S.foot.mps, C.FALLBACK_MPS.foot) };
   }
 
   /* ---------------- geometry on the sphere (local flat approximation, fine for kilometres) ---------------- */
@@ -131,7 +145,10 @@
     var initCrew = (opts.crew && opts.crew.length ? opts.crew : [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }]).map(function (c) { return copyCrewInit(c); });
     var initClock = clamp(num(opts.clockSpeed, 1), 0.01, 100000);
 
+    var info = missionInfo(), SPD = speeds(), BASE = info.base;
     var elapsedMs, clock, events, crew, order;
+    function tasksOf(stopId) { return info.tasks.filter(function (t) { return t.stopId === stopId; }); }
+    function speedOf(c) { return c.speedOverride !== null ? c.speedOverride : SPD[c.travel]; }
 
     function copyCrewInit(c) {
       var id = slug(c.id || c.name) || 'crew';
@@ -140,12 +157,12 @@
     function makeCrew(c, index) {
       // crew without a position start around the base, a few metres apart (deterministic, not random)
       var a = index * 2.4, r = 6 + 4 * index;
-      var lat = c.lat !== null ? c.lat : C.BASE.lat + Math.cos(a) * r / M_PER_DEG;
-      var lon = c.lon !== null ? c.lon : C.BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(C.BASE.lat * Math.PI / 180));
+      var lat = c.lat !== null ? c.lat : BASE.lat + Math.cos(a) * r / M_PER_DEG;
+      var lon = c.lon !== null ? c.lon : BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(BASE.lat * Math.PI / 180));
       return {
         id: c.id, name: c.name, lat: clamp(lat, -90, 90), lon: lon, zM: C.Z0_M, headingDeg: 0,
         o2: 100, bat: 100, hr: C.HR_IDLE, hrNoise: 0, hrOverride: null, suitT: C.SUIT_NOM_C, dose: 0,
-        mode: 'idle', thenReturn: false, walkSpeed: C.WALK_MPS, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
+        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, stopId: null, taskId: null, tasksDone: 0, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
       };
     }
     function reset() {
@@ -166,6 +183,7 @@
 
     function addCrew(spec) {
       var c = copyCrewInit(spec || {});
+      if (RESERVED_IDS.indexOf(c.id) >= 0) c.id = c.id + '-crew';   // 'all', 'earth', 'control'... would clash with message targets
       if (crew[c.id]) { var n = 2; while (crew[c.id + '-' + n]) n++; c.id = c.id + '-' + n; }
       if (order.length >= 12) return { ok: false, error: 'crew limit (12) reached' };
       initCrew.push(c);
@@ -180,12 +198,53 @@
       return { ok: true };
     }
 
+    /* ---- mission run: base -> stop 1 .. stop 5 -> base. Drive legs by rover, on foot (EVA) at each stop for its tasks ---- */
+    function startDrive(c, i) {
+      var st = info.stops[i], r = c.run;
+      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: st.lat, lon: st.lon, label: st.name }; c.path = []; c.headingWalk = false; c.mode = 'walking';
+    }
+    function startHome(c) {
+      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.mode = 'returning';
+    }
+    function startEva(c) {
+      var r = c.run, st = info.stops[r.i];
+      r.phase = 'eva'; r.evaT = 0; r.tasks = tasksOf(st.id); r.doneBase = c.tasksDone;
+      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : C.EVA_DEFAULT_MIN * 60;
+      c.travel = 'foot'; c.stopId = st.id; c.taskId = r.tasks.length ? r.tasks[0].id : null; c.target = null; c.path = []; c.mode = 'walking';
+    }
+    function evaStep(c, ds) {   // time on foot at a stop; tasks complete one after the other
+      var r = c.run, acc = 0, n = 0;
+      r.evaT += ds;
+      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc) n++; }
+      if (r.evaT >= r.evaTotal) {
+        c.tasksDone = r.doneBase + r.tasks.length;
+        if (r.i + 1 < info.stops.length) startDrive(c, r.i + 1); else startHome(c);
+        return false;
+      }
+      c.tasksDone = r.doneBase + n; c.taskId = r.tasks.length ? r.tasks[Math.min(n, r.tasks.length - 1)].id : null;
+      return true;
+    }
+    function arriveRun(c) {
+      if (c.run.phase === 'drive') startEva(c);
+      else { c.run = null; c.target = null; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
+    }
+    function startRun(c, speed) {
+      if (!info.stops.length) return 'no mission stops';
+      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], doneBase: 0, evaTotal: 0 };
+      c.tasksDone = 0; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
+      startDrive(c, 0);
+      return null;
+    }
+
     /* ---- one physics step of ds simulated seconds ---- */
     function stepCrew(c, ds) {
-      // 1. movement
-      var moving = false, remaining = 0, startLat = c.lat, startLon = c.lon;
-      if (c.mode === 'walking' || c.mode === 'returning') {
-        remaining = c.walkSpeed * ds;
+      // 1. movement (or time on foot at a stop)
+      var moving = false, working = false, remaining = 0, startLat = c.lat, startLon = c.lon;
+      if (c.run && c.run.phase === 'eva') working = evaStep(c, ds);
+      if (!working && (c.mode === 'walking' || c.mode === 'returning')) {
+        remaining = speedOf(c) * ds;
         var guard = 0;
         while (remaining > 1e-6 && guard++ < 64) {
           if (c.headingWalk && !c.target) {
@@ -199,9 +258,10 @@
           if (d > 0.01) c.headingDeg = bearing(c, c.target);
           if (d <= remaining) {
             c.lat = c.target.lat; c.lon = c.target.lon; remaining -= d;
+            if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             if (c.path.length) c.target = c.path.shift();
             else if (c.thenReturn && c.mode === 'walking') {   // end of an excursion: head home
-              c.thenReturn = false; c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.mode = 'returning';
+              c.thenReturn = false; c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.mode = 'returning';
             } else {
               c.target = null;
               if (c.mode === 'returning') { c.mode = 'resting'; } else { c.mode = 'idle'; }
@@ -213,24 +273,32 @@
             remaining = 0;
           }
         }
-        moving = c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01;
+        moving = !working && (c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01);
       }
-      c.speed = moving ? c.walkSpeed : 0;
+      c.speed = moving ? speedOf(c) : 0;
       var dH = ds / 3600;
-      // 2. consumption: standing/resting uses the base rate, walking adds in proportion to speed
-      var effort = moving ? Math.min(c.walkSpeed / C.WALK_MPS, C.EFFORT_CAP) : 0;
+      // 2. consumption. In the pressurised rover (travel 'rover', also while parked) the crew breathes cabin air: no suit oxygen is used,
+      //    the suit battery only idles, effort is zero. On foot (EVA or a manual walk): standing/resting uses the base rate and walking
+      //    adds in proportion to speed (working at a stop counts as EVA_EFFORT).
+      var inRover = c.travel === 'rover' && !working;
+      var effort = inRover ? 0 : working ? C.EVA_EFFORT : moving ? Math.min(speedOf(c) / SPD.foot, C.EFFORT_CAP) : 0;
       var jitter = 1 + (rand() - 0.5) * 0.1;
       var restO2 = c.mode === 'resting' ? C.O2_PER_H.rest * 0.9 : C.O2_PER_H.rest;
       var restBat = c.mode === 'resting' ? C.BAT_PER_H.rest * 0.9 : C.BAT_PER_H.rest;
-      c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
-      c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      if (inRover) {
+        c.o2 = clamp(c.o2 - C.ROVER_O2_PER_H * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - C.ROVER_BAT_PER_H * jitter * dH, 0, 100);
+      } else {
+        c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      }
       // 3. environment at the new position
       var p = xy(c.lat, c.lon);
       c.amb = ambientC(elapsedMs, events.dust);
       c.rad = radiationAt(p[0], p[1]) * (events.solar ? C.SPE_MULT : 1);
       c.dose += c.rad * dH / 1000;   // uSv/h * h = uSv; / 1000 = mSv
       // 4. heart rate: first-order lag towards a target (unless the operator pinned it)
-      var tHr = (c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
+      var tHr = (inRover ? C.HR_ROVER : c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving || working ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
       c.hr += (tHr - c.hr) * (1 - Math.exp(-ds / C.HR_TAU_S));
       c.hrNoise = (rand() - 0.5) * 4;
       // 5. suit temperature: life support holds ~21 C; walking adds heat, a cold exterior leaks a little in; with a dead battery it drifts to ambient
@@ -261,7 +329,9 @@
       if (id === 'all' || id === '*') return order.map(function (k) { return crew[k]; });
       return crew[id] ? [crew[id]] : [];
     }
-    function setSpeed(c, mps) { c.walkSpeed = clamp(mps, 0.1, C.MAX_MPS); }
+    function setSpeed(c, mps) { c.speedOverride = clamp(mps, 0.1, C.MAX_MPS); }
+    function setTravel(c, mode) { if (mode !== 'rover' && mode !== 'foot') return false; c.travel = mode; c.speedOverride = null; return true; }
+    function endRun(c) { c.run = null; c.stopId = null; c.taskId = null; }
 
     function command(cmd) {
       if (!cmd || typeof cmd !== 'object') return { ok: false, error: 'no command' };
@@ -279,7 +349,7 @@
           refreshEnv(); return { ok: true };
         case 'addCrew': return addCrew(cmd);
         case 'removeCrew': return removeCrew(String(cmd.crew || ''));
-        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'set':
+        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'setTravel': case 'runMission': case 'set':
           list = targets(cmd);
           if (!list.length) return { ok: false, error: 'unknown crew ' + cmd.crew };
           break;
@@ -289,23 +359,28 @@
       list.forEach(function (c) {
         if (name === 'walk') {
           var wps = [];
+          if (cmd.travel !== undefined && !setTravel(c, cmd.travel)) { err = 'travel must be rover or foot'; return; }
           if (cmd.to) { var p = pointOf(cmd.to); if (!p) { err = 'bad target'; return; } wps.push(p); }
           if (Array.isArray(cmd.path)) {   // optional extension: further waypoints, visited in order
             for (var i = 0; i < cmd.path.length && i < 64; i++) { var q = pointOf(cmd.path[i]); if (!q) { err = 'bad path point ' + i; return; } wps.push(q); }
           }
           if (cmd.speed !== undefined && isFinite(Number(cmd.speed))) setSpeed(c, Number(cmd.speed));
-          if (wps.length) { c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
-          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
+          if (wps.length) { endRun(c); c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
+          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { endRun(c); c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
           else err = 'walk needs to {lat,lon}, path or heading';
         } else if (name === 'stop') {
-          c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
+          endRun(c); c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
         } else if (name === 'return') {
-          c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.path = []; c.headingWalk = false; c.thenReturn = false;
+          endRun(c); c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.headingWalk = false; c.thenReturn = false;
           if (distM(c, c.target) < 1) { c.target = null; c.mode = 'resting'; } else c.mode = 'returning';
         } else if (name === 'setSpeed') {
           var m = Number(cmd.mps);
           if (!isFinite(m) || m <= 0) { err = 'mps must be positive'; return; }
           setSpeed(c, m);
+        } else if (name === 'setTravel') {
+          if (!setTravel(c, cmd.mode)) err = 'mode must be rover or foot';
+        } else if (name === 'runMission') {
+          err = startRun(c, cmd.speed);
         } else if (name === 'set') {
           err = setField(c, String(cmd.field || ''), cmd.value);
         }
@@ -317,7 +392,7 @@
       if (C.FIELDS.indexOf(field) < 0) return 'cannot set ' + field;
       if (field === 'mode') {
         if (['idle', 'resting'].indexOf(value) < 0) return 'mode can be set to idle or resting';
-        c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
+        endRun(c); c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
       }
       if (field === 'hr' && (value === null || value === 'auto')) { c.hrOverride = null; return null; }
       var v = Number(value);
@@ -326,10 +401,10 @@
       else if (field === 'batPct') c.bat = clamp(v, 0, 100);
       else if (field === 'hr') { c.hrOverride = clamp(v, 0, 250); c.hr = c.hrOverride; }
       else if (field === 'suitTempC') c.suitT = clamp(v, -120, 80);
-      else if (field === 'doseMsv') c.dose = Math.max(0, v);
+      else if (field === 'doseMsv') c.dose = clamp(v, 0, 1e5);
       else if (field === 'headingDeg') c.headingDeg = norm360(v);
       else if (field === 'lat') { if (Math.abs(v) > 90) return 'lat out of range'; c.lat = v; }
-      else if (field === 'lon') c.lon = v;
+      else if (field === 'lon') c.lon = ((v + 180) % 360 + 360) % 360 - 180;   // wrapped into [-180, 180)
       return null;
     }
 
@@ -342,13 +417,16 @@
         hr: Math.round(c.hrOverride !== null ? c.hrOverride + c.hrNoise * 0.5 : c.hr + c.hrNoise),
         suitTempC: round(c.suitT, 1), ambientTempC: round(c.amb, 1), radUsvH: round(c.rad, 2), doseMsv: round(c.dose, 4),
         mode: c.mode, speedMps: round(c.speed, 2),
-        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null
+        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null,
+        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: { done: c.tasksDone, total: info.tasks.length },
+        distM: c.target ? round(distM(c, c.target), 1) : null,
+        etaS: c.run && c.run.phase === 'eva' ? Math.max(0, Math.round(c.run.evaTotal - c.run.evaT)) : c.target && speedOf(c) > 0 ? Math.round(distM(c, c.target) / speedOf(c)) : null
       };
     }
     function world() {
       var out = {};
       order.forEach(function (id) { out[id] = record(crew[id]); });
-      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: C.BASE.lat, lon: C.BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
+      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: BASE.lat, lon: BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
     }
 
     /* Continue from a world snapshot (used by world-client when the authority disappears). Unknown crew are added. */
@@ -365,8 +443,10 @@
         c.lat = num(r.lat, c.lat); c.lon = num(r.lon, c.lon); c.headingDeg = num(r.headingDeg, 0);
         c.o2 = clamp(num(r.o2Pct, 100), 0, 100); c.bat = clamp(num(r.batPct, 100), 0, 100); c.hr = num(r.hr, c.hr);
         c.suitT = num(r.suitTempC, c.suitT); c.dose = Math.max(0, num(r.doseMsv, 0)); c.speed = 0;
+        c.travel = r.travel === 'rover' ? 'rover' : 'foot'; c.run = null; c.stopId = null; c.taskId = null;   // a mission run in progress is not part of the world: it stops at its current target
+        c.tasksDone = r.progress && isFinite(Number(r.progress.done)) ? Math.max(0, Number(r.progress.done)) : 0;
         c.mode = ['idle', 'walking', 'returning', 'resting'].indexOf(r.mode) >= 0 ? r.mode : 'idle';
-        c.walkSpeed = clamp(num(r.speedMps, 0) || c.walkSpeed, 0.1, C.MAX_MPS);
+        var sp = num(r.speedMps, 0); c.speedOverride = sp > 0 && Math.abs(sp - SPD[c.travel]) > 0.01 ? clamp(sp, 0.1, C.MAX_MPS) : null;
         c.target = pointOf(r.target); c.path = [];
         if (!c.target && (c.mode === 'walking' || c.mode === 'returning')) c.mode = 'idle';
       });
@@ -376,11 +456,11 @@
 
     reset();
     return { tick: tick, world: world, command: command, reset: reset, load: load, addCrew: addCrew, removeCrew: removeCrew,
-             crewIds: function () { return order.slice(); }, clockSpeed: function () { return clock; } };
+             crewIds: function () { return order.slice(); }, mission: function () { return info; }, speeds: function () { return { rover: SPD.rover, foot: SPD.foot }; }, clockSpeed: function () { return clock; } };
   }
 
   var api = {
-    create: create, C: C, PLACES: PLACES, demoPath: demoPath, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
+    create: create, C: C, missionInfo: missionInfo, speeds: speeds, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
     localHour: localHour, localMarsTime: localMarsTime, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

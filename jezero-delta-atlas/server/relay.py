@@ -50,6 +50,7 @@ ALLOWED_HOSTS = {'localhost', '127.0.0.1', '::1'}   # extended in main(): LAN IP
 MSG_RATE = 30            # messages per second per room (burst 60)
 REQ_RATE = 120           # requests per second per client IP (burst 300)
 
+EPOCH = '%x%04x' % (int(time.time()), os.getpid() & 0xffff)   # changes on every relay start: clients detect a restart and republish
 LOCK = threading.Lock()
 ROOMS = {}
 BUCKETS = {}
@@ -80,6 +81,11 @@ class Room:
         self.last = time.time()
         self.creator = ''
         self.bucket = Bucket(MSG_RATE, MSG_RATE * 2)
+
+
+def jsize(o):
+    """Size of the JSON text in UTF-8 bytes (what actually travels; emoji and CJK are not inflated by \\u escapes)."""
+    return len(json.dumps(o, separators=(',', ':'), ensure_ascii=False).encode('utf-8', 'replace'))
 
 
 def clean(s, n):
@@ -239,7 +245,7 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ['api', 'ping'] and self.command == 'GET':
             with LOCK:
                 n = len(ROOMS)
-            self.send_json(200, {'ok': True, 'v': 2, 'rooms': n})
+            self.send_json(200, {'ok': True, 'v': 2, 'rooms': n, 'epoch': EPOCH})
             return True
         if len(parts) < 4 or parts[1] != 'rooms' or not CODE_RE.match(parts[2]):
             self.fail(HTTPStatus.NOT_FOUND, 'unknown endpoint or invalid room code')
@@ -263,7 +269,7 @@ class Handler(SimpleHTTPRequestHandler):
     # ---- handlers ----
     def h_msg(self, code):
         m = self.payload
-        if not isinstance(m, dict) or len(json.dumps(m, separators=(',', ':'))) > MAX_MSG:
+        if not isinstance(m, dict) or jsize(m) > MAX_MSG:
             self.fail(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'message too large or not an object')
             return True
         if (not isinstance(m.get('id'), str) or not 0 < len(m['id']) <= 64 or not isinstance(m.get('type'), str)
@@ -298,12 +304,12 @@ class Handler(SimpleHTTPRequestHandler):
         with LOCK:
             r = get_room(code, False)
             if r is None:
-                self.send_json(200, {'msgs': [], 'next': 0})
+                self.send_json(200, {'msgs': [], 'next': 0, 'epoch': EPOCH, **({'reset': True} if since > 0 else {})})
                 return True
             reset = since > r.seq
             out = [m for s, m in r.msgs if reset or s > since]
             nxt = r.seq
-        d = {'msgs': out, 'next': nxt}
+        d = {'msgs': out, 'next': nxt, 'epoch': EPOCH}
         if reset:
             d['reset'] = True
         self.send_json(200, d)
@@ -317,7 +323,7 @@ class Handler(SimpleHTTPRequestHandler):
         if not isinstance(b, dict) or 'value' not in b:
             self.fail(HTTPStatus.BAD_REQUEST, 'body needs a value')
             return True
-        if len(json.dumps(b['value'], separators=(',', ':'))) > MAX_STATE:
+        if jsize(b['value']) > MAX_STATE:
             self.fail(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'state too large')
             return True
         frm = clean_from(b.get('from')) or {'role': 'legacy', 'id': '', 'name': '', 'cid': ''}
@@ -349,12 +355,15 @@ class Handler(SimpleHTTPRequestHandler):
         with LOCK:
             r = get_room(code, False)
             if r is None:
-                self.send_json(200, {'ver': 0, 'items': {}})
+                self.send_json(200, {'ver': 0, 'items': {}, 'epoch': EPOCH, **({'reset': True} if since > 0 else {})})
                 return True
             reset = since > r.ver
             items = {k: e for k, e in r.state.items() if reset or e['ver'] > since}
             ver = r.ver
-        self.send_json(200, {'ver': ver, 'items': items})
+        d = {'ver': ver, 'items': items, 'epoch': EPOCH}
+        if reset:
+            d['reset'] = True
+        self.send_json(200, d)
         return True
 
     def h_presence(self, code):

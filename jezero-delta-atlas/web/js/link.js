@@ -5,11 +5,11 @@
 (function () {
   'use strict';
   var CODE_RE = /^[A-HJ-NP-Z2-9]{5}$/, LEGACY = 'LOCAL', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 100;
+  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 200, OUTBOX_N = 100;
   var ROLES = ['crew', 'earth', 'control', 'helmet', 'tablet', 'legacy'];
   var cfg = window.JDA_LINK || {};
   var cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);   // this page load
-  var subs = [], statusSubs = [], presSubs = [], stateSubs = {};
+  var subs = [], statusSubs = [], presSubs = [], stateSubs = Object.create(null);
   var room = null, status = 'local', S = null, implicit = false, pendingOut = { msgs: [], state: {} };   // pendingOut: what an implicit (LOCAL) room sent, replayed into the first explicit room   // S = per-join session (timers, seen, log, state, presence)
 
   /* ---------- helpers ---------- */
@@ -25,7 +25,11 @@
   }
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function size(o) { try { return JSON.stringify(o).length; } catch (e) { return Infinity; } }
+  function size(o) {   // JSON size in UTF-8 bytes, the same measure the relay uses (emoji / CJK count by bytes, not UTF-16 units)
+    var j; try { j = JSON.stringify(o); } catch (e) { return Infinity; }
+    if (typeof j !== 'string') return Infinity;
+    try { return unescape(encodeURIComponent(j)).length; } catch (e) { return j.length * 3; }
+  }
   function isObj(o) { return o && typeof o === 'object' && !Array.isArray(o); }
   function safeKey(k) { return typeof k === 'string' && /^[A-Za-z0-9:_.-]{1,64}$/.test(k) && k !== '__proto__'; }
   function warn() { if (window.console) console.warn.apply(console, ['JdaLink'].concat([].slice.call(arguments))); }
@@ -62,7 +66,7 @@
 
   /* ---------- session ---------- */
   function newSession(code) {
-    return { code: code, seen: {}, seenQ: [], log: [], state: {}, relayVer: {}, pres: {}, timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
+    var N = Object.create; return { code: code, seen: N(null), seenQ: [], log: [], state: N(null), mine: N(null), outbox: [], epoch: null, repub: false, relayVer: N(null), pres: N(null), timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
   }
   function markSeen(id) { S.seen[id] = 1; S.seenQ.push(id); if (S.seenQ.length > 3000) delete S.seen[S.seenQ.shift()]; }
   function setStatus(s) { if (s === status) return; status = s; statusSubs.slice().forEach(function (fn) { call(fn, s); }); }
@@ -152,31 +156,66 @@
     opt = opt || {};
     var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : 0;
     return fetch('/api' + path, { method: opt.method || 'GET', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, body: opt.body ? JSON.stringify(opt.body) : undefined, cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+      .then(function (r) { clearTimeout(tm); if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; } return r.json(); }, function (e) { clearTimeout(tm); throw e; });
   }
   function probeRelay() {
     if (!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
     return api('/ping').then(function (j) { return !!(j && j.ok); }, function () { return false; });
   }
   function relayOk() { var ses = S; if (ses && ses.relayFails) { ses.relayFails = 0; setStatus('relay'); } }
-  function relayFail(e) { var ses = S; if (!ses) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  function relayFail(e) { var ses = S; if (!ses || (e && e.status === 429)) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  /* messages wait in the outbox until the relay has accepted them (relay restarting, rate limit, brief outage) */
+  function postOut(ses, item) {
+    if (item.busy || ses.closed) return;
+    item.busy = true;
+    api('/rooms/' + ses.code + '/msg', { method: 'POST', body: item.m }).then(function () {
+      var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1);
+    }, function (e) {
+      item.busy = false;
+      if (e && (e.status === 400 || e.status === 403 || e.status === 404 || e.status === 411 || e.status === 413)) { var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1); warn('relay refused a message', e.message); }
+      else relayFail(e);
+    });
+  }
+  function queueOut(ses, m) {
+    var item = { m: m, busy: false };
+    ses.outbox.push(item);
+    if (ses.outbox.length > OUTBOX_N) ses.outbox.shift();
+    if (ses.relay) postOut(ses, item);
+  }
+  function flushOut(ses) { ses.outbox.slice().forEach(function (it) { postOut(ses, it); }); }
+  function republishAll(ses) {   // a relay that restarted (or was not reachable before) has none of this page's messages or state: send them again (the relay and readers dedupe by id)
+    ses.log.forEach(function (m) { if (m.from && m.from.cid === cid && !ses.outbox.some(function (it) { return it.m.id === m.id; })) queueOut(ses, m); });
+    ses.repub = true;
+  }
   function startRelay() {
-    var ses = S, base = '/rooms/' + ses.code;
+    var ses = S, base = '/rooms/' + ses.code, delay = POLL_MS;
     ses.relay = true; setStatus('relay');
+    republishAll(ses);
     function loop() {
       if (ses.closed) return;
+      delay = POLL_MS;
       Promise.all([api(base + '/msgs?since=' + ses.since), api(base + '/state?since=' + ses.stateVer)]).then(function (r) {
         if (ses.closed) return;
-        var first = !ses.synced;
+        var first = !ses.synced, restarted = !!(r[0].epoch && ses.epoch && r[0].epoch !== ses.epoch);
+        if (r[0].epoch) ses.epoch = r[0].epoch;
+        if (restarted) { ses.relayVer = {}; ses.since = 0; ses.stateVer = 0; republishAll(ses); }
         if (r[0].reset) ses.since = 0;
         (r[0].msgs || []).forEach(function (m) { deliver(m, first); });
-        if (isFinite(r[0].next)) ses.since = r[0].next;
+        if (isFinite(r[0].next) && !restarted) ses.since = r[0].next;
+        if (r[1].reset || restarted) ses.relayVer = {};
         var items = r[1].items || {};
         Object.keys(items).forEach(function (key) { applyState(key, items[key], true); });
-        if (isFinite(r[1].ver)) ses.stateVer = r[1].ver;
+        if (isFinite(r[1].ver) && !restarted) ses.stateVer = r[1].ver;
+        if (ses.repub && !restarted) {   // put back this page's own state values that the relay does not have
+          ses.repub = false;
+          Object.keys(ses.mine).forEach(function (key) {
+            if (!(key in items) && !(ses.state[key] && ses.state[key].from.cid !== cid)) api(base + '/state/' + encodeURIComponent(key), { method: 'PUT', body: ses.mine[key] }).catch(function (x) { relayFail(x); });
+          });
+        }
         ses.synced = true;
+        flushOut(ses);
         relayOk();
-      }).catch(relayFail).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, POLL_MS)); });
+      }).catch(function (e) { if (e && e.status === 429) delay = 2500; relayFail(e); }).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, delay)); });
     }
     loop();
   }
@@ -290,10 +329,18 @@
       Object.keys(carry.state).forEach(function (key) { try { setState(key, carry.state[key]); } catch (e) { /* ignore */ } });
       pendingOut = { msgs: [], state: {} };
     }
+    function reprobe(ses2) {   // relay not reachable at load: keep looking, so a relay started later (or restarted) is picked up without a reload
+      var tm = setTimeout(function () {
+        if (ses2.closed || ses2.relay) return;
+        probeRelay().then(function (ok2) { if (ses2.closed) return; if (ok2) { startRelay(); heartbeat(); } else reprobe(ses2); });
+      }, 4000);
+      ses2.timers.push(tm);
+    }
     if (c !== LEGACY) {   // the legacy default room never leaves this browser
       probeRelay().then(function (ok) {
         if (ses.closed) return;
         if (ok) startRelay();
+        else if (/^https?:$/.test(location.protocol)) reprobe(ses);
         if (online) startOnline();
         heartbeat();
         flushCarry();
@@ -322,7 +369,7 @@
     lsSet(k(ses.code, 'log'), JSON.stringify(ses.log.slice(-LOG_N)));
     try { if (ses.bc) ses.bc.postMessage({ k: 'msg', m: m }); } catch (e) { /* ignore */ }
     lsSet(k(ses.code, 'msg'), JSON.stringify(m));
-    if (ses.relay) api('/rooms/' + ses.code + '/msg', { method: 'POST', body: m }).catch(function (e) { warn('relay send failed', e && e.message); relayFail(e); });
+    queueOut(ses, m);
     if (ses.online) remoteUpsert({ id: m.id, room: ses.code, kind: 'msg', payload: m }).catch(function (e) { warn('online send failed', e && e.message); });
     return m;
   }
@@ -336,6 +383,7 @@
     var wire = { value: e.value, t: e.t, from: e.from };
     lsSet(k(ses.code, 'state.' + key), JSON.stringify(wire));
     try { if (ses.bc) ses.bc.postMessage({ k: 'state', key: key, e: wire }); } catch (x) { /* ignore */ }
+    ses.mine[key] = wire;
     if (ses.relay) api('/rooms/' + ses.code + '/state/' + encodeURIComponent(key), { method: 'PUT', body: wire }).catch(function (x) { relayFail(x); });
     if (ses.online) remoteUpsert({ id: 'state:' + ses.code + ':' + key, room: ses.code, kind: 'state', payload: { key: key, entry: wire }, updated_at: new Date().toISOString() }).catch(function () { });
     return true;

@@ -53,9 +53,9 @@
     var sl = of(E.buildSchedule(cfg(), todos, [], NOW).blocks, 'sleep');
     sl.forEach(function (b) { assert.strictEqual(mins(b), 480); });
   });
-  t('no two blocks overlap (30 mixed tasks + objectives)', function () {
+  t('no two blocks overlap (30 mixed tasks + mission tasks)', function () {
     var todos = []; for (var i = 0; i < 30; i++) todos.push(task('n' + i, { estMin: 20 + (i * 7) % 200, importance: 1 + i % 5, deadline: i % 3 ? iso(at(1 + i % 5, 17)) : null }));
-    var objs = [{ id: 'o1', title: 'Obj 1' }, { id: 'o2', title: 'Obj 2' }];
+    var objs = [{ id: 'task-1-1', title: 'Task 1', estMin: 45 }, { id: 'task-1-2', title: 'Task 2', estMin: 25 }];
     var r = E.buildSchedule(cfg(), todos, objs, NOW);
     noOverlap(r.blocks);
     assert.ok(workBlocks(r.blocks).length > 10);
@@ -113,10 +113,22 @@
     assert.ok(workBlocks(r.blocks).some(function (b) { return b.refId === 'A'; }));
     assert.ok(!workBlocks(r.blocks).some(function (b) { return b.refId === 'B'; }));
   });
-  t('mission objectives are scheduled as type "mission" with their own refId', function () {
-    var r = E.buildSchedule(cfg(), [], [{ id: 'obj-1', title: 'Sample the delta' }], NOW);
-    var m = of(r.blocks, 'mission'); assert.ok(m.length >= 1); assert.strictEqual(m[0].refId, 'obj-1');
-    assert.strictEqual(m.reduce(function (a, b) { return a + mins(b); }, 0), 60);
+  t('mission tasks are scheduled as type "mission" with their own refId and their own estimate', function () {
+    var r = E.buildSchedule(cfg(), [], [{ id: 'task-1-1', title: 'Recover the sample tubes', estMin: 45 }], NOW);
+    var m = of(r.blocks, 'mission'); assert.ok(m.length >= 1); assert.strictEqual(m[0].refId, 'task-1-1');
+    assert.strictEqual(m.reduce(function (a, b) { return a + mins(b); }, 0), 45);
+  });
+  t('a mission task without an estimate gets the configured default (missionObjectiveMinutes)', function () {
+    var r = E.buildSchedule(cfg(), [], [{ id: 'task-x', title: 'No estimate' }], NOW);
+    assert.strictEqual(of(r.blocks, 'mission').reduce(function (a, b) { return a + mins(b); }, 0), cfg().work.missionObjectiveMinutes);
+  });
+  t('the 10 mission tasks are scheduled in the order given (stop order), all of them', function () {
+    var objs = []; for (var n = 1; n <= 5; n++) for (var o = 1; o <= 2; o++) objs.push({ id: 'task-' + n + '-' + o, title: 'T' + n + o, estMin: 20 + n * 5 + o });
+    var r = E.buildSchedule(cfg(), [], objs, NOW), seen = [];
+    of(r.blocks, 'mission').sort(function (a, b) { return new Date(a.start) - new Date(b.start); }).forEach(function (b) { if (seen.indexOf(b.refId) < 0) seen.push(b.refId); });
+    assert.strictEqual(seen.join(','), objs.map(function (x) { return x.id; }).join(','));
+    objs.forEach(function (x) { assert.strictEqual(of(r.blocks, 'mission').filter(function (b) { return b.refId === x.id; }).reduce(function (a, b) { return a + mins(b); }, 0), x.estMin); });
+    noOverlap(r.blocks);
   });
   t('long jobs are split into blocks no longer than the work block maximum', function () {
     var r = E.buildSchedule(cfg(), [task('long', { estMin: 400 })], [], NOW);

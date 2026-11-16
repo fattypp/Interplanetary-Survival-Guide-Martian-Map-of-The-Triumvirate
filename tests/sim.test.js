@@ -3,19 +3,27 @@
    Browser: serve the repo root, open jezero-delta-atlas/web/html/control.html (window.JdaSim exists), load this file with a <script> tag;
             result in window.SIM_TEST_RESULT = {passed, failed, failures}. */
 (function (root) {
-  var S = typeof module !== 'undefined' && module.exports ? require('../jezero-delta-atlas/web/js/sim-core.js') : root.JdaSim;
+  var isNode = typeof module !== 'undefined' && module.exports;
+  if (isNode) { globalThis.window = globalThis; require('../jezero-delta-atlas/web/data/mission-data.js'); require('../jezero-delta-atlas/web/data/travel-speeds.js'); }   // the data files assign to window.*
+  var S = isNode ? require('../jezero-delta-atlas/web/js/sim-core.js') : root.JdaSim;
+  var MI = S.missionInfo(), SP = S.speeds(), BASE = MI.base, STOPS = MI.stops;
   var res = { passed: 0, failed: 0, failures: [] };
   function ok(c, m) { if (!c) throw new Error(m || 'not ok'); }
   function near(a, b, t, m) { if (!(Math.abs(a - b) <= t)) throw new Error((m || 'near') + ': expected ~' + b + ' got ' + a); }
   function test(n, f) { try { f(); res.passed++; } catch (e) { res.failed++; res.failures.push(n + ' -> ' + e.message); } }
   function mk(seed) { return S.create({ seed: seed || 1, crew: [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }] }); }
+  function window_has() { return !!(globalThis.window || root).JEZERO_MISSION; }
+  function window_mission() { return (globalThis.window || root).JEZERO_MISSION; }
+  function window_speeds() { return (globalThis.window || root).JEZERO_SPEEDS; }
   function run(sim, ms, step) { for (var t = 0; t < ms; t += step || 100) sim.tick(step || 100); }
-  var HAWKS = { lat: S.PLACES.hawks.lat, lon: S.PLACES.hawks.lon, label: 'Hawksbill Gap' };
+  var HAWKS = { lat: STOPS[1].lat, lon: STOPS[1].lon, label: STOPS[1].name };   // stop 2, about 0.8 km from base
+  function stopPath() { return STOPS.slice(2).map(function (p) { return { lat: p.lat, lon: p.lon, label: p.name }; }); }
 
   test('world schema', function () {
     var w = mk().world(), c = w.crew.jayesh;
     ok(w.v === 1 && typeof w.t === 'string' && w.clockSpeed === 1 && w.base.lat && w.events.solar === false && w.events.dust === false);
-    ['id','name','lat','lon','zM','x','y','headingDeg','o2Pct','batPct','hr','suitTempC','ambientTempC','radUsvH','doseMsv','mode','speedMps','target'].forEach(function (k) { ok(k in c, 'missing ' + k); });
+    ['id','name','lat','lon','zM','x','y','headingDeg','o2Pct','batPct','hr','suitTempC','ambientTempC','radUsvH','doseMsv','mode','speedMps','target','travel','stopId','taskId','progress','distM','etaS'].forEach(function (k) { ok(k in c, 'missing ' + k); });
+    ok(c.travel === 'foot' && c.stopId === null && c.taskId === null && c.progress.done === 0 && c.progress.total === MI.tasks.length);
     ok(c.mode === 'idle' && c.target === null);
   });
   test('deterministic with the same seed and inputs', function () {
@@ -27,7 +35,7 @@
     var s = mk(); s.command({ cmd: 'walk', crew: 'jayesh', to: HAWKS });
     var d0 = S.distM(s.world().crew.jayesh, HAWKS); run(s, 10000);
     var d1 = S.distM(s.world().crew.jayesh, HAWKS), w = s.world().crew.jayesh;
-    near(d0 - d1, 14, 0.5, 'moved 10 s x 1.4 m/s'); ok(w.mode === 'walking' && w.speedMps === 1.4 && w.target.label === 'Hawksbill Gap');
+    near(d0 - d1, 10 * SP.foot, 0.5, 'moved 10 s at the foot speed'); ok(w.mode === 'walking' && w.speedMps === SP.foot && w.target.label === HAWKS.label);
   });
   test('clock x60 moves 60 times as far', function () {
     var a = mk(), b = mk();
@@ -40,20 +48,73 @@
     var s = mk(); s.command({ cmd: 'setClockSpeed', n: 3600 }); s.command({ cmd: 'walk', crew: 'jayesh', to: HAWKS });
     run(s, 20000); var c = s.world().crew.jayesh; ok(c.mode === 'idle', c.mode); near(S.distM(c, HAWKS), 0, 1);
     s.command({ cmd: 'return', crew: 'jayesh' }); ok(s.world().crew.jayesh.mode === 'returning'); run(s, 30000);
-    c = s.world().crew.jayesh; ok(c.mode === 'resting', c.mode); near(S.distM(c, S.PLACES.landing), 0, 1);
+    c = s.world().crew.jayesh; ok(c.mode === 'resting', c.mode); near(S.distM(c, BASE), 0, 1);
   });
   test('stop, heading walk, multi-waypoint path with thenReturn', function () {
     var s = mk(); s.command({ cmd: 'walk', crew: 'jayesh', heading: 90 }); run(s, 5000);
-    var c = s.world().crew.jayesh; near(c.headingDeg, 90, 0.1); ok(c.lon > S.PLACES.landing.lon);
+    var c = s.world().crew.jayesh; near(c.headingDeg, 90, 0.1); ok(c.lon > BASE.lon);
     s.command({ cmd: 'stop', crew: 'jayesh' }); ok(s.world().crew.jayesh.mode === 'idle' && s.world().crew.jayesh.speedMps === 0);
-    s.command({ cmd: 'setClockSpeed', n: 3600 }); s.command({ cmd: 'walk', crew: 'juhyeok', to: HAWKS, path: S.demoPath(), thenReturn: true });
+    s.command({ cmd: 'setClockSpeed', n: 3600 }); s.command({ cmd: 'walk', crew: 'juhyeok', to: HAWKS, path: stopPath(), thenReturn: true });
     var seen = {}; for (var i = 0; i < 600; i++) { s.tick(100); var t = s.world().crew.juhyeok.target; if (t && t.label) seen[t.label] = 1; }
-    ok(Object.keys(seen).length >= 6, 'stops seen: ' + Object.keys(seen)); ok(s.world().crew.juhyeok.mode === 'resting', s.world().crew.juhyeok.mode);
+    ok(Object.keys(seen).length >= STOPS.length, 'stops seen: ' + Object.keys(seen)); ok(s.world().crew.juhyeok.mode === 'resting', s.world().crew.juhyeok.mode);
   });
   test('walking drains oxygen and battery faster than standing', function () {
-    var s = mk(); s.command({ cmd: 'walk', crew: 'jayesh', to: HAWKS }); s.command({ cmd: 'setClockSpeed', n: 3600 }); run(s, 1000);
+    var s = mk(); s.command({ cmd: 'walk', crew: 'jayesh', to: { lat: BASE.lat + 0.5, lon: BASE.lon } }); s.command({ cmd: 'setClockSpeed', n: 3600 }); run(s, 1000);
     var w = s.world(), a = 100 - w.crew.jayesh.o2Pct, b = 100 - w.crew.juhyeok.o2Pct;
     ok(a > b * 1.8 && b > 0, a + ' vs ' + b); ok(100 - w.crew.jayesh.batPct > 100 - w.crew.juhyeok.batPct);
+  });
+  test('base is the mission base camp (inside the map); speeds come from JEZERO_SPEEDS', function () {
+    var w = mk().world();
+    ok(window_has(), 'mission data'); near(w.base.lat, window_mission().base.lat, 1e-9); near(w.base.lon, window_mission().base.lon, 1e-9);
+    ok(S.distM(w.crew.jayesh, BASE) < 30 && w.crew.jayesh.x > 0 && w.crew.jayesh.x < 1990 && w.crew.jayesh.y > 0 && w.crew.jayesh.y < 1390, 'crew starts at base, on the map');
+    near(SP.foot, window_speeds().foot.mps, 1e-9); near(SP.rover, window_speeds().rover.mps, 1e-9); ok(SP.rover > SP.foot);
+    var s = mk(); s.command({ cmd: 'walk', crew: 'jayesh', to: HAWKS, travel: 'rover' }); run(s, 1000);
+    var c = s.world().crew.jayesh; ok(c.travel === 'rover' && c.speedMps === SP.rover, 'rover speed ' + c.speedMps);
+    s.command({ cmd: 'setTravel', crew: 'jayesh', mode: 'foot' }); run(s, 1000); ok(s.world().crew.jayesh.speedMps === SP.foot);
+    ok(!s.command({ cmd: 'setTravel', crew: 'jayesh', mode: 'boat' }).ok);
+    s.command({ cmd: 'return', crew: 'jayesh' }); s.command({ cmd: 'setClockSpeed', n: 3600 }); run(s, 20000); near(S.distM(s.world().crew.jayesh, BASE), 0, 1);
+  });
+  test('oxygen: rover uses cabin air, on foot (EVA) drains much more', function () {
+    var s = mk(); s.command({ cmd: 'setClockSpeed', n: 3600 });
+    s.command({ cmd: 'walk', crew: 'jayesh', to: { lat: BASE.lat + 0.5, lon: BASE.lon }, travel: 'rover' });
+    s.command({ cmd: 'walk', crew: 'juhyeok', to: { lat: BASE.lat + 0.5, lon: BASE.lon }, travel: 'foot' });
+    run(s, 1000); var w = s.world(), r = w.crew.jayesh, f = w.crew.juhyeok;
+    ok(r.o2Pct === 100, 'rover o2 ' + r.o2Pct); ok(f.o2Pct < 95, 'foot o2 ' + f.o2Pct);
+    ok(100 - r.batPct < (100 - f.batPct) / 3, 'battery ' + r.batPct + ' vs ' + f.batPct); ok(r.hr < f.hr - 15, 'hr ' + r.hr + ' vs ' + f.hr);
+  });
+  test('run mission: base -> 5 stops by rover, EVA at each, back to base', function () {
+    var s = mk(); ok(STOPS.length === 5 && MI.tasks.length === 10, 'mission data: ' + STOPS.length + ' stops, ' + MI.tasks.length + ' tasks');
+    ok(s.command({ cmd: 'setClockSpeed', n: 600 }).ok && s.command({ cmd: 'runMission', crew: 'jayesh' }).ok);
+    var visited = [], tasksSeen = {}, modes = {}, prevDone = 0, evaO2 = [], lastO2 = 100;
+    for (var i = 0; i < 60000 && s.world().crew.jayesh.mode !== 'resting'; i++) {
+      s.tick(100); var c = s.world().crew.jayesh;
+      if (c.stopId && visited[visited.length - 1] !== c.stopId) visited.push(c.stopId);
+      if (c.taskId) tasksSeen[c.taskId] = 1;
+      modes[c.travel + ':' + (c.stopId ? 'eva' : 'drive')] = 1;
+      if (c.stopId) ok(c.travel === 'foot', 'on foot at a stop'); else if (c.mode !== 'resting') ok(c.travel === 'rover', 'rover between stops');
+      ok(c.progress.done >= prevDone && c.progress.done <= c.progress.total); prevDone = c.progress.done;
+    }
+    var c = s.world().crew.jayesh;
+    ok(visited.join() === STOPS.map(function (p) { return p.id; }).join(), 'order ' + visited);
+    ok(Object.keys(tasksSeen).length === MI.tasks.length, 'tasks seen ' + Object.keys(tasksSeen).length);
+    ok(c.mode === 'resting' && S.distM(c, BASE) < 1 && c.progress.done === c.progress.total && c.stopId === null && c.travel === 'foot', JSON.stringify(c));
+    ok(modes['rover:drive'] && modes['foot:eva']);
+    ok(c.o2Pct > 0 && c.o2Pct < 100, 'oxygen used only on foot: ' + c.o2Pct);
+    var j = s.world().crew.juhyeok; ok(j.mode === 'idle' && j.progress.done === 0, 'the other crew member is not affected');
+  });
+  test('run mission: EVA time is the sum of the stop tasks, drive time uses the rover speed', function () {
+    var s = mk(), tot = 0; MI.tasks.forEach(function (t) { tot += t.estMin * 60; });
+    var legs = 0, p = BASE; STOPS.concat([BASE]).forEach(function (q) { legs += S.distM(p, q); p = q; });
+    s.command({ cmd: 'setClockSpeed', n: 100 }); s.command({ cmd: 'runMission', crew: 'jayesh' });
+    var t0 = Date.parse(s.world().t); for (var i = 0; i < 200000 && s.world().crew.jayesh.mode !== 'resting'; i++) s.tick(100);
+    var sim = (Date.parse(s.world().t) - t0) / 1000, expect = tot + legs / SP.rover + 0;
+    near(sim, expect, expect * 0.02 + 120, 'mission duration s');
+  });
+  test('manual stop cancels a mission run; mission run is deterministic', function () {
+    var a = mk(3), b = mk(3);
+    [a, b].forEach(function (s) { s.command({ cmd: 'setClockSpeed', n: 300 }); s.command({ cmd: 'runMission', crew: 'all' }); run(s, 8000); });
+    ok(JSON.stringify(a.world()) === JSON.stringify(b.world()));
+    a.command({ cmd: 'stop', crew: 'jayesh' }); var c = a.world().crew.jayesh; ok(c.mode === 'idle' && c.stopId === null); run(a, 2000); ok(a.world().crew.jayesh.mode === 'idle');
   });
   test('speed command changes pace, clamps', function () {
     var s = mk(); s.command({ cmd: 'setSpeed', crew: 'jayesh', mps: 5 }); s.command({ cmd: 'walk', crew: 'jayesh', to: HAWKS });
@@ -112,6 +173,26 @@
   test('huge dt is bounded and finite', function () {
     var s = mk(); s.command({ cmd: 'setClockSpeed', n: 100000 }); s.command({ cmd: 'walk', crew: 'jayesh', heading: 45 }); s.tick(1e9);
     var c = s.world().crew.jayesh; ok(isFinite(c.lat) && isFinite(c.lon) && isFinite(c.o2Pct));
+  });
+
+  test('operator set: lon wraps, dose is capped, reserved crew ids are renamed', function () {
+    var s = mk();
+    ok(s.command({ cmd: 'set', crew: 'jayesh', field: 'lon', value: -540 }).ok); near(s.world().crew.jayesh.lon, -180, 1e-6, 'lon -540 wraps to -180');
+    ok(s.command({ cmd: 'set', crew: 'jayesh', field: 'lon', value: 1e9 }).ok); var lo = s.world().crew.jayesh.lon; ok(lo >= -180 && lo < 180, 'lon in range: ' + lo);
+    ok(s.command({ cmd: 'set', crew: 'jayesh', field: 'doseMsv', value: 1e12 }).ok); ok(s.world().crew.jayesh.doseMsv <= 1e5);
+    ['all', 'earth', 'control', 'me'].forEach(function (id) { var r = s.addCrew({ id: id, name: id }); ok(r.ok && r.id !== id && !!s.world().crew[r.id], 'reserved id ' + id + ' -> ' + r.id); });
+    ok(!s.world().crew.all);
+  });
+
+  test('world-client fallback: in a joined room only this crew (plus known crew), stand-alone keeps the defaults', function () {
+    var W = root.JdaWorld, L = root.JdaLink; if (!W || !W._localCrewList) return;   // browser pages that load world-client.js only
+    var ids = W._localCrewList().map(function (c) { return c.id; });
+    ok(ids[0] === W.id(), 'own crew first');
+    if (L && L.room && !L.room.implicit && L.room.code !== 'LOCAL' && L.room.role !== 'legacy') {
+      var known = {}; ((W.world() && W.world().crew && Object.keys(W.world().crew)) || []).forEach(function (k) { known[k] = 1; });
+      ((L.presence && L.presence()) || []).forEach(function (p) { known[String(p.id).toLowerCase()] = 1; });
+      ids.forEach(function (i) { ok(i === W.id() || known[i], 'invented teammate ' + i); });
+    } else ok(ids.indexOf('jayesh') >= 0 && ids.indexOf('juhyeok') >= 0, 'stand-alone defaults');
   });
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -1,5 +1,5 @@
 /* Reference data for the tablet global map (web/js/tablet.js).
-   Landing sites: published lat / lon of the mission landing points (planetographic latitude, east-positive longitude).
+   Landing sites of OTHER missions (context only, unrelated to the crew's five stops): published lat / lon of the mission landing points (planetographic latitude, east-positive longitude).
    Map image: web/images/mars-global.jpg, equirectangular, -180..+180 E, 90 N at the top (see docs/IMAGE-CREDITS.md). */
 window.MARS_SITES = {
   radiusKm: 3389.5,
@@ -25,43 +25,6 @@ window.MARS_SITES = {
     { id: 'insight', name: 'InSight', lat: 4.5, lon: 135.62 },
     { id: 'perseverance', name: 'Perseverance', lat: 18.4446, lon: 77.4509 }
   ],
-  /* Jezero crater region used when a mission task is selected */
-  jezero: { lat: 18.485, lon: 77.355, ppd: 2800 },
-  /* lat, lon of the stops in docs/mission-guide.md (landing exact; the others are positions drawn on the detailed Jezero map, approximate) */
-  stopPos: {
-    "sample-1": [18.426, 77.4607],
-    "sample-2": [18.3998, 77.4325],
-    "sample-3": [18.3877, 77.4346],
-    "sample-4": [18.4029, 77.4078],
-    "sample-5": [18.4061, 77.396],
-    "sample-6": [18.3983, 77.4096],
-    "sample-7": [18.4118, 77.3959],
-    "sample-8": [18.4491, 77.4506],
-    "sample-9": [18.4381, 77.4558],
-    "sample-10": [18.4642, 77.4271],
-    "sample-11": [18.464, 77.4149],
-    "sample-12": [18.4603, 77.4301],
-    "sample-13": [18.4694, 77.4132],
-    "sample-14": [18.454, 77.4298],
-    "sample-15": [18.476, 77.4158],
-    "sample-16": [18.4478, 77.4248],
-    "sample-17": [18.4809, 77.4231],
-    "sample-18": [18.445, 77.4156],
-    "sample-19": [18.5167, 77.3419],
-    "sample-20": [18.5219, 77.3529],
-    "sample-21": [18.519, 77.3375],
-    "sample-22": [18.4159, 77.2939],
-    "sample-23": [18.4091, 77.2837],
-    "sample-24": [18.4142, 77.2985],
-    "sample-25": [18.556, 77.2479],
-    "sample-26": [18.3919, 77.2548],
-    "sample-27": [18.3886, 77.2666],
-    "sample-28": [18.3965, 77.253],
-    "place-landing": [18.4446, 77.4509],
-    "place-hawksbill-gap": [18.4785, 77.399],
-    "place-three-forks": [18.4468, 77.4278],
-    "place-neretva-vallis": [18.5847, 77.2513],
-    "place-witch-hazel-hill": [18.3965, 77.2601],
-    "place-seitah": [18.4071, 77.4131]
-  }
+  /* Fallback view of the Jezero CTX tile (centre of the mosaic); the tablet fits the view to base camp and the stops from JEZERO_MISSION */
+  jezero: { lat: 18.5068, lon: 77.3214, ppd: 2800 }
 };

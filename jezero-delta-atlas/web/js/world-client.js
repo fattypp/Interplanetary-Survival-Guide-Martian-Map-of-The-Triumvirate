@@ -7,7 +7,7 @@
   var STALE_MS = 4000, LOCAL_TICK_MS = 200;
   var DEFAULT_CREW = [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }];
 
-  var listeners = [], world = null, lastAuthMs = 0, source = 'local';
+  var listeners = [], world = null, authWorld = null, lastAuthMs = 0, source = 'local';
   var local = null, localTimer = null, lastLocalMs = 0, meOverride = null, offState = null, offLink = null, lastLinkRoom = null;
 
   function emit() {
@@ -30,11 +30,24 @@
   }
 
   /* ---- local fallback ---- */
+  function inRoom() {
+    var L = root.JdaLink, r = L && L.room;
+    return !!(r && !r.implicit && r.code !== 'LOCAL' && r.role !== 'legacy');
+  }
+  /* Crew simulated by the local fallback. Stand-alone (no room): this page's crew plus the two default crew members.
+     In a joined room: only this page's crew plus crew that really exist there (the last real world, presence); no invented teammates. */
   function localCrewList() {
     var id = meId(), list = [];
     var mine = DEFAULT_CREW.filter(function (c) { return c.id === id; })[0] || { id: id, name: id.charAt(0).toUpperCase() + id.slice(1) };
     list.push(mine);
-    DEFAULT_CREW.forEach(function (c) { if (c.id !== mine.id) list.push(c); });
+    function add(cid, name) {
+      cid = String(cid || '').toLowerCase();
+      if (!cid || list.some(function (c) { return c.id === cid; })) return;
+      list.push({ id: cid, name: name || cid.charAt(0).toUpperCase() + cid.slice(1) });
+    }
+    if (!inRoom()) { DEFAULT_CREW.forEach(function (c) { add(c.id, c.name); }); return list; }
+    if (authWorld && authWorld.crew) Object.keys(authWorld.crew).forEach(function (k) { add(k, authWorld.crew[k] && authWorld.crew[k].name); });
+    try { ((root.JdaLink.presence && root.JdaLink.presence()) || []).forEach(function (p) { if (p && ['crew', 'helmet', 'tablet'].indexOf(p.role) >= 0) add(p.id, p.name); }); } catch (e) { /* no presence */ }
     return list;
   }
   function startLocal() {
@@ -61,7 +74,7 @@
 
   function onWorldState(value) {
     if (!validWorld(value)) return;
-    world = value;
+    world = value; authWorld = value;
     if (value.stale) {   // the authority announced it is going away: fall back at once, continuing from this world
       lastAuthMs = 0; source = 'local';
       if (localTimer) stopLocal();
@@ -78,6 +91,8 @@
     var L = root.JdaLink;
     if (L && L.room && lastLinkRoom !== L.room.code && typeof L.onState === 'function') {
       lastLinkRoom = L.room.code;
+      world = null; if (localTimer) stopLocal();   // a fallback started before joining simulated the stand-alone crew: restart it for this room
+      authWorld = null;
       if (offState) { try { offState(); } catch (e) { /* ignore */ } }
       offState = L.onState('world', function (v) { onWorldState(v); });
       if (L.getState) { var cur = L.getState('world'); if (cur && cur.value) onWorldState(cur.value); }
@@ -99,6 +114,7 @@
     time: function () { return world ? new Date(world.t) : new Date(); },
     world: function () { return world; },
     id: meId,
+    _localCrewList: localCrewList,   // for tests
     setMe: function (id) {
       meOverride = id ? String(id).toLowerCase() : null;
       if (local && meOverride && local.crewIds().indexOf(meOverride) < 0) local.addCrew({ id: meOverride, name: meOverride.charAt(0).toUpperCase() + meOverride.slice(1) });
@@ -119,7 +135,7 @@
     command: function (cmd) {
       if (!cmd) return { ok: false, error: 'no command' };
       if (source === 'authority' && root.JdaLink && root.JdaLink.send) {
-        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed });
+        root.JdaLink.send({ type: 'cmd', cmd: cmd.cmd, crew: cmd.crew || meId(), to: cmd.to, heading: cmd.heading, path: cmd.path, mps: cmd.mps, n: cmd.n, field: cmd.field, value: cmd.value, solar: cmd.solar, dust: cmd.dust, speed: cmd.speed, travel: cmd.travel, mode: cmd.mode, thenReturn: cmd.thenReturn });
         return { ok: true, sent: true };
       }
       if (local) { var c = {}; for (var k in cmd) c[k] = cmd[k]; if (!c.crew) c.crew = meId(); return local.command(c); }

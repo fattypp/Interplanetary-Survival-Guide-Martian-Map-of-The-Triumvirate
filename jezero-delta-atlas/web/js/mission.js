@@ -1,4 +1,4 @@
-/* Mission feature: stops (from docs/mission-guide.md via data/mission-data.js), pin layer 'mission-stops',
+/* Mission feature: base camp, 5 stops and their 10 tasks (docs/mission-guide.md via data/mission-data.js), pin layer 'mission-stops',
    Mission tab, user-added missions, and the Atlas.missions API (see docs/ARCHITECTURE.md). */
 (function () {
   'use strict';
@@ -35,43 +35,60 @@
   var MAX_TITLE = 80, MAX_DESC = 500, MAX_CUSTOM = 200;
   var NS = 'http://www.w3.org/2000/svg';
 
-  /* ---------- positions: taken from Atlas.mapData (the exact values the sample and place layers draw) ----------
-     mapData x,y are true page pixels even when onMap is false (outside the current map). */
-  var PLACE_KEY = { 'place-landing': 'landing', 'place-hawksbill-gap': 'hawks', 'place-three-forks': 'three',
-    'place-neretva-vallis': 'neretva', 'place-witch-hazel-hill': 'whh', 'place-seitah': 'seitah' };
-  var MD = A.mapData || { samples: [], places: [] };
-  function mdSample(n) { for (var i = 0; i < MD.samples.length; i++) if (MD.samples[i].n === n) return MD.samples[i]; return null; }
-  function mdPlace(key) { for (var i = 0; i < MD.places.length; i++) if (MD.places[i].id === key) return MD.places[i]; return null; }
   function inMap(x, y) { return x >= 0 && x <= A.W && y >= 0 && y <= A.H; }
 
   /* ---------- state ---------- */
   var objectives = D.objectives || [];
-  var objIndex = {}; objectives.forEach(function (o, i) { objIndex[o.id] = i + 1; });
+  var objById = {}; objectives.forEach(function (o) { objById[o.id] = o; });
   var done = A.store.get('mission.done', {}); if (!done || typeof done !== 'object' || Array.isArray(done)) done = {};
   var custom = A.store.get('mission.custom', []); if (!Array.isArray(custom)) custom = [];
-  custom = custom.filter(function (c) { return c && typeof c.id === 'string' && typeof c.title === 'string'; });
+  (function () {   // saved missions from older versions or a corrupt store: keep usable ones, drop duplicate ids and off-map positions
+    var seen = {};
+    custom = custom.filter(function (c) {
+      if (!c || typeof c !== 'object' || typeof c.id !== 'string' || typeof c.title !== 'string' || seen[c.id] || taskByIdEarly(c.id)) return false;
+      seen[c.id] = 1;
+      if (typeof c.description !== 'string') c.description = '';
+      if (typeof c.x !== 'number' || typeof c.y !== 'number' || !isFinite(c.x) || !isFinite(c.y) || !inMap(c.x, c.y)) { c.x = null; c.y = null; }
+      return true;
+    });
+    function taskByIdEarly(id) { return (D.tasks || []).some(function (t) { return t.id === id; }) || (D.stops || []).some(function (t) { return t.id === id; }) || id === 'base'; }
+  })();
   var seq = Number(A.store.get('mission.seq', 0)) || 0;
   custom.forEach(function (c) { var n = parseInt(String(c.id).replace('custom-', ''), 10); if (n > seq) seq = n; });
 
-  var stops = [];
-  (D.stops || []).forEach(function (s) {
-    var p = null, num = parseInt(s.id.replace('sample-', ''), 10) || s.no, md = null;
-    if (s.kind === 'sample') md = mdSample(num); else md = mdPlace(PLACE_KEY[s.id]);
-    if (md) p = [md.x, md.y];
-    else if (typeof s.lat === 'number' && typeof s.lon === 'number') p = A.xy(s.lon, s.lat);   // a stop added to the guide with its own position
-    var hasPos = !!p, on = hasPos && inMap(p[0], p[1]), q = hasPos ? A.ll(p[0], p[1]) : null;
-    var approx = s.kind === 'sample' || (s.id !== 'place-landing' && !(typeof s.lat === 'number'));
-    stops.push({
-      id: s.id, no: s.no, name: s.name, sub: s.kind, area: s.area, sol: s.sol, date: s.date, objectives: s.objectives || [],
-      title: s.kind === 'sample' ? 'Sample ' + num + ' · ' + s.name : s.name,
-      kind: 'stop', description: s.description, x: on ? p[0] : null, y: on ? p[1] : null, lat: q ? q[1] : null, lon: q ? q[0] : null,
-      source: SRC, onMap: on, hasPos: hasPos, approx: approx, px: hasPos ? p[0] : null, py: hasPos ? p[1] : null
-    });
+  /* Base camp, the 5 stops and the 10 tasks come from data/mission-data.js (generated from docs/mission-guide.md).
+     x,y are page px; lat/lon come back through Atlas.ll so they agree with the map readout. */
+  function place(o) {
+    var q = A.ll(o.x, o.y);
+    return { x: o.x, y: o.y, lat: q[1], lon: q[0], onMap: inMap(o.x, o.y) };
+  }
+  var base = (function () {
+    var b = D.base || { id: 'base', name: 'Base camp', x: A.W - 24, y: A.H / 2 };
+    var p = place(b);
+    return { id: 'base', name: b.name, title: b.name, kind: 'base', description: b.description || 'Start and end of the drive. Confirm the ground is flat and rock-free enough to live on.',
+      x: p.x, y: p.y, lat: p.lat, lon: p.lon, source: SRC, onMap: p.onMap };
+  })();
+  var stops = (D.stops || []).map(function (s) {
+    var p = place(s);
+    return { id: s.id, no: s.n, n: s.n, name: s.name, title: s.name, kind: 'stop', description: s.description, x: p.x, y: p.y, lat: p.lat, lon: p.lon,
+      source: SRC, onMap: p.onMap, objectives: objectives.map(function (o) { return o.id; }), taskIds: [] };
   });
+  var stopById = {}; stops.forEach(function (s) { stopById[s.id] = s; });
+  var tasks = (D.tasks || []).filter(function (t) { return stopById[t.stopId]; }).map(function (t) {
+    var s = stopById[t.stopId], o = objById[t.objective] || {};
+    s.taskIds.push(t.id);
+    return { id: t.id, kind: 'task', stopId: s.id, stopNo: s.n, stopName: s.name, objective: t.objective, objectiveShort: o.short || ('Objective ' + t.objective),
+      title: t.title, description: t.description, estMin: t.estMin, x: s.x, y: s.y, lat: s.lat, lon: s.lon, source: SRC, onMap: s.onMap };
+  });
+  var taskById = {}; tasks.forEach(function (t) { taskById[t.id] = t; });
 
   function save() { A.store.set('mission.done', done); A.store.set('mission.custom', custom); A.store.set('mission.seq', seq); }
   function changed(reason, id) { A.bus.emit('missions:changed', { reason: reason, id: id || null }); }
-  function isDone(id) { return !!done[id]; }
+  function isDone(id) {
+    var s = stopById[id];
+    if (s) return s.taskIds.length > 0 && s.taskIds.every(function (t) { return !!done[t]; });   // a stop is visited when both its tasks are done
+    return !!done[id];
+  }
 
   function customView(c, i) {
     var hasPos = typeof c.x === 'number' && typeof c.y === 'number', q = hasPos ? A.ll(c.x, c.y) : null;
@@ -82,8 +99,10 @@
   }
   function stopView(s) {
     var o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; });
-    o.objectives = s.objectives.slice(); o.done = isDone(s.id); return o;
+    o.objectives = s.objectives.slice(); o.taskIds = s.taskIds.slice(); o.done = isDone(s.id); return o;
   }
+  function taskView(t) { var o = {}; Object.keys(t).forEach(function (k) { o[k] = t[k]; }); o.done = isDone(t.id); return o; }
+  function baseView() { var o = {}; Object.keys(base).forEach(function (k) { o[k] = base[k]; }); return o; }
 
   /* ---------- validation and API ---------- */
   function validate(m) {
@@ -106,14 +125,18 @@
     return errs.length ? { errors: errs } : { value: { title: title, description: desc, x: x, y: y } };
   }
 
+  /* Atlas.missions.list(): objectives, stops, tasks, then user missions. kind is 'objective' | 'stop' | 'task' | 'custom'.
+     Base camp is not a stop: it is Atlas.missions.base(). setDone(id) accepts a task (one task), a stop (both its tasks) or a custom mission. */
   var API = A.missions = {
     list: function () {
       var out = objectives.map(function (o) {
-        return { id: o.id, title: o.title, kind: 'objective', description: o.text, x: null, y: null, lat: null, lon: null, source: SRC };
+        return { id: o.id, title: o.title, short: o.short, kind: 'objective', description: o.title, x: null, y: null, lat: null, lon: null, source: SRC };
       });
-      return out.concat(stops.map(stopView), custom.map(customView));
+      return out.concat(stops.map(stopView), tasks.map(taskView), custom.map(customView));
     },
     stops: function () { return stops.map(stopView); },
+    tasks: function () { return tasks.map(taskView); },
+    base: baseView,
     /* returns the new mission, or null when the input is invalid (use A.missions.validate for the reasons) */
     add: function (m) {
       var v = validate(m);
@@ -129,34 +152,78 @@
       custom.splice(i, 1); delete done[id]; save(); changed('remove', id); return true;
     },
     setDone: function (id, flag) {
-      var known = stops.some(function (s) { return s.id === id; }) || custom.some(function (c) { return c.id === id; });
-      if (!known) return false;
-      if (flag) done[id] = true; else delete done[id];
+      var s = stopById[id], ids = s ? s.taskIds : (taskById[id] || custom.some(function (c) { return c.id === id; })) ? [id] : null;
+      if (!ids) return false;
+      ids.forEach(function (k) { if (flag) done[k] = true; else delete done[k]; });
       save(); changed('done', id); return true;
     },
-    isDone: isDone
+    isDone: isDone,
+    /* testing hook: behave as if the world run reports n finished tasks (see 'mission run mirror' below) */
+    _applyRun: function (n) { applyRun(n); }
   };
+
+  /* ---------- mission run mirror ----------
+     While a world authority (control page) runs the mission, this crew member's record has progress:{done,total}. The first `done`
+     tasks (mission order, 2 per stop) are marked done here, so the Mission tab, Planner and schedule show them as done.
+     - Marked once per task (runHandled): a task the user un-ticks afterwards is NOT ticked again until the run restarts.
+     - A task ticked or un-ticked by hand leaves runMarked (the user owns it from then on).
+     - progress.done going down means the run restarted: tasks marked by the run (and still in runMarked) are re-opened, handling is reset.
+     - Nothing is published back to the world. Without an authority nothing here runs and manual ticking is unchanged. The run state (handled / marked / last) is kept in jda.mission.run so a reload does not forget which ticks came from the run. */
+  var runSaved = A.store.get('mission.run', null);
+  if (!runSaved || typeof runSaved !== 'object' || Array.isArray(runSaved)) runSaved = {};
+  function idMap(v) { var o = {}; if (v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function (k) { if (v[k] === true && taskById[k]) o[k] = true; }); return o; }
+  var runHandled = idMap(runSaved.handled), runMarked = idMap(runSaved.marked), runLast = isFinite(Number(runSaved.last)) ? Math.max(-1, Math.floor(Number(runSaved.last))) : -1;
+  function saveRun() { A.store.set('mission.run', { handled: runHandled, marked: runMarked, last: runLast }); }
+  function applyRun(n) {
+    n = Math.max(0, Math.min(tasks.length, Math.floor(Number(n)) || 0));
+    var chg = false;
+    if (n < runLast) {
+      tasks.forEach(function (t) { if (runMarked[t.id] && done[t.id]) { delete done[t.id]; chg = true; } });
+      runHandled = {}; runMarked = {};
+    }
+    runLast = n;
+    for (var i = 0; i < n; i++) {
+      var id = tasks[i].id;
+      if (runHandled[id]) continue;
+      runHandled[id] = true;
+      if (!done[id]) { done[id] = true; runMarked[id] = true; chg = true; }
+    }
+    saveRun();
+    if (chg) { save(); changed('run'); }
+  }
+  var setDoneUser = API.setDone;
+  API.setDone = function (id, flag) {
+    var s = stopById[id], ids = s ? s.taskIds : [id];
+    ids.forEach(function (k) { delete runMarked[k]; });
+    saveRun();
+    return setDoneUser(id, flag);
+  };
+  if (window.JdaWorld && typeof window.JdaWorld.on === 'function') window.JdaWorld.on(function () {
+    var W = window.JdaWorld, me = null;
+    if (W.source !== 'authority') return;
+    try { me = W.me(); } catch (e) { me = null; }
+    if (me && me.progress && isFinite(Number(me.progress.done))) applyRun(me.progress.done);
+  });
 
   /* ---------- pin layer ---------- */
   var layer = A.el('g', { class: 'ms-layer' });
   var pend = A.el('g', { class: 'ms-pending' }, layer);   // preview pin while picking a location
   var pinsG = A.el('g', {}, layer);
   var PIN = 'M0,0 C-3,-8 -11,-13 -11,-20 A11,11 0 1 1 11,-20 C11,-13 3,-8 0,0Z';
+  var HOME = 'M0,0 L-9,-9 L-9,-20 L0,-27 L9,-20 L9,-9Z';   // base camp: a house-shaped marker, the tip is the point
 
-  function objClass(s) {
-    if (s.kind === 'custom') return 'ms-custom';
-    var n = s.objectives.length;
-    return n === 0 ? 'ms-none' : n > 1 ? 'ms-multi' : 'ms-o' + (((objIndex[s.objectives[0]] || 1) - 1) % 4 + 1);
+  function pinLabel(s) {
+    if (s.kind === 'base') return s.title + ', start and end of the drive';
+    if (s.kind === 'custom') return s.title + ' (my mission)' + (isDone(s.id) ? ', done' : '');
+    return 'Stop ' + s.no + ': ' + s.title + ', 2 tasks' + (isDone(s.id) ? ', done' : '');
   }
-  function objNames(s) { return s.objectives.map(function (id) { return 'Objective ' + objIndex[id]; }).join(', '); }
-  function pinLabel(s) { return s.title + (s.kind === 'custom' ? ' (my mission)' : ' (' + (objNames(s) || 'no objective') + ')') + (s.approx ? ', approximate position' : '') + (isDone(s.id) ? ', visited' : ''); }
-
   function makePin(s, text, parent) {
-    var g = A.el('g', { class: 'ms-pin hit ' + objClass(s) + (isDone(s.id) ? ' ms-done' : '') + (s.approx ? ' ms-approx' : ''), transform: 'translate(' + s.x + ' ' + s.y + ')', tabindex: '0', role: 'button', 'aria-label': pinLabel(s), 'data-id': s.id }, parent);
+    var cls = s.kind === 'custom' ? 'ms-custom' : s.kind === 'base' ? 'ms-base' : 'ms-multi';
+    var g = A.el('g', { class: 'ms-pin hit ' + cls + (s.kind !== 'base' && isDone(s.id) ? ' ms-done' : ''), transform: 'translate(' + s.x + ' ' + s.y + ')', tabindex: '0', role: 'button', 'aria-label': pinLabel(s), 'data-id': s.id }, parent);
     var k = A.el('g', { class: 'ms-s' }, g);
-    A.el('path', { class: 'ms-body', d: PIN }, k);
-    var t = A.el('text', { class: 'ms-num', x: 0, y: -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
-    if (isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
+    A.el('path', { class: 'ms-body', d: s.kind === 'base' ? HOME : PIN }, k);
+    var t = A.el('text', { class: 'ms-num', x: 0, y: s.kind === 'base' ? -12.5 : -16.5, 'text-anchor': 'middle' }, k); t.textContent = text;
+    if (s.kind !== 'base' && isDone(s.id)) { A.el('circle', { class: 'ms-tick', cx: 9, cy: -6, r: 5 }, k); A.el('path', { class: 'ms-tickp', d: 'M6.2 -6 L8.4 -3.8 L12 -8.2' }, k); }
     var lab = A.el('text', { class: 'ms-lab', x: 15, y: -14 }, k); lab.textContent = s.title;
     g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); select(s.id); });
     g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); select(s.id); } });
@@ -164,96 +231,38 @@
   }
   function drawPins() {
     while (pinsG.firstChild) pinsG.removeChild(pinsG.firstChild);
-    var n = 0;
+    makePin(base, 'B', pinsG);
     stops.forEach(function (s) { if (s.onMap) makePin(s, String(s.no), pinsG); });
     custom.forEach(function (c, i) { var v = customView(c, i); if (v.onMap) makePin(v, 'C' + (i + 1), pinsG); });
   }
 
-  /* ---------- edge markers for stops outside the map ---------- */
-  var KM_PER_DEG = 59.27;   // Mars, 3396 km radius (same constant atlas-map.js uses for its scale bar)
-  var DIRS = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast'];
-  function dirName(dx, dy) { var a = Math.atan2(dy, dx), i = Math.round(a / (Math.PI / 4)); return DIRS[(i + 8) % 8]; }
-  function kmBetween(x1, y1, x2, y2) {
-    var a = A.ll(x1, y1), b = A.ll(x2, y2), dl = (b[0] - a[0]) * Math.cos((a[1] + b[1]) / 2 * Math.PI / 180) * KM_PER_DEG, dp = (b[1] - a[1]) * KM_PER_DEG;
-    return Math.sqrt(dl * dl + dp * dp);
-  }
-  function fmtKm(k) { return k < 10 ? (Math.round(k * 10) / 10) + '' : Math.round(k) + ''; }
-  var EDGE_INSET = 30, CLUSTER = 70;   // page px
-  function edgePoint(px, py) {   // where the line from the map centre to the stop leaves the map, pulled EDGE_INSET inside
-    var cx = A.W / 2, cy = A.H / 2, dx = px - cx, dy = py - cy;
-    var t = Math.min(dx ? (A.W / 2 - EDGE_INSET) / Math.abs(dx) : Infinity, dy ? (A.H / 2 - EDGE_INSET) / Math.abs(dy) : Infinity);
-    return { x: cx + dx * t, y: cy + dy * t, ang: Math.atan2(dy, dx), dir: dirName(dx, dy) };
-  }
-  var edges = [];   // [{x,y,ang,dir,members:[stop]}]
-  (function () {
-    stops.forEach(function (s) {
-      if (s.onMap || !s.hasPos) return;
-      var e = edgePoint(s.px, s.py), hit = null;
-      edges.forEach(function (c) { if (!hit && Math.hypot(c.x - e.x, c.y - e.y) < CLUSTER) hit = c; });
-      if (hit) { hit.members.push(s); if (hit.dir !== e.dir) hit.dir = dirName(hit.mx, hit.my); } else { e.members = [s]; e.mx = s.px - A.W / 2; e.my = s.py - A.H / 2; edges.push(e); }
-    });
-    edges.forEach(function (c) {
-      var d = c.members.map(function (m) { return kmBetween(c.x, c.y, m.px, m.py); });
-      c.minKm = Math.min.apply(null, d); c.maxKm = Math.max.apply(null, d); c.i = -1;
-    });
-  })();
-  function edgeLabel(c) {
-    var n = c.members.length, km = n === 1 ? 'about ' + fmtKm(c.minKm) + ' km' : 'about ' + fmtKm(c.minKm) + ' to ' + fmtKm(c.maxKm) + ' km';
-    return (n === 1 ? c.members[0].title : n + ' stops (' + c.members.map(function (m) { return m.no; }).join(', ') + ')') + ', outside the map, ' + km + ' ' + c.dir + ' of the map edge';
-  }
-  function selectEdge(c) {
-    if (A.pick.busy()) return;
-    c.i = (c.i + 1) % c.members.length;
-    var m = c.members[c.i];
-    select(m.id);
-    if (c.members.length > 1) {
-      var meta = document.querySelector('#info .meta');
-      A.setInfo(m.title, document.querySelector('#info p').textContent, 'Marker ' + (c.i + 1) + ' of ' + c.members.length + ': ' + c.members.length + ' stops outside the map to the ' + c.dir + '. Click the marker again for the next one. ' + (meta ? meta.textContent : ''));
-    }
-  }
-  function drawEdges() {
-    while (edgeG.firstChild) edgeG.removeChild(edgeG.firstChild);
-    edges.forEach(function (c) {
-      var n = c.members.length, g = A.el('g', { class: 'ms-edge hit', transform: 'translate(' + c.x + ' ' + c.y + ')', tabindex: '0', role: 'button', 'aria-label': edgeLabel(c) }, edgeG);
-      var k = A.el('g', { class: 'ms-s' }, g);
-      A.el('polygon', { class: 'ms-arrow', points: '19,0 11,-7 11,7', transform: 'rotate(' + (c.ang * 180 / Math.PI) + ')' }, k);
-      A.el('circle', { class: 'ms-edgec', r: 11 }, k);
-      var t = A.el('text', { class: 'ms-num', x: 0, y: 4, 'text-anchor': 'middle' }, k); t.textContent = n === 1 ? String(c.members[0].no) : String(n);
-      var lab = A.el('text', { class: 'ms-lab', x: 0, y: -16, 'text-anchor': 'middle' }, k); lab.textContent = n === 1 ? c.members[0].title : n + ' stops ' + c.dir;
-      g.addEventListener('click', function (e) { if (A.pick.busy()) return; e.stopPropagation(); selectEdge(c); });
-      g.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !A.pick.busy()) { e.preventDefault(); selectEdge(c); } });
-    });
-  }
-  var edgeG = A.el('g', { class: 'ms-edges' }, layer);
-  drawEdges();
-
   A.registerLayer({
-    id: 'mission-stops', label: 'Mission stops', group: 'Mission', color: '#c4501b', node: layer, on: true,
-    count: stops.filter(function (s) { return s.hasPos; }).length
+    id: 'mission-stops', label: 'Base camp and mission stops', group: 'Mission', color: '#c4501b', node: layer, on: true,
+    count: stops.length
   });
 
-  /* ---------- selecting a stop ---------- */
+  /* ---------- selecting a stop, a task or base camp ---------- */
   function find(id) {
+    if (id === 'base') return baseView();
     var l = API.list(), r = null; l.forEach(function (m) { if (m.id === id && m.kind !== 'objective') r = m; }); return r;
   }
+  function taskLine(t) { return t.objectiveShort + ': ' + t.title + ' (about ' + t.estMin + ' min)'; }
   function select(id) {
     var m = find(id); if (!m) return;
-    var text = m.description || '(no description)';
+    var text = m.description || '(no description)', meta;
     if (m.kind === 'stop') {
-      if (m.sol !== null) text += ' Sealed on sol ' + m.sol + (m.date ? ' (' + m.date + ')' : '') + '.';
-      text += ' Area: ' + m.area + '. Serves: ' + (objNames(m) || 'no listed objective') + '.';
-      if (m.approx) text += m.sub === 'sample' ? ' Position approximate: placed by area, not the true sample location.' : ' Position approximate.';
-    }
-    var meta = m.kind === 'custom' ? 'My mission' : 'Mission stop ' + m.no;
+      var ts = tasks.filter(function (t) { return t.stopId === m.id; });
+      text += ' Tasks: ' + ts.map(taskLine).join('. ') + '.';
+      meta = 'Mission stop ' + m.no;
+    } else if (m.kind === 'task') {
+      text = m.description + ' About ' + m.estMin + ' min.';
+      meta = 'Stop ' + m.stopNo + ', ' + m.stopName + ' · ' + m.objectiveShort;
+    } else if (m.kind === 'base') meta = 'Base camp, start and end of the drive';
+    else meta = 'My mission';
     if (m.onMap) meta += ' · ' + m.lat.toFixed(4) + '°N  ' + m.lon.toFixed(4) + '°E';
     else if (m.kind === 'custom') meta += ' · no location';
-    else {
-      meta += ' · outside current map';
-      if (m.hasPos) { var e = edgePoint(m.px, m.py); meta += ' (about ' + fmtKm(kmBetween(e.x, e.y, m.px, m.py)) + ' km ' + e.dir + ' of the map edge)'; }
-    }
-    if (m.approx && m.onMap) meta += ' · approximate';
-    meta += isDone(m.id) ? ' · visited' : '';
-    A.setInfo(m.title, text, meta);
+    meta += m.kind !== 'base' && isDone(m.id) ? ' · done' : '';
+    A.setInfo(m.kind === 'stop' ? 'Stop ' + m.no + ' · ' + m.title : m.title, text, meta);
     if (m.onMap) A.focus(m.x, m.y, 2.6);
   }
 
@@ -261,12 +270,11 @@
   var ui = { list: null, prog: null, bar: null, q: '', filter: 'all', open: {}, custIds: {} };
   var form = {};
 
-  function stopMatches(s, q) {
-    if (ui.filter === 'todo' && isDone(s.id)) return false;
-    if (ui.filter === 'done' && !isDone(s.id)) return false;
+  function taskMatches(t, q) {
+    if (ui.filter === 'todo' && isDone(t.id)) return false;
+    if (ui.filter === 'done' && !isDone(t.id)) return false;
     if (!q) return true;
-    var hay = [s.title, s.name, s.area, s.description, s.date || '', s.sol !== null ? 'sol ' + s.sol : '', s.onMap ? '' : 'outside current map'].join(' ').toLowerCase();
-    return hay.indexOf(q) >= 0;
+    return [t.title, t.description, t.stopName, t.objectiveShort, 'stop ' + t.stopNo].join(' ').toLowerCase().indexOf(q) >= 0;
   }
   function customMatches(c, q) {
     if (ui.filter === 'todo' && c.done) return false;
@@ -274,22 +282,29 @@
     return !q || (c.title + ' ' + c.description).toLowerCase().indexOf(q) >= 0;
   }
 
-  function row(m, isCustom) {
-    var cb = h('input', { type: 'checkbox', checked: m.done, attrs: { 'aria-label': 'Mark ' + m.title + ' as visited', 'data-key': 'cb:' + m.id }, onchange: function () { API.setDone(m.id, cb.checked); } });
-    var sub = [];
-    if (isCustom) sub.push(m.onMap ? 'on the map' : 'no location');
-    else {
-      sub.push(m.area);
-      if (m.sol !== null) sub.push('sol ' + m.sol);
-      if (!m.onMap) sub.push('outside current map');
-    }
-    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + m.id, 'aria-label': 'Show ' + m.title + ' on the map' }, onclick: function () { select(m.id); } }, [
-      h('span', { class: 'ms-badge ' + objClass(m) + (m.onMap ? '' : ' ms-off'), text: isCustom ? 'C' + m.no : String(m.no), attrs: { 'aria-hidden': 'true' } }),
-      h('span', { class: 'ms-t' }, [h('b', { text: m.title }), h('small', { text: sub.join(' · ') })])
+  function taskRow(t) {
+    var cb = h('input', { type: 'checkbox', checked: t.done, attrs: { 'aria-label': 'Mark ' + t.title + ' as done', 'data-key': 'cb:' + t.id }, onchange: function () { API.setDone(t.id, cb.checked); } });
+    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + t.id, 'aria-label': 'Show the task ' + t.title + ' on the map' }, onclick: function () { select(t.id); } }, [
+      h('span', { class: 'ms-badge ms-obj ms-o' + t.objective, text: 'O' + t.objective, attrs: { title: t.objectiveShort } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: t.title }), h('small', { text: t.objectiveShort + ' · about ' + t.estMin + ' min' })])
     ]);
-    var kids = [h('label', { class: 'ms-chk' }, [cb]), go];
-    if (isCustom) kids.push(delButton(m));
-    return h('div', { class: 'ms-row' + (m.done ? ' is-done' : '') }, kids);
+    return h('div', { class: 'ms-row ms-task' + (t.done ? ' is-done' : '') }, [h('label', { class: 'ms-chk' }, [cb]), go]);
+  }
+  function stopBlock(s, ts) {
+    var d = isDone(s.id), nd = ts.filter(function (t) { return t.done; }).length;
+    var head = h('button', { type: 'button', class: 'ms-go ms-stophead', attrs: { 'data-key': 'go:' + s.id, 'aria-label': 'Show stop ' + s.no + ', ' + s.title + ', on the map' }, onclick: function () { select(s.id); } }, [
+      h('span', { class: 'ms-badge ms-multi', text: String(s.no), attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: s.title }), h('small', { text: nd + ' of ' + s.taskIds.length + ' tasks done' + (d ? ' · stop done' : '') })])
+    ]);
+    return h('div', { class: 'ms-stop' + (d ? ' is-done' : '') }, [head].concat(ts.map(taskRow)));
+  }
+  function customRow(m) {
+    var cb = h('input', { type: 'checkbox', checked: m.done, attrs: { 'aria-label': 'Mark ' + m.title + ' as done', 'data-key': 'cb:' + m.id }, onchange: function () { API.setDone(m.id, cb.checked); } });
+    var go = h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:' + m.id, 'aria-label': 'Show ' + m.title + ' on the map' }, onclick: function () { select(m.id); } }, [
+      h('span', { class: 'ms-badge ms-custom', text: 'C' + m.no, attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: m.title }), h('small', { text: m.onMap ? 'on the map' : 'no location' })])
+    ]);
+    return h('div', { class: 'ms-row' + (m.done ? ' is-done' : '') }, [h('label', { class: 'ms-chk' }, [cb]), go, delButton(m)]);
   }
   function delButton(m) {
     var armed = false, timer = null;
@@ -304,46 +319,50 @@
     };
     return b;
   }
-
-  function section(key, head, text, items, doneN, totalN, builder, emptyText) {
-    var q = ui.q, forced = !!q || ui.filter !== 'all';
-    var det = h('details', { class: 'ms-det', attrs: { 'data-sec': key } }, [
-      h('summary', {}, ['Stops ', h('span', { class: 'ms-n', text: items.length === totalN ? String(totalN) : items.length + ' of ' + totalN })])
-    ]);
-    det.open = forced || !!ui.open[key];
-    det.addEventListener('toggle', function () { if (!forced) ui.open[key] = det.open; });
-    if (!items.length) det.appendChild(h('p', { class: 'ms-empty', text: emptyText }));
-    items.forEach(function (it) { det.appendChild(builder(it)); });
+  function bar(doneN, totalN, label) {
     var pct = totalN ? Math.round(doneN / totalN * 100) : 0;
-    return h('section', { class: 'ms-sec' }, [
-      h('h3', {}, [head, h('span', { class: 'ms-n', text: doneN + ' / ' + totalN + ' visited' })]),
-      text ? h('p', { class: 'ms-text', text: text }) : null,
-      h('div', { class: 'ms-bar', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(totalN), 'aria-valuenow': String(doneN), 'aria-label': head + ' progress' } }, h('i', { style: 'width:' + pct + '%' })),
-      det
-    ]);
+    return h('div', { class: 'ms-bar', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(totalN), 'aria-valuenow': String(doneN), 'aria-label': label } }, h('i', { style: 'width:' + pct + '%' }));
   }
 
   function refresh() {
     if (!ui.list) return;
     var focusKey = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-key') : null;
-    var q = ui.q.trim().toLowerCase(), views = stops.map(stopView);
+    var q = ui.q.trim().toLowerCase(), tv = tasks.map(taskView);
     while (ui.list.firstChild) ui.list.removeChild(ui.list.firstChild);
+    // the two objectives, with progress over their 5 tasks
+    var objSec = h('section', { class: 'ms-sec' }, [h('h3', { text: 'Objectives' })]);
     objectives.forEach(function (o) {
-      var all = views.filter(function (s) { return s.objectives.indexOf(o.id) >= 0; });
-      var d = all.filter(function (s) { return s.done; }).length;
-      ui.list.appendChild(section(o.id, o.title, o.text, all.filter(function (s) { return stopMatches(s, q); }), d, all.length, function (s) { return row(s, false); }, 'No stops match.'));
+      var mine = tv.filter(function (t) { return t.objective === o.id; }), d = mine.filter(function (t) { return t.done; }).length;
+      objSec.appendChild(h('div', { class: 'ms-obj-row' }, [
+        h('p', { class: 'ms-objt' }, [h('span', { class: 'ms-badge ms-obj ms-o' + o.id, text: 'O' + o.id }), h('b', { text: ' ' + o.title }), h('span', { class: 'ms-n', text: d + ' / ' + mine.length + ' tasks' })]),
+        bar(d, mine.length, o.short + ' progress')
+      ]));
     });
-    var loose = views.filter(function (s) { return !s.objectives.length; });
-    if (loose.length) {
-      var dl = loose.filter(function (s) { return s.done; }).length;
-      ui.list.appendChild(section('other', 'Other stops', 'Stops with no listed objective.', loose.filter(function (s) { return stopMatches(s, q); }), dl, loose.length, function (s) { return row(s, false); }, 'No stops match.'));
-    }
+    ui.list.appendChild(objSec);
+    // base camp, then the stops with their tasks
+    var stopSec = h('section', { class: 'ms-sec' }, [h('h3', {}, ['Route', h('span', { class: 'ms-n', text: 'base camp + ' + stops.length + ' stops' })])]);
+    stopSec.appendChild(h('div', { class: 'ms-row ms-basefix' }, [h('button', { type: 'button', class: 'ms-go', attrs: { 'data-key': 'go:base', 'aria-label': 'Show base camp on the map' }, onclick: function () { select('base'); } }, [
+      h('span', { class: 'ms-badge ms-base', text: 'B', attrs: { 'aria-hidden': 'true' } }),
+      h('span', { class: 'ms-t' }, [h('b', { text: base.title }), h('small', { text: 'Start and end of the drive' })])])]));
+    var shown = 0;
+    stops.forEach(function (s) {
+      var ts = tv.filter(function (t) { return t.stopId === s.id; }), vis = ts.filter(function (t) { return taskMatches(t, q); });
+      if (!vis.length) return;
+      shown++; stopSec.appendChild(stopBlock(stopView(s), vis));
+    });
+    if (!shown) stopSec.appendChild(h('p', { class: 'ms-empty', text: 'No tasks match.' }));
+    ui.list.appendChild(stopSec);
     var cv = custom.map(customView), cd = cv.filter(function (c) { return c.done; }).length;
-    ui.list.appendChild(section('custom', 'My missions', 'Missions you added. They are stored only in this browser.', cv.filter(function (c) { return customMatches(c, q); }), cd, cv.length, function (c) { return row(c, true); }, cv.length ? 'No missions match.' : 'None yet. Add one below.'));
-    var nd = views.filter(function (s) { return s.done; }).length;
-    ui.prog.textContent = 'Visited ' + nd + ' of ' + views.length + ' stops' + (cv.length ? ' · ' + cd + ' of ' + cv.length + ' of my missions' : '');
-    ui.progBar.style.width = (views.length ? Math.round(nd / views.length * 100) : 0) + '%';
-    ui.progBox.setAttribute('aria-valuenow', String(nd)); ui.progBox.setAttribute('aria-valuemax', String(views.length));
+    var cs = h('section', { class: 'ms-sec' }, [h('h3', {}, ['My missions', h('span', { class: 'ms-n', text: cd + ' / ' + cv.length + ' done' })]),
+      h('p', { class: 'ms-text', text: 'Missions you added. They are stored only in this browser.' })]);
+    var cshow = cv.filter(function (c) { return customMatches(c, q); });
+    if (!cshow.length) cs.appendChild(h('p', { class: 'ms-empty', text: cv.length ? 'No missions match.' : 'None yet. Add one below.' }));
+    cshow.forEach(function (c) { cs.appendChild(customRow(c)); });
+    ui.list.appendChild(cs);
+    var nd = tv.filter(function (t) { return t.done; }).length, sd = stops.filter(function (s) { return isDone(s.id); }).length;
+    ui.prog.textContent = nd + ' of ' + tv.length + ' tasks done · ' + sd + ' of ' + stops.length + ' stops done' + (cv.length ? ' · ' + cd + ' of ' + cv.length + ' of my missions' : '');
+    ui.progBar.style.width = (tv.length ? Math.round(nd / tv.length * 100) : 0) + '%';
+    ui.progBox.setAttribute('aria-valuenow', String(nd)); ui.progBox.setAttribute('aria-valuemax', String(tv.length));
     if (focusKey) { var f = ui.root.querySelector('[data-key="' + focusKey.replace(/["\\]/g, '') + '"]'); if (f) f.focus(); }
   }
 
@@ -447,17 +466,14 @@
       ui.prog = h('p', { class: 'ms-prog' });
       ui.progBar = h('i');
       ui.progBox = h('div', { class: 'ms-bar big', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuenow': '0', 'aria-valuemax': '0', 'aria-label': 'Visited stops' } }, ui.progBar);
-      var search = h('input', { type: 'search', class: 'ms-search', placeholder: 'Search stops (name, area, sol, date)', attrs: { 'aria-label': 'Search stops' }, oninput: function () { ui.q = search.value; refresh(); } });
-      var filt = h('select', { class: 'ms-filter', attrs: { 'aria-label': 'Filter stops by status' }, onchange: function () { ui.filter = filt.value; refresh(); } }, [
-        h('option', { value: 'all', text: 'All' }), h('option', { value: 'todo', text: 'Not visited' }), h('option', { value: 'done', text: 'Visited' })]);
+      var search = h('input', { type: 'search', class: 'ms-search', placeholder: 'Search tasks (title, stop, objective)', attrs: { 'aria-label': 'Search tasks' }, oninput: function () { ui.q = search.value; refresh(); } });
+      var filt = h('select', { class: 'ms-filter', attrs: { 'aria-label': 'Filter tasks by status' }, onchange: function () { ui.filter = filt.value; refresh(); } }, [
+        h('option', { value: 'all', text: 'All' }), h('option', { value: 'todo', text: 'Not done' }), h('option', { value: 'done', text: 'Done' })]);
       ui.list = h('div', { class: 'ms-list' });
-      var legend = h('p', { class: 'ms-legend' }, objectives.map(function (o, i) { return h('span', {}, [h('i', { class: 'ms-sw ms-o' + (i % 4 + 1) }), o.title]); })
-        .concat([h('span', {}, [h('i', { class: 'ms-sw ms-multi' }), 'Both']), h('span', {}, [h('i', { class: 'ms-sw ms-custom' }), 'Mine']),
-          h('span', {}, [h('i', { class: 'ms-sw ms-dash' }), 'Dashed outline: approximate position']),
-          h('span', {}, [h('i', { class: 'ms-sw ms-arrow-sw' }), 'Arrow marker: stop outside the map (number or count)'])]));
+      var legend = h('p', { class: 'ms-legend' }, [h('span', {}, [h('i', { class: 'ms-sw ms-multi' }), 'Stop (numbered 1 to 5)']), h('span', {}, [h('i', { class: 'ms-sw ms-base' }), 'Base camp']),
+        h('span', {}, [h('i', { class: 'ms-sw ms-custom' }), 'My mission'])]);
       container.appendChild(h('div', {}, [
-        h('p', { class: 'ms-intro', text: 'Stops from the mission guide. Sample positions are approximate (placed by area, not the true sample locations). Tick a stop when you have visited it.' }),
-        h('p', { class: 'ms-intro', text: 'Objective tags are a simplified editorial mapping (see docs/mission-guide.md), not an official science assignment.' }),
+        h('p', { class: 'ms-intro', text: 'Jezero Pathfinder: drive the pressurised rover from base camp to five stops, get out on foot at each one, then drive back. At every stop there are two tasks, one for each objective. Tick a task when it is done.' }),
         ui.prog, ui.progBox, legend,
         h('div', { class: 'ms-tools' }, [search, filt]),
         ui.list, buildForm()

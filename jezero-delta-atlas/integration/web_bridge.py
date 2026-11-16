@@ -73,25 +73,20 @@ MISSION_GUIDE = ROOT.parent / "docs" / "mission-guide.md"
 MISSION_JS = WEB / "data" / "mission-data.js"
 
 
-def parse_mission_guide(text):
-    """Parse docs/mission-guide.md into {"objectives": [...], "stops": [...]}.
-    Objective lines look like '1. **Objective 1:** Find evidence of ancient microbial life.'
-    Stops are the rows of the table under '## Mission Stops' (see the column list in the guide).
-    A malformed stop row stops the generator with a message instead of writing bad data."""
-    objectives = []
-    for line in text.splitlines():
-        m = re.match(r"\s*(?:\d+[.)]\s*)?\*\*Objective\s+(\d+):\*\*\s*(.+?)\s*$", line)
-        if m:
-            n, body = int(m.group(1)), m.group(2)
-            objectives.append({"id": f"objective-{n}", "title": f"Objective {n}", "text": body})
-    return {"objectives": objectives, "stops": parse_mission_stops(text, {o["id"] for o in objectives})}
+# Atlas page geometry (the same formula as Atlas.xy in web/js/atlas-map.js: page 1990 x 1390 over the NW/SE corners above)
+PAGE_W, PAGE_H = 1990, 1390
+LON0, LAT1, DLON, DLAT = NW[1], NW[0], SE[1] - NW[1], NW[0] - SE[0]
 
 
-def parse_mission_stops(text, objective_ids):
-    """Helper of parse_mission_guide: the '## Mission Stops' table -> list of stop dicts."""
-    stops, ids, inside, header_seen = [], set(), False, False
+def to_xy(lat, lon):
+    return round((lon - LON0) / DLON * PAGE_W, 1), round((LAT1 - lat) / DLAT * PAGE_H, 1)
+
+
+def md_table(text, section, cols):
+    """Rows of the first table under '## <section>' as lists of cells; the header must match `cols` exactly."""
+    rows, inside, header_seen = [], False, False
     for no, line in enumerate(text.splitlines(), 1):
-        if re.match(r"##\s+Mission Stops\s*$", line):
+        if re.match(r"##\s+" + re.escape(section) + r"\s*$", line):
             inside = True
             continue
         if inside and re.match(r"##\s", line):
@@ -99,37 +94,83 @@ def parse_mission_stops(text, objective_ids):
         if not inside or not line.lstrip().startswith("|"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if not header_seen:                       # first table row is the header
+        if not header_seen:
             header_seen = True
+            if cells != cols:
+                raise SystemExit(f"mission-guide.md line {no}: '{section}' table header must be {' | '.join(cols)}")
             continue
         if all(re.fullmatch(r":?-{3,}:?", c) for c in cells):
-            continue                              # the |---|---| separator row
-        if len(cells) != 9:
-            raise SystemExit(f"mission-guide.md line {no}: expected 9 columns, found {len(cells)}")
-        sid, name, kind, area, desc, sol, date, objs, pos = cells
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", sid) or sid in ids:
-            raise SystemExit(f"mission-guide.md line {no}: bad or duplicate stop id {sid!r}")
-        if kind not in ("sample", "place") or not name:
-            raise SystemExit(f"mission-guide.md line {no}: kind must be sample or place and name is required")
-        if sol != "-" and not sol.isdigit():
-            raise SystemExit(f"mission-guide.md line {no}: sol must be a number or -")
-        oids = []
-        if objs != "-":
-            for n in re.split(r"\s*,\s*", objs):
-                if not n.isdigit() or f"objective-{n}" not in objective_ids:
-                    raise SystemExit(f"mission-guide.md line {no}: unknown objective {n!r}")
-                oids.append(f"objective-{n}")
-        lat = lon = None
-        if pos != "-":
-            m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", pos)
-            if not m:
-                raise SystemExit(f"mission-guide.md line {no}: position must be 'lat, lon' or -")
-            lat, lon = float(m.group(1)), float(m.group(2))
+            continue
+        if len(cells) != len(cols):
+            raise SystemExit(f"mission-guide.md line {no}: expected {len(cols)} columns, found {len(cells)}")
+        rows.append((no, cells))
+    if not header_seen:
+        raise SystemExit(f"mission-guide.md: section '## {section}' with a table not found")
+    return rows
+
+
+def lat_lon(no, lat, lon):
+    try:
+        la, lo = float(lat), float(lon)
+    except ValueError:
+        raise SystemExit(f"mission-guide.md line {no}: lat and lon must be numbers")
+    if not (SE[0] <= la <= NW[0] and NW[1] <= lo <= SE[1]):
+        raise SystemExit(f"mission-guide.md line {no}: {la}, {lo} is outside the atlas map "
+                         f"({SE[0]} to {NW[0]} N, {NW[1]} to {SE[1]} E)")
+    return la, lo
+
+
+def parse_mission_guide(text):
+    """Parse docs/mission-guide.md into {"objectives", "base", "stops", "tasks"} (the JEZERO_MISSION contract in
+    docs/MULTIPAGE.md). Any deviation (not 2 objectives, not exactly 5 stops, not exactly one task per stop and objective,
+    bad ids, positions outside the map, estMin outside 20..60) stops the generator with a message instead of writing bad data."""
+    objectives = []
+    for no, (n, title, short) in md_table(text, "Mission Objectives", ["Id", "Title", "Short"]):
+        if not n.isdigit() or int(n) != len(objectives) + 1 or not title or not short:
+            raise SystemExit(f"mission-guide.md line {no}: objective ids must be 1, 2 in order, with title and short")
+        objectives.append({"id": int(n), "title": title, "short": short})
+    if [o["id"] for o in objectives] != [1, 2]:
+        raise SystemExit("mission-guide.md: exactly 2 objectives (1 and 2) are required")
+
+    base, stops, ids = None, [], set()
+    for no, (sid, name, lat, lon, desc) in md_table(text, "Mission Stops", ["Id", "Name", "Lat", "Lon", "Description"]):
+        la, lo = lat_lon(no, lat, lon)
+        x, y = to_xy(la, lo)
+        if not name or sid in ids:
+            raise SystemExit(f"mission-guide.md line {no}: empty name or duplicate id {sid!r}")
         ids.add(sid)
-        stops.append({"id": sid, "no": len(stops) + 1, "name": name, "kind": kind, "area": area, "description": desc,
-                      "sol": None if sol == "-" else int(sol), "date": None if date == "-" else date,
-                      "objectives": oids, "lat": lat, "lon": lon})
-    return stops
+        if sid == "base":
+            if base:
+                raise SystemExit(f"mission-guide.md line {no}: more than one base row")
+            base = {"id": "base", "name": name, "lat": la, "lon": lo, "x": x, "y": y}
+            continue
+        n = len(stops) + 1
+        if sid != f"stop-{n}":
+            raise SystemExit(f"mission-guide.md line {no}: stop ids must be stop-1 .. stop-5 in order (found {sid!r})")
+        stops.append({"id": sid, "n": n, "name": name, "lat": la, "lon": lo, "x": x, "y": y, "description": desc})
+    if not base:
+        raise SystemExit("mission-guide.md: the base row (id 'base') is missing")
+    if len(stops) != 5:
+        raise SystemExit(f"mission-guide.md: exactly 5 stops are required, found {len(stops)}")
+
+    tasks, seen = [], set()
+    for no, (tid, stop, obj, title, desc, est) in md_table(text, "Mission Tasks", ["Id", "Stop", "Objective", "Title", "Description", "Est. min"]):
+        if stop not in ids or stop == "base":
+            raise SystemExit(f"mission-guide.md line {no}: unknown stop {stop!r}")
+        if obj not in ("1", "2"):
+            raise SystemExit(f"mission-guide.md line {no}: objective must be 1 or 2")
+        if tid != f"task-{stop.split('-')[1]}-{obj}" or tid in seen:
+            raise SystemExit(f"mission-guide.md line {no}: task id must be task-<stop number>-<objective> and unique (found {tid!r})")
+        if not title or not desc or not est.isdigit() or not 20 <= int(est) <= 60:
+            raise SystemExit(f"mission-guide.md line {no}: title, description and an estimate of 20 to 60 minutes are required")
+        seen.add(tid)
+        tasks.append({"id": tid, "stopId": stop, "objective": int(obj), "title": title, "description": desc, "estMin": int(est)})
+    want = {f"task-{n}-{o}" for n in range(1, 6) for o in (1, 2)}
+    if seen != want or len(tasks) != 10:
+        raise SystemExit(f"mission-guide.md: exactly 10 tasks are required (one per stop and objective); missing {sorted(want - seen)}")
+    order = {s["id"]: i for i, s in enumerate(stops)}
+    tasks.sort(key=lambda t: (order[t["stopId"]], t["objective"]))   # stop order, Objective 1 first
+    return {"objectives": objectives, "base": base, "stops": stops, "tasks": tasks}
 
 
 def layers():
@@ -143,7 +184,7 @@ def missiondata():
     data = parse_mission_guide(MISSION_GUIDE.read_text(encoding="utf-8"))
     MISSION_JS.write_text("/* Generated by integration/web_bridge.py from docs/mission-guide.md. Do not edit by hand. */\n"
                           "window.JEZERO_MISSION = " + json.dumps(data, indent=1, ensure_ascii=False) + ";\n", encoding="utf-8")
-    print(f"wrote {MISSION_JS.relative_to(ROOT)} ({len(data['objectives'])} objectives, {len(data['stops'])} stops)")
+    print(f"wrote {MISSION_JS.relative_to(ROOT)} ({len(data['objectives'])} objectives, base camp, {len(data['stops'])} stops, {len(data['tasks'])} tasks)")
 
 
 def local_file(ref, kind):

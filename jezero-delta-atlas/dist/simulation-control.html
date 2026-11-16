@@ -129,6 +129,18 @@ main{grid-template-columns:minmax(0,1fr)}main>*{min-width:0}
 .ch{padding-right:max(16px,env(safe-area-inset-right))}
 @media (max-width:900px){.ch{padding-top:52px}}
 
+/* mission progress and travel */
+.progrow{display:flex;align-items:center;gap:10px}
+.progrow progress{flex:1 1 auto;height:10px;accent-color:var(--acc)}
+.progtext{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.btnrow .lbl{align-self:center;flex:0 0 auto;min-width:0;font-size:11px;text-transform:uppercase;color:var(--mute)}
+.vit dd{overflow-wrap:anywhere}
+
+.cf-back{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.6)}
+.cf-dlg{width:min(420px,100%);padding:18px;border:2px solid var(--bad);border-radius:12px;background:var(--panel);color:inherit}
+.cf-dlg p{margin:0 0 14px;font-weight:600}
+.cf-dlg .btnrow{justify-content:flex-end}
+
 </style>
 </head>
 <body>
@@ -160,8 +172,8 @@ main{grid-template-columns:minmax(0,1fr)}main>*{min-width:0}
       <label class="field">Crew member
         <select id="heroCrew"></select>
       </label>
-      <button type="button" id="moveNow" class="btn big primary">Move now</button>
-      <p class="hint" id="moveHint">Sends the selected crew member on a walk past six mission stops (Three Forks, Hawksbill Gap, Upper Fan, Neretva Vallis, Witch Hazel Hill, Seitah), then back to base. Raises the clock to x60 if it is slower.</p>
+      <button type="button" id="runMission" class="btn big primary">Run mission</button>
+      <p class="hint" id="moveHint">Drives the selected crew member by rover from base camp to each of the five stops in order; at each stop the crew goes out on foot for the stop's tasks, then back in the rover, and finally back to base camp. Raises the clock to x600 if it is slower.</p>
     </div>
   </section>
 
@@ -201,7 +213,7 @@ main{grid-template-columns:minmax(0,1fr)}main>*{min-width:0}
       <table id="worldTable">
         <caption class="sr">Live values for every crew member</caption>
         <thead><tr>
-          <th scope="col">Crew</th><th scope="col">Mode</th><th scope="col">Lat</th><th scope="col">Lon</th><th scope="col">Map x,y</th>
+          <th scope="col">Crew</th><th scope="col">Mode</th><th scope="col">Travel</th><th scope="col">Stop / task</th><th scope="col">Tasks</th><th scope="col">Lat</th><th scope="col">Lon</th><th scope="col">Map x,y</th>
           <th scope="col">Speed m/s</th><th scope="col">Head</th><th scope="col">O2 %</th><th scope="col">Bat %</th><th scope="col">HR</th>
           <th scope="col">Suit C</th><th scope="col">Amb C</th><th scope="col">Rad uSv/h</th><th scope="col">Dose mSv</th>
         </tr></thead>
@@ -236,11 +248,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 (function () {
   'use strict';
   var CODE_RE = /^[A-HJ-NP-Z2-9]{5}$/, LEGACY = 'LOCAL', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 100;
+  var MAX_MSG = 4096, MAX_STATE = 65536, HEARTBEAT = 5000, ONLINE_MS = 15000, POLL_MS = 900, LOG_N = 200, OUTBOX_N = 100;
   var ROLES = ['crew', 'earth', 'control', 'helmet', 'tablet', 'legacy'];
   var cfg = window.JDA_LINK || {};
   var cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);   // this page load
-  var subs = [], statusSubs = [], presSubs = [], stateSubs = {};
+  var subs = [], statusSubs = [], presSubs = [], stateSubs = Object.create(null);
   var room = null, status = 'local', S = null, implicit = false, pendingOut = { msgs: [], state: {} };   // pendingOut: what an implicit (LOCAL) room sent, replayed into the first explicit room   // S = per-join session (timers, seen, log, state, presence)
 
   /* ---------- helpers ---------- */
@@ -256,7 +268,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function size(o) { try { return JSON.stringify(o).length; } catch (e) { return Infinity; } }
+  function size(o) {   // JSON size in UTF-8 bytes, the same measure the relay uses (emoji / CJK count by bytes, not UTF-16 units)
+    var j; try { j = JSON.stringify(o); } catch (e) { return Infinity; }
+    if (typeof j !== 'string') return Infinity;
+    try { return unescape(encodeURIComponent(j)).length; } catch (e) { return j.length * 3; }
+  }
   function isObj(o) { return o && typeof o === 'object' && !Array.isArray(o); }
   function safeKey(k) { return typeof k === 'string' && /^[A-Za-z0-9:_.-]{1,64}$/.test(k) && k !== '__proto__'; }
   function warn() { if (window.console) console.warn.apply(console, ['JdaLink'].concat([].slice.call(arguments))); }
@@ -293,7 +309,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
 
   /* ---------- session ---------- */
   function newSession(code) {
-    return { code: code, seen: {}, seenQ: [], log: [], state: {}, relayVer: {}, pres: {}, timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
+    var N = Object.create; return { code: code, seen: N(null), seenQ: [], log: [], state: N(null), mine: N(null), outbox: [], epoch: null, repub: false, relayVer: N(null), pres: N(null), timers: [], bc: null, listeners: [], relay: false, online: false, relayFails: 0, since: 0, stateVer: 0, closed: false, synced: false };
   }
   function markSeen(id) { S.seen[id] = 1; S.seenQ.push(id); if (S.seenQ.length > 3000) delete S.seen[S.seenQ.shift()]; }
   function setStatus(s) { if (s === status) return; status = s; statusSubs.slice().forEach(function (fn) { call(fn, s); }); }
@@ -383,31 +399,66 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     opt = opt || {};
     var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : 0;
     return fetch('/api' + path, { method: opt.method || 'GET', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, body: opt.body ? JSON.stringify(opt.body) : undefined, cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+      .then(function (r) { clearTimeout(tm); if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; } return r.json(); }, function (e) { clearTimeout(tm); throw e; });
   }
   function probeRelay() {
     if (!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
     return api('/ping').then(function (j) { return !!(j && j.ok); }, function () { return false; });
   }
   function relayOk() { var ses = S; if (ses && ses.relayFails) { ses.relayFails = 0; setStatus('relay'); } }
-  function relayFail(e) { var ses = S; if (!ses) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  function relayFail(e) { var ses = S; if (!ses || (e && e.status === 429)) return; ses.relayFails++; if (ses.relayFails === 3) { warn('relay unreachable, using the same-browser link', e && e.message); setStatus('local'); } }
+  /* messages wait in the outbox until the relay has accepted them (relay restarting, rate limit, brief outage) */
+  function postOut(ses, item) {
+    if (item.busy || ses.closed) return;
+    item.busy = true;
+    api('/rooms/' + ses.code + '/msg', { method: 'POST', body: item.m }).then(function () {
+      var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1);
+    }, function (e) {
+      item.busy = false;
+      if (e && (e.status === 400 || e.status === 403 || e.status === 404 || e.status === 411 || e.status === 413)) { var i = ses.outbox.indexOf(item); if (i >= 0) ses.outbox.splice(i, 1); warn('relay refused a message', e.message); }
+      else relayFail(e);
+    });
+  }
+  function queueOut(ses, m) {
+    var item = { m: m, busy: false };
+    ses.outbox.push(item);
+    if (ses.outbox.length > OUTBOX_N) ses.outbox.shift();
+    if (ses.relay) postOut(ses, item);
+  }
+  function flushOut(ses) { ses.outbox.slice().forEach(function (it) { postOut(ses, it); }); }
+  function republishAll(ses) {   // a relay that restarted (or was not reachable before) has none of this page's messages or state: send them again (the relay and readers dedupe by id)
+    ses.log.forEach(function (m) { if (m.from && m.from.cid === cid && !ses.outbox.some(function (it) { return it.m.id === m.id; })) queueOut(ses, m); });
+    ses.repub = true;
+  }
   function startRelay() {
-    var ses = S, base = '/rooms/' + ses.code;
+    var ses = S, base = '/rooms/' + ses.code, delay = POLL_MS;
     ses.relay = true; setStatus('relay');
+    republishAll(ses);
     function loop() {
       if (ses.closed) return;
+      delay = POLL_MS;
       Promise.all([api(base + '/msgs?since=' + ses.since), api(base + '/state?since=' + ses.stateVer)]).then(function (r) {
         if (ses.closed) return;
-        var first = !ses.synced;
+        var first = !ses.synced, restarted = !!(r[0].epoch && ses.epoch && r[0].epoch !== ses.epoch);
+        if (r[0].epoch) ses.epoch = r[0].epoch;
+        if (restarted) { ses.relayVer = {}; ses.since = 0; ses.stateVer = 0; republishAll(ses); }
         if (r[0].reset) ses.since = 0;
         (r[0].msgs || []).forEach(function (m) { deliver(m, first); });
-        if (isFinite(r[0].next)) ses.since = r[0].next;
+        if (isFinite(r[0].next) && !restarted) ses.since = r[0].next;
+        if (r[1].reset || restarted) ses.relayVer = {};
         var items = r[1].items || {};
         Object.keys(items).forEach(function (key) { applyState(key, items[key], true); });
-        if (isFinite(r[1].ver)) ses.stateVer = r[1].ver;
+        if (isFinite(r[1].ver) && !restarted) ses.stateVer = r[1].ver;
+        if (ses.repub && !restarted) {   // put back this page's own state values that the relay does not have
+          ses.repub = false;
+          Object.keys(ses.mine).forEach(function (key) {
+            if (!(key in items) && !(ses.state[key] && ses.state[key].from.cid !== cid)) api(base + '/state/' + encodeURIComponent(key), { method: 'PUT', body: ses.mine[key] }).catch(function (x) { relayFail(x); });
+          });
+        }
         ses.synced = true;
+        flushOut(ses);
         relayOk();
-      }).catch(relayFail).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, POLL_MS)); });
+      }).catch(function (e) { if (e && e.status === 429) delay = 2500; relayFail(e); }).then(function () { if (!ses.closed) ses.timers.push(setTimeout(loop, delay)); });
     }
     loop();
   }
@@ -521,10 +572,18 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       Object.keys(carry.state).forEach(function (key) { try { setState(key, carry.state[key]); } catch (e) { /* ignore */ } });
       pendingOut = { msgs: [], state: {} };
     }
+    function reprobe(ses2) {   // relay not reachable at load: keep looking, so a relay started later (or restarted) is picked up without a reload
+      var tm = setTimeout(function () {
+        if (ses2.closed || ses2.relay) return;
+        probeRelay().then(function (ok2) { if (ses2.closed) return; if (ok2) { startRelay(); heartbeat(); } else reprobe(ses2); });
+      }, 4000);
+      ses2.timers.push(tm);
+    }
     if (c !== LEGACY) {   // the legacy default room never leaves this browser
       probeRelay().then(function (ok) {
         if (ses.closed) return;
         if (ok) startRelay();
+        else if (/^https?:$/.test(location.protocol)) reprobe(ses);
         if (online) startOnline();
         heartbeat();
         flushCarry();
@@ -553,7 +612,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     lsSet(k(ses.code, 'log'), JSON.stringify(ses.log.slice(-LOG_N)));
     try { if (ses.bc) ses.bc.postMessage({ k: 'msg', m: m }); } catch (e) { /* ignore */ }
     lsSet(k(ses.code, 'msg'), JSON.stringify(m));
-    if (ses.relay) api('/rooms/' + ses.code + '/msg', { method: 'POST', body: m }).catch(function (e) { warn('relay send failed', e && e.message); relayFail(e); });
+    queueOut(ses, m);
     if (ses.online) remoteUpsert({ id: m.id, room: ses.code, kind: 'msg', payload: m }).catch(function (e) { warn('online send failed', e && e.message); });
     return m;
   }
@@ -567,6 +626,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var wire = { value: e.value, t: e.t, from: e.from };
     lsSet(k(ses.code, 'state.' + key), JSON.stringify(wire));
     try { if (ses.bc) ses.bc.postMessage({ k: 'state', key: key, e: wire }); } catch (x) { /* ignore */ }
+    ses.mine[key] = wire;
     if (ses.relay) api('/rooms/' + ses.code + '/state/' + encodeURIComponent(key), { method: 'PUT', body: wire }).catch(function (x) { relayFail(x); });
     if (ses.online) remoteUpsert({ id: 'state:' + ses.code + ':' + key, room: ses.code, kind: 'state', payload: { key: key, entry: wire }, updated_at: new Date().toISOString() }).catch(function () { });
     return true;
@@ -625,12 +685,35 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
   }
   function load() { try { var o = JSON.parse(localStorage.getItem(LAST) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
   function save(o) { try { localStorage.setItem(LAST, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function hashRaw() {   // the room text in the URL hash as typed (normalised), or null when there is none
+    var m = /[#&]room=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* use as typed */ }
+    return window.JdaLink.normCode(raw);
+  }
+  var BAD_CODE = 'Room codes have 5 letters or digits, no I or O. Check the code or create a new room.';
+  function hashBad() { var r = hashRaw(); return r !== null && !window.JdaLink.isValidCode(r); }
   function hashCode() {
     var m = /[#&]room=([^&]*)/.exec(location.hash || '');
     if (!m) return '';
-    var c = window.JdaLink.normCode(decodeURIComponent(m[1]));
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw); } catch (e) { /* malformed escape: use the text as typed */ }
+    var c = window.JdaLink.normCode(raw);
     return window.JdaLink.isValidCode(c) ? c : '';
   }
+  function hashCrew() {   // #room=CODE&crew=jayesh picks a known crew member without asking
+    var m = /[#&]crew=([^&]*)/.exec(location.hash || '');
+    if (!m) return null;
+    var v = m[1];
+    try { v = decodeURIComponent(v); } catch (e) { return null; }
+    v = slug(v);
+    for (var i = 0; i < CREW.length; i++) if (CREW[i].id === v) return CREW[i];
+    // crew members added on the control page: any valid id that is not reserved
+    if (v && RESERVED.indexOf(v) < 0) return { id: v, name: v.charAt(0).toUpperCase() + v.slice(1) };
+    return null;
+  }
+  var RESERVED = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];
   function linkFor(code) {
     return location.origin + location.pathname + location.search + '#room=' + code;
   }
@@ -652,7 +735,11 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var offs = [];
 
     function who(saved) {
-      if (wantCrew) return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      if (wantCrew) {
+        var hc2 = hashCrew() || (saved.crewId ? null : CREW.filter(function (c) { return c.id === opts.defaultCrew; })[0]);
+        if (hc2 && hashCode()) return { role: role, id: hc2.id, name: hc2.name };
+        return { role: role, id: saved.crewId || '', name: saved.crewName || '' };
+      }
       if (wantName) return { role: role, id: opts.id || role, name: saved.name || opts.name || '' };
       return { role: role, id: opts.id || role, name: opts.name || '' };
     }
@@ -758,7 +845,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       opener = from || null;
       var saved = load(), n = ++uid, firstRun = !joined();
       var cur = joined() ? L.room : null;
-      var codeVal = hashCode() || (cur && cur.code) || saved.code || '';
+      var badHash = hashBad(), codeVal = badHash ? hashRaw().slice(0, 5) : (hashCode() || (cur && cur.code) || saved.code || '');
       back = el('div', 'lu-back');
       dlg = el('div', 'lu-dlg', null, { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'lu-t' + n, 'aria-describedby': 'lu-d' + n });
       dlg.appendChild(el('h2', null, firstRun ? 'Join a room' : 'Change room', { id: 'lu-t' + n }));
@@ -805,7 +892,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
         crewOther.parentNode.querySelector('#lu-otherl' + n).hidden = !other;
         crewOther.hidden = !other;
       }
-      var err = el('p', 'lu-err', '', { id: 'lu-e' + n, role: 'alert' });
+      var err = el('p', 'lu-err', badHash ? BAD_CODE : '', { id: 'lu-e' + n, role: 'alert' });
       form.appendChild(err);
       var act = el('div', 'lu-act');
       var joinBtn = el('button', 'lu-btn lu-primary', 'Join room', { type: 'submit' });
@@ -821,7 +908,9 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
           if (!r) return { error: 'Choose who you are.' };
           if (r.value !== '__other') { var c = CREW.filter(function (x) { return x.id === r.value; })[0]; return { role: role, id: c.id, name: c.name }; }
           var nm = crewOther.value.trim().slice(0, 24), sl = slug(nm);
-          if (!sl) return { error: 'Enter your name.' };
+          if (!nm) return { error: 'Enter your name.' };
+          if (!sl) return { error: 'Use at least one letter A-Z or digit in your name.' };
+          if (RESERVED.indexOf(sl) >= 0) return { error: 'That name is reserved. Choose another one.' };
           return { role: role, id: sl, name: nm };
         }
         if (wantName) { var v = nameIn.value.trim().slice(0, 24); return { role: role, id: opts.id || role, name: v || opts.name || '' }; }
@@ -842,7 +931,7 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
       back.appendChild(dlg);
       root.appendChild(back);
       document.addEventListener('keydown', onKey, true);
-      (code.value ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
+      (code.value && !badHash ? (wantCrew || wantName ? (crewRadios[0] || nameIn) : joinBtn) : code).focus();
     }
 
     /* ----- start ----- */
@@ -850,11 +939,13 @@ window.JDA_LINK = { url: '', key: '', table: 'link_messages' };
     var saved = load(), hc = hashCode(), code = hc || saved.code || '';
     var info = who(saved);
     var identityKnown = !wantCrew || !!info.id;
-    if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
+    if (hashBad()) openDialog(null);   // a broken code in the URL never falls back to the remembered room
+    else if (code && identityKnown && L.isValidCode(code)) joinNow(code, info);
     else openDialog(null);
 
     function onHash() {
       var c = hashCode();
+      if (!c && hashBad() && !dlg) { openDialog(null); return; }
       if (!c || (L.room && L.room.code === c && joined())) return;
       var sv = load(), inf = who(sv);
       if (!wantCrew || inf.id) { if (dlg) closeDialog(); joinNow(c, inf); }
@@ -881,11 +972,181 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
 
 </script>
 <script>
+/* Generated by integration/web_bridge.py from docs/mission-guide.md. Do not edit by hand. */
+window.JEZERO_MISSION = {
+ "objectives": [
+  {
+   "id": 1,
+   "title": "Find evidence of ancient microbial life",
+   "short": "Microbial life"
+  },
+  {
+   "id": 2,
+   "title": "Assess whether the site can sustain human life",
+   "short": "Sustaining human life"
+  }
+ ],
+ "base": {
+  "id": "base",
+  "name": "Base camp",
+  "lat": 18.447,
+  "lon": 77.408,
+  "x": 1872.9,
+  "y": 1334.0
+ },
+ "stops": [
+  {
+   "id": "stop-1",
+   "n": 1,
+   "name": "Three Forks sample depot",
+   "lat": 18.4525,
+   "lon": 77.4015,
+   "x": 1807.0,
+   "y": 1275.3,
+   "description": "Level ground close to the foot of the delta where the 10 sample tubes were left."
+  },
+  {
+   "id": "stop-2",
+   "n": 2,
+   "name": "Delta front mudstone",
+   "lat": 18.458,
+   "lon": 77.397,
+   "x": 1761.4,
+   "y": 1216.5,
+   "description": "Fine-grained layers at the front of the delta, laid down in still water."
+  },
+  {
+   "id": "stop-3",
+   "n": 3,
+   "name": "Delta top boulders",
+   "lat": 18.48,
+   "lon": 77.385,
+   "x": 1639.8,
+   "y": 981.5,
+   "description": "Boulders on top of the delta that the river carried in."
+  },
+  {
+   "id": "stop-4",
+   "n": 4,
+   "name": "Western delta clay beds",
+   "lat": 18.502,
+   "lon": 77.369,
+   "x": 1477.7,
+   "y": 746.5,
+   "description": "Clay-rich beds in the western part of the delta."
+  },
+  {
+   "id": "stop-5",
+   "n": 5,
+   "name": "Western Breach and Bright Angel",
+   "lat": 18.493,
+   "lon": 77.293,
+   "x": 707.5,
+   "y": 842.6,
+   "description": "The ravine where the river entered the crater, near the Bright Angel outcrops and the Cheyava Falls find."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "task-1-1",
+   "stopId": "stop-1",
+   "objective": 1,
+   "title": "Recover the sample tubes",
+   "description": "Recover the 10 sample tubes: photograph, check seal, log, stow.",
+   "estMin": 45
+  },
+  {
+   "id": "task-1-2",
+   "stopId": "stop-1",
+   "objective": 2,
+   "title": "Check ground and shelter at the depot",
+   "description": "Check how firm and how level the ground is around the depot, and note rock overhangs or hollows that could shelter people from radiation.",
+   "estMin": 25
+  },
+  {
+   "id": "task-2-1",
+   "stopId": "stop-2",
+   "objective": 1,
+   "title": "Sample the finest mud layers",
+   "description": "Find the finest mud layers, look for colour spots or rings, sample below the surface.",
+   "estMin": 60
+  },
+  {
+   "id": "task-2-2",
+   "stopId": "stop-2",
+   "objective": 2,
+   "title": "Look for water-bearing minerals in the mudstone",
+   "description": "Check the mudstone for minerals that hold water, as a possible water source, and log whether the slope is stable enough to walk on.",
+   "estMin": 30
+  },
+  {
+   "id": "task-3-1",
+   "stopId": "stop-3",
+   "objective": 1,
+   "title": "Photograph and sample the boulders",
+   "description": "Photograph and sample boulders the river carried in.",
+   "estMin": 40
+  },
+  {
+   "id": "task-3-2",
+   "stopId": "stop-3",
+   "objective": 2,
+   "title": "Judge boulder spacing for safe ground",
+   "description": "Measure the size and spacing of the boulders to judge where the rover can drive safely and where a shelter could be placed.",
+   "estMin": 30
+  },
+  {
+   "id": "task-4-1",
+   "stopId": "stop-4",
+   "objective": 1,
+   "title": "Sample one intact clay layer",
+   "description": "Photograph the layering and sample one intact clay layer; seal and log it.",
+   "estMin": 45
+  },
+  {
+   "id": "task-4-2",
+   "stopId": "stop-4",
+   "objective": 2,
+   "title": "Test how much water the clay holds",
+   "description": "Test how much water the clay holds, as a possible water source for the crew.",
+   "estMin": 40
+  },
+  {
+   "id": "task-5-1",
+   "stopId": "stop-5",
+   "objective": 1,
+   "title": "Photograph the ravine walls and sample the channel floor",
+   "description": "Photograph the ravine walls; sample channel-floor mudstone near the Cheyava Falls find.",
+   "estMin": 60
+  },
+  {
+   "id": "task-5-2",
+   "stopId": "stop-5",
+   "objective": 2,
+   "title": "Check shelter and safe passage in the ravine",
+   "description": "Record how well the ravine walls shelter people from radiation and wind, and check whether the channel floor is safe to cross.",
+   "estMin": 30
+  }
+ ]
+};
+
+</script>
+<script>
+/* Travel speeds, single source for the atlas route planner, the simulation and the control page.
+   The crew drives a pressurised rover between stops (about 10 km/h) and walks at the stops (about 5 km/h). */
+window.JEZERO_SPEEDS = {
+  rover: { label: 'Pressurised rover', mps: 2.8 },
+  foot:  { label: 'Astronaut on foot', mps: 1.4 }
+};
+
+</script>
+<script>
 /* sim-core.js: window.JdaSim, the crew simulation engine (pure logic, no DOM, no network).
    Contract: docs/MULTIPAGE.md (world schema, commands). Models and limits: docs/SIMULATION.md.
    Everything here is scenario data: there is no real suit, radiation or vitals feed.
    Works in a browser (window.JdaSim) and in Node (module.exports) for tests.
-   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid). */
+   Optional inputs, read if present: window.JEZERO_CRATERS (map extent), window.JEZERO_SCIENCE (radiation grid),
+   window.JEZERO_MISSION (base camp, 5 stops, tasks), window.JEZERO_SPEEDS (rover / foot m/s). */
 (function (root) {
   'use strict';
 
@@ -895,14 +1156,27 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     SOL_S: 88775.244,                  // length of a Mars solar day in seconds
     START_ISO: '2026-11-15T08:00:00Z', // mission clock at reset (this is a scenario clock, not a real date on Mars)
     START_LOCAL_H: 9,                  // local mean solar time at the start (hours, 0..24)
-    BASE: { lat: 18.4446, lon: 77.4509 },       // Octavia E. Butler landing site (from the Atlas data)
+    // Fallbacks, used only when web/data/mission-data.js / travel-speeds.js are not loaded (coordinates from the MissionGuide).
+    FALLBACK_BASE: { id: 'base', name: 'Base camp', lat: 18.447, lon: 77.408 },
+    FALLBACK_STOPS: [
+      { id: 'stop-1', name: 'Three Forks sample depot', lat: 18.4525, lon: 77.4015 },
+      { id: 'stop-2', name: 'Delta front mudstone', lat: 18.458, lon: 77.397 },
+      { id: 'stop-3', name: 'Delta top boulders', lat: 18.480, lon: 77.385 },
+      { id: 'stop-4', name: 'Western delta clay beds', lat: 18.502, lon: 77.369 },
+      { id: 'stop-5', name: 'Western Breach and Bright Angel', lat: 18.493, lon: 77.293 }
+    ],
+    FALLBACK_MPS: { rover: 2.8, foot: 1.4 },    // only if JEZERO_SPEEDS is absent
+    EVA_DEFAULT_MIN: 30,               // time on foot at a stop when the stop has no tasks in the data
     BASELINE_USVH: 26.67,              // MSL/RAD GCR dose equivalent 0.64 mSv/day (same as the science layer)
     SPE_MULT: 2.5,                     // solar particle event multiplier (same as the science layer)
-    WALK_MPS: 1.4,                     // default walking speed
     MAX_MPS: 30,                       // hard limit of the speed command
     O2_PER_H:  { rest: 4, walk: 9 },   // percent of a full tank per simulated hour (same as suit.js: resting 4, walking 9)
     BAT_PER_H: { rest: 3, walk: 6 },   // percent of a full battery per simulated hour (same as suit.js)
-    EFFORT_CAP: 3,                     // effort = speed / 1.4 m/s, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EFFORT_CAP: 3,                     // effort = speed / foot speed, capped here (a faster "speed" is a vehicle, not a bigger lung)
+    EVA_EFFORT: 1,                     // working on foot at a stop (sampling, photographing) costs the same as walking at foot speed
+    ROVER_O2_PER_H: 0,                 // pressurised rover: cabin air, the suit tank is not drawn on
+    ROVER_BAT_PER_H: 1,                // suit battery on standby while the rover supplies power (percent per hour)
+    HR_ROVER: 68,                      // seated in the rover cabin, close to resting
     HR_REST: 66, HR_IDLE: 72, HR_WALK_ADD: 28, HR_TAU_S: 45,
     SUIT_NOM_C: 21, SUIT_TAU_S: 600,
     AMB_MEAN_C: -48, AMB_AMP_C: 38, AMB_PEAK_H: 14,   // clear-sky day: about -86 C at 02:00 to -10 C at 14:00 local
@@ -914,6 +1188,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   var M_PER_DEG = Math.PI / 180 * C.R_MARS_M;   // metres per degree of latitude (and of longitude at the equator)
 
   function num(v, fb) { v = Number(v); return isFinite(v) ? v : fb; }
+  var RESERVED_IDS = ['all', 'earth', 'legacy', 'control', 'me', 'helmet', 'tablet', 'crew'];   // same list as link-ui.js
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function round(v, d) { var k = Math.pow(10, d); return Math.round(v * k) / k; }
   function norm360(a) { a = a % 360; return a < 0 ? a + 360 : a; }
@@ -965,22 +1240,21 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     return g.min + (top * (1 - fy) + bot * fy) / 255 * (g.max - g.min);
   }
 
-  /* ---------------- places and the demo path ----------------
-     The atlas draws its place names on an older, larger canvas (1990 x 1848 px = 77.10-77.80 E, 18.10-18.75 N, see o2n in atlas-map.js).
-     The conversion to lat/lon is replicated here. Several places lie outside the current map image; they still have valid lat/lon. */
-  function o2ll(px, py) { return { lat: round(18.75 - py / 1848 * 0.65, 5), lon: round(77.1 + px / 1990 * 0.7, 5) }; }
-  function place(label, px, py) { var p = o2ll(px, py); p.label = label; return p; }
-  var PLACES = {
-    landing: { label: 'Octavia E. Butler Landing', lat: C.BASE.lat, lon: C.BASE.lon },
-    three:   place('Three Forks', 932, 862),
-    hawks:   place('Hawksbill Gap', 850, 772),
-    fan:     place('Upper Fan', 700, 655),
-    neretva: place('Neretva Vallis', 430, 470),
-    whh:     place('Witch Hazel Hill', 455, 1005),
-    seitah:  place('Seitah', 890, 975)
-  };
-  function demoPath() {   // landing -> Three Forks -> Hawksbill Gap -> Upper Fan -> Neretva -> Witch Hazel Hill -> Seitah (then the caller sends "return")
-    return ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah'].map(function (k) { var p = PLACES[k]; return { lat: p.lat, lon: p.lon, label: p.label }; });
+  /* ---------------- mission data and speeds (read lazily; fall back to the MissionGuide values) ---------------- */
+  function pt(o) { return o && isFinite(Number(o.lat)) && isFinite(Number(o.lon)) && o.lat !== null && o.lon !== null; }
+  function missionInfo() {
+    var M = root.JEZERO_MISSION || {};
+    var b = pt(M.base) ? M.base : C.FALLBACK_BASE;
+    var base = { id: 'base', name: String(b.name || 'Base camp'), lat: Number(b.lat), lon: Number(b.lon) };
+    var raw = Array.isArray(M.stops) && M.stops.length ? M.stops : C.FALLBACK_STOPS;
+    var stops = raw.filter(pt).map(function (st, i) { return { id: String(st.id || 'stop-' + (i + 1)), n: i + 1, name: String(st.name || 'Stop ' + (i + 1)), lat: Number(st.lat), lon: Number(st.lon) }; });
+    var tasks = (Array.isArray(M.tasks) ? M.tasks : []).filter(function (t) { return t && t.id && t.stopId; })
+      .map(function (t) { return { id: String(t.id), stopId: String(t.stopId), title: String(t.title || t.id), estMin: num(t.estMin, 0) > 0 ? Number(t.estMin) : 20 }; });
+    return { base: base, stops: stops, tasks: tasks };
+  }
+  function speeds() {
+    var S = root.JEZERO_SPEEDS || {};
+    return { rover: num(S.rover && S.rover.mps, C.FALLBACK_MPS.rover), foot: num(S.foot && S.foot.mps, C.FALLBACK_MPS.foot) };
   }
 
   /* ---------------- geometry on the sphere (local flat approximation, fine for kilometres) ---------------- */
@@ -1014,7 +1288,10 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     var initCrew = (opts.crew && opts.crew.length ? opts.crew : [{ id: 'jayesh', name: 'Jayesh' }, { id: 'juhyeok', name: 'Juhyeok' }]).map(function (c) { return copyCrewInit(c); });
     var initClock = clamp(num(opts.clockSpeed, 1), 0.01, 100000);
 
+    var info = missionInfo(), SPD = speeds(), BASE = info.base;
     var elapsedMs, clock, events, crew, order;
+    function tasksOf(stopId) { return info.tasks.filter(function (t) { return t.stopId === stopId; }); }
+    function speedOf(c) { return c.speedOverride !== null ? c.speedOverride : SPD[c.travel]; }
 
     function copyCrewInit(c) {
       var id = slug(c.id || c.name) || 'crew';
@@ -1023,12 +1300,12 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     function makeCrew(c, index) {
       // crew without a position start around the base, a few metres apart (deterministic, not random)
       var a = index * 2.4, r = 6 + 4 * index;
-      var lat = c.lat !== null ? c.lat : C.BASE.lat + Math.cos(a) * r / M_PER_DEG;
-      var lon = c.lon !== null ? c.lon : C.BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(C.BASE.lat * Math.PI / 180));
+      var lat = c.lat !== null ? c.lat : BASE.lat + Math.cos(a) * r / M_PER_DEG;
+      var lon = c.lon !== null ? c.lon : BASE.lon + Math.sin(a) * r / (M_PER_DEG * Math.cos(BASE.lat * Math.PI / 180));
       return {
         id: c.id, name: c.name, lat: clamp(lat, -90, 90), lon: lon, zM: C.Z0_M, headingDeg: 0,
         o2: 100, bat: 100, hr: C.HR_IDLE, hrNoise: 0, hrOverride: null, suitT: C.SUIT_NOM_C, dose: 0,
-        mode: 'idle', thenReturn: false, walkSpeed: C.WALK_MPS, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
+        mode: 'idle', thenReturn: false, travel: 'foot', speedOverride: null, run: null, stopId: null, taskId: null, tasksDone: 0, speed: 0, target: null, path: [], headingWalk: false, rad: C.BASELINE_USVH, amb: 0
       };
     }
     function reset() {
@@ -1049,6 +1326,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
 
     function addCrew(spec) {
       var c = copyCrewInit(spec || {});
+      if (RESERVED_IDS.indexOf(c.id) >= 0) c.id = c.id + '-crew';   // 'all', 'earth', 'control'... would clash with message targets
       if (crew[c.id]) { var n = 2; while (crew[c.id + '-' + n]) n++; c.id = c.id + '-' + n; }
       if (order.length >= 12) return { ok: false, error: 'crew limit (12) reached' };
       initCrew.push(c);
@@ -1063,12 +1341,53 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       return { ok: true };
     }
 
+    /* ---- mission run: base -> stop 1 .. stop 5 -> base. Drive legs by rover, on foot (EVA) at each stop for its tasks ---- */
+    function startDrive(c, i) {
+      var st = info.stops[i], r = c.run;
+      r.phase = 'drive'; r.i = i; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: st.lat, lon: st.lon, label: st.name }; c.path = []; c.headingWalk = false; c.mode = 'walking';
+    }
+    function startHome(c) {
+      c.run.phase = 'home'; c.travel = 'rover'; c.stopId = null; c.taskId = null;
+      c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.mode = 'returning';
+    }
+    function startEva(c) {
+      var r = c.run, st = info.stops[r.i];
+      r.phase = 'eva'; r.evaT = 0; r.tasks = tasksOf(st.id); r.doneBase = c.tasksDone;
+      r.evaTotal = r.tasks.length ? r.tasks.reduce(function (a, t) { return a + t.estMin * 60; }, 0) : C.EVA_DEFAULT_MIN * 60;
+      c.travel = 'foot'; c.stopId = st.id; c.taskId = r.tasks.length ? r.tasks[0].id : null; c.target = null; c.path = []; c.mode = 'walking';
+    }
+    function evaStep(c, ds) {   // time on foot at a stop; tasks complete one after the other
+      var r = c.run, acc = 0, n = 0;
+      r.evaT += ds;
+      for (var i = 0; i < r.tasks.length; i++) { acc += r.tasks[i].estMin * 60; if (r.evaT >= acc) n++; }
+      if (r.evaT >= r.evaTotal) {
+        c.tasksDone = r.doneBase + r.tasks.length;
+        if (r.i + 1 < info.stops.length) startDrive(c, r.i + 1); else startHome(c);
+        return false;
+      }
+      c.tasksDone = r.doneBase + n; c.taskId = r.tasks.length ? r.tasks[Math.min(n, r.tasks.length - 1)].id : null;
+      return true;
+    }
+    function arriveRun(c) {
+      if (c.run.phase === 'drive') startEva(c);
+      else { c.run = null; c.target = null; c.travel = 'foot'; c.stopId = null; c.taskId = null; c.mode = 'resting'; }   // back at base, out of the rover
+    }
+    function startRun(c, speed) {
+      if (!info.stops.length) return 'no mission stops';
+      c.run = { phase: 'drive', i: 0, evaT: 0, tasks: [], doneBase: 0, evaTotal: 0 };
+      c.tasksDone = 0; c.thenReturn = false; c.speedOverride = speed !== undefined && isFinite(Number(speed)) ? clamp(Number(speed), 0.1, C.MAX_MPS) : null;
+      startDrive(c, 0);
+      return null;
+    }
+
     /* ---- one physics step of ds simulated seconds ---- */
     function stepCrew(c, ds) {
-      // 1. movement
-      var moving = false, remaining = 0, startLat = c.lat, startLon = c.lon;
-      if (c.mode === 'walking' || c.mode === 'returning') {
-        remaining = c.walkSpeed * ds;
+      // 1. movement (or time on foot at a stop)
+      var moving = false, working = false, remaining = 0, startLat = c.lat, startLon = c.lon;
+      if (c.run && c.run.phase === 'eva') working = evaStep(c, ds);
+      if (!working && (c.mode === 'walking' || c.mode === 'returning')) {
+        remaining = speedOf(c) * ds;
         var guard = 0;
         while (remaining > 1e-6 && guard++ < 64) {
           if (c.headingWalk && !c.target) {
@@ -1082,9 +1401,10 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
           if (d > 0.01) c.headingDeg = bearing(c, c.target);
           if (d <= remaining) {
             c.lat = c.target.lat; c.lon = c.target.lon; remaining -= d;
+            if (c.run) { arriveRun(c); working = !!(c.run && c.run.phase === 'eva'); remaining = 0; break; }
             if (c.path.length) c.target = c.path.shift();
             else if (c.thenReturn && c.mode === 'walking') {   // end of an excursion: head home
-              c.thenReturn = false; c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.mode = 'returning';
+              c.thenReturn = false; c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.mode = 'returning';
             } else {
               c.target = null;
               if (c.mode === 'returning') { c.mode = 'resting'; } else { c.mode = 'idle'; }
@@ -1096,24 +1416,32 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
             remaining = 0;
           }
         }
-        moving = c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01;
+        moving = !working && (c.mode === 'walking' || c.mode === 'returning' || distM({ lat: startLat, lon: startLon }, c) > 0.01);
       }
-      c.speed = moving ? c.walkSpeed : 0;
+      c.speed = moving ? speedOf(c) : 0;
       var dH = ds / 3600;
-      // 2. consumption: standing/resting uses the base rate, walking adds in proportion to speed
-      var effort = moving ? Math.min(c.walkSpeed / C.WALK_MPS, C.EFFORT_CAP) : 0;
+      // 2. consumption. In the pressurised rover (travel 'rover', also while parked) the crew breathes cabin air: no suit oxygen is used,
+      //    the suit battery only idles, effort is zero. On foot (EVA or a manual walk): standing/resting uses the base rate and walking
+      //    adds in proportion to speed (working at a stop counts as EVA_EFFORT).
+      var inRover = c.travel === 'rover' && !working;
+      var effort = inRover ? 0 : working ? C.EVA_EFFORT : moving ? Math.min(speedOf(c) / SPD.foot, C.EFFORT_CAP) : 0;
       var jitter = 1 + (rand() - 0.5) * 0.1;
       var restO2 = c.mode === 'resting' ? C.O2_PER_H.rest * 0.9 : C.O2_PER_H.rest;
       var restBat = c.mode === 'resting' ? C.BAT_PER_H.rest * 0.9 : C.BAT_PER_H.rest;
-      c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
-      c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      if (inRover) {
+        c.o2 = clamp(c.o2 - C.ROVER_O2_PER_H * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - C.ROVER_BAT_PER_H * jitter * dH, 0, 100);
+      } else {
+        c.o2 = clamp(c.o2 - (restO2 + (C.O2_PER_H.walk - C.O2_PER_H.rest) * effort) * jitter * dH, 0, 100);
+        c.bat = clamp(c.bat - (restBat + (C.BAT_PER_H.walk - C.BAT_PER_H.rest) * effort) * jitter * dH, 0, 100);
+      }
       // 3. environment at the new position
       var p = xy(c.lat, c.lon);
       c.amb = ambientC(elapsedMs, events.dust);
       c.rad = radiationAt(p[0], p[1]) * (events.solar ? C.SPE_MULT : 1);
       c.dose += c.rad * dH / 1000;   // uSv/h * h = uSv; / 1000 = mSv
       // 4. heart rate: first-order lag towards a target (unless the operator pinned it)
-      var tHr = (c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
+      var tHr = (inRover ? C.HR_ROVER : c.mode === 'resting' ? C.HR_REST : C.HR_IDLE) + C.HR_WALK_ADD * effort * (moving || working ? 1 : 0) + (c.o2 < 20 ? 10 : 0) + (c.o2 <= 0 ? 25 : 0);
       c.hr += (tHr - c.hr) * (1 - Math.exp(-ds / C.HR_TAU_S));
       c.hrNoise = (rand() - 0.5) * 4;
       // 5. suit temperature: life support holds ~21 C; walking adds heat, a cold exterior leaks a little in; with a dead battery it drifts to ambient
@@ -1144,7 +1472,9 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       if (id === 'all' || id === '*') return order.map(function (k) { return crew[k]; });
       return crew[id] ? [crew[id]] : [];
     }
-    function setSpeed(c, mps) { c.walkSpeed = clamp(mps, 0.1, C.MAX_MPS); }
+    function setSpeed(c, mps) { c.speedOverride = clamp(mps, 0.1, C.MAX_MPS); }
+    function setTravel(c, mode) { if (mode !== 'rover' && mode !== 'foot') return false; c.travel = mode; c.speedOverride = null; return true; }
+    function endRun(c) { c.run = null; c.stopId = null; c.taskId = null; }
 
     function command(cmd) {
       if (!cmd || typeof cmd !== 'object') return { ok: false, error: 'no command' };
@@ -1162,7 +1492,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
           refreshEnv(); return { ok: true };
         case 'addCrew': return addCrew(cmd);
         case 'removeCrew': return removeCrew(String(cmd.crew || ''));
-        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'set':
+        case 'walk': case 'stop': case 'return': case 'setSpeed': case 'setTravel': case 'runMission': case 'set':
           list = targets(cmd);
           if (!list.length) return { ok: false, error: 'unknown crew ' + cmd.crew };
           break;
@@ -1172,23 +1502,28 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       list.forEach(function (c) {
         if (name === 'walk') {
           var wps = [];
+          if (cmd.travel !== undefined && !setTravel(c, cmd.travel)) { err = 'travel must be rover or foot'; return; }
           if (cmd.to) { var p = pointOf(cmd.to); if (!p) { err = 'bad target'; return; } wps.push(p); }
           if (Array.isArray(cmd.path)) {   // optional extension: further waypoints, visited in order
             for (var i = 0; i < cmd.path.length && i < 64; i++) { var q = pointOf(cmd.path[i]); if (!q) { err = 'bad path point ' + i; return; } wps.push(q); }
           }
           if (cmd.speed !== undefined && isFinite(Number(cmd.speed))) setSpeed(c, Number(cmd.speed));
-          if (wps.length) { c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
-          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
+          if (wps.length) { endRun(c); c.target = wps.shift(); c.path = wps; c.headingWalk = false; c.mode = 'walking'; c.thenReturn = !!cmd.thenReturn; }
+          else if (cmd.heading !== undefined && isFinite(Number(cmd.heading))) { endRun(c); c.headingDeg = norm360(Number(cmd.heading)); c.target = null; c.path = []; c.headingWalk = true; c.mode = 'walking'; c.thenReturn = false; }
           else err = 'walk needs to {lat,lon}, path or heading';
         } else if (name === 'stop') {
-          c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
+          endRun(c); c.target = null; c.path = []; c.headingWalk = false; c.thenReturn = false; c.mode = 'idle'; c.speed = 0;
         } else if (name === 'return') {
-          c.target = { lat: C.BASE.lat, lon: C.BASE.lon, label: 'Base' }; c.path = []; c.headingWalk = false; c.thenReturn = false;
+          endRun(c); c.target = { lat: BASE.lat, lon: BASE.lon, label: BASE.name }; c.path = []; c.headingWalk = false; c.thenReturn = false;
           if (distM(c, c.target) < 1) { c.target = null; c.mode = 'resting'; } else c.mode = 'returning';
         } else if (name === 'setSpeed') {
           var m = Number(cmd.mps);
           if (!isFinite(m) || m <= 0) { err = 'mps must be positive'; return; }
           setSpeed(c, m);
+        } else if (name === 'setTravel') {
+          if (!setTravel(c, cmd.mode)) err = 'mode must be rover or foot';
+        } else if (name === 'runMission') {
+          err = startRun(c, cmd.speed);
         } else if (name === 'set') {
           err = setField(c, String(cmd.field || ''), cmd.value);
         }
@@ -1200,7 +1535,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       if (C.FIELDS.indexOf(field) < 0) return 'cannot set ' + field;
       if (field === 'mode') {
         if (['idle', 'resting'].indexOf(value) < 0) return 'mode can be set to idle or resting';
-        c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
+        endRun(c); c.mode = value; c.target = null; c.path = []; c.headingWalk = false; c.speed = 0; return null;
       }
       if (field === 'hr' && (value === null || value === 'auto')) { c.hrOverride = null; return null; }
       var v = Number(value);
@@ -1209,10 +1544,10 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       else if (field === 'batPct') c.bat = clamp(v, 0, 100);
       else if (field === 'hr') { c.hrOverride = clamp(v, 0, 250); c.hr = c.hrOverride; }
       else if (field === 'suitTempC') c.suitT = clamp(v, -120, 80);
-      else if (field === 'doseMsv') c.dose = Math.max(0, v);
+      else if (field === 'doseMsv') c.dose = clamp(v, 0, 1e5);
       else if (field === 'headingDeg') c.headingDeg = norm360(v);
       else if (field === 'lat') { if (Math.abs(v) > 90) return 'lat out of range'; c.lat = v; }
-      else if (field === 'lon') c.lon = v;
+      else if (field === 'lon') c.lon = ((v + 180) % 360 + 360) % 360 - 180;   // wrapped into [-180, 180)
       return null;
     }
 
@@ -1225,13 +1560,16 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
         hr: Math.round(c.hrOverride !== null ? c.hrOverride + c.hrNoise * 0.5 : c.hr + c.hrNoise),
         suitTempC: round(c.suitT, 1), ambientTempC: round(c.amb, 1), radUsvH: round(c.rad, 2), doseMsv: round(c.dose, 4),
         mode: c.mode, speedMps: round(c.speed, 2),
-        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null
+        target: c.target ? { lat: round(c.target.lat, 6), lon: round(c.target.lon, 6), label: c.target.label || '' } : null,
+        travel: c.travel, stopId: c.stopId, taskId: c.taskId, progress: { done: c.tasksDone, total: info.tasks.length },
+        distM: c.target ? round(distM(c, c.target), 1) : null,
+        etaS: c.run && c.run.phase === 'eva' ? Math.max(0, Math.round(c.run.evaTotal - c.run.evaT)) : c.target && speedOf(c) > 0 ? Math.round(distM(c, c.target) / speedOf(c)) : null
       };
     }
     function world() {
       var out = {};
       order.forEach(function (id) { out[id] = record(crew[id]); });
-      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: C.BASE.lat, lon: C.BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
+      return { v: 1, t: new Date(startMs + elapsedMs).toISOString(), clockSpeed: clock, base: { lat: BASE.lat, lon: BASE.lon }, crew: out, events: { solar: events.solar, dust: events.dust } };
     }
 
     /* Continue from a world snapshot (used by world-client when the authority disappears). Unknown crew are added. */
@@ -1248,8 +1586,10 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
         c.lat = num(r.lat, c.lat); c.lon = num(r.lon, c.lon); c.headingDeg = num(r.headingDeg, 0);
         c.o2 = clamp(num(r.o2Pct, 100), 0, 100); c.bat = clamp(num(r.batPct, 100), 0, 100); c.hr = num(r.hr, c.hr);
         c.suitT = num(r.suitTempC, c.suitT); c.dose = Math.max(0, num(r.doseMsv, 0)); c.speed = 0;
+        c.travel = r.travel === 'rover' ? 'rover' : 'foot'; c.run = null; c.stopId = null; c.taskId = null;   // a mission run in progress is not part of the world: it stops at its current target
+        c.tasksDone = r.progress && isFinite(Number(r.progress.done)) ? Math.max(0, Number(r.progress.done)) : 0;
         c.mode = ['idle', 'walking', 'returning', 'resting'].indexOf(r.mode) >= 0 ? r.mode : 'idle';
-        c.walkSpeed = clamp(num(r.speedMps, 0) || c.walkSpeed, 0.1, C.MAX_MPS);
+        var sp = num(r.speedMps, 0); c.speedOverride = sp > 0 && Math.abs(sp - SPD[c.travel]) > 0.01 ? clamp(sp, 0.1, C.MAX_MPS) : null;
         c.target = pointOf(r.target); c.path = [];
         if (!c.target && (c.mode === 'walking' || c.mode === 'returning')) c.mode = 'idle';
       });
@@ -1259,11 +1599,11 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
 
     reset();
     return { tick: tick, world: world, command: command, reset: reset, load: load, addCrew: addCrew, removeCrew: removeCrew,
-             crewIds: function () { return order.slice(); }, clockSpeed: function () { return clock; } };
+             crewIds: function () { return order.slice(); }, mission: function () { return info; }, speeds: function () { return { rover: SPD.rover, foot: SPD.foot }; }, clockSpeed: function () { return clock; } };
   }
 
   var api = {
-    create: create, C: C, PLACES: PLACES, demoPath: demoPath, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
+    create: create, C: C, missionInfo: missionInfo, speeds: speeds, xy: xy, ll: ll, radiationAt: radiationAt, ambientC: ambientC,
     localHour: localHour, localMarsTime: localMarsTime, distM: distM, bearing: bearing, M_PER_DEG: M_PER_DEG
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -1278,10 +1618,10 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   'use strict';
   var Sim = window.JdaSim;
   if (!Sim) { document.body.textContent = 'sim-core.js failed to load.'; return; }
-  var C = Sim.C;
+  var C = Sim.C, MI = Sim.missionInfo(), SPD = Sim.speeds();
   var sim = Sim.create({ seed: 20260101 });
   var $ = function (id) { return document.getElementById(id); };
-  var REMOTE_CMDS = ['walk', 'stop', 'return', 'setSpeed', 'setClockSpeed', 'set', 'event', 'reset'];
+  var REMOTE_CMDS = ['walk', 'stop', 'return', 'setSpeed', 'setTravel', 'runMission', 'setClockSpeed', 'set', 'event', 'reset'];
   var CLOCKS = [1, 10, 60, 600, 3600];
   var authorId = 'c' + Math.random().toString(36).slice(2, 8), epoch = Date.now();
   var role = 'authority', observeUntil = 0, otherEvents = 0, lastOther = null, otherEpoch = 0;   // role: 'observing' | 'authority' | 'blocked'
@@ -1307,6 +1647,35 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   }
   function nameOf(id) { return W.crew[id] ? W.crew[id].name : id; }
 
+  /* in-page confirmation (no browser dialogs): alertdialog with focus trap, Esc or Cancel closes, focus returns to the trigger */
+  function confirmStep(trigger, title, yesLabel, onYes) {
+    var back = h('div', { class: 'cf-back' }), yes, no, prevent = false;
+    function close(ok) {
+      if (prevent) return; prevent = true;
+      document.removeEventListener('keydown', onKey, true);
+      if (back.parentNode) back.parentNode.removeChild(back);
+      var t = trigger && document.contains(trigger) ? trigger : ($('addName') || document.body);
+      try { t.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+      if (ok) { onYes(); if (!document.contains(t) || document.activeElement === document.body) { try { $('addName').focus({ preventScroll: true }); } catch (e) { /* ignore */ } } }
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); }
+      else if (e.key === 'Tab') {
+        var f = [no, yes], i = f.indexOf(document.activeElement);
+        if (i < 0) { f[0].focus(); e.preventDefault(); }
+        else if (e.shiftKey && i === 0) { f[1].focus(); e.preventDefault(); }
+        else if (!e.shiftKey && i === 1) { f[0].focus(); e.preventDefault(); }
+      }
+    }
+    no = h('button', { type: 'button', class: 'btn', text: 'Cancel', onclick: function () { close(false); } });
+    yes = h('button', { type: 'button', class: 'btn danger', text: yesLabel, onclick: function () { close(true); } });
+    var dlg = h('div', { class: 'cf-dlg', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'cf-t' }, [h('p', { id: 'cf-t', text: title }), h('div', { class: 'btnrow' }, [no, yes])]);
+    back.appendChild(dlg);
+    back.addEventListener('mousedown', function (e) { if (e.target === back) close(false); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(back); no.focus();
+  }
+
   /* ---------- commands ---------- */
   function run(cmd, who) {
     var r = sim.command(cmd);
@@ -1323,19 +1692,39 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       case 'stop': return who + ' stops';
       case 'return': return who + ' returns to base';
       case 'setSpeed': return who + ' speed ' + c.mps + ' m/s';
+      case 'setTravel': return who + ' travels ' + (c.mode === 'rover' ? 'by rover' : 'on foot');
+      case 'runMission': return who + ' runs the mission: base camp, ' + MI.stops.length + ' stops, back to base camp';
       case 'setClockSpeed': return 'clock x' + c.n;
       case 'set': return who + ' ' + c.field + ' = ' + c.value;
       case 'event': return 'events ' + JSON.stringify({ solar: c.solar, dust: c.dust });
       default: return c.cmd;
     }
   }
-  function walkTo(id, p) { return run({ cmd: 'walk', crew: id, to: { lat: p.lat, lon: p.lon, label: p.label } }); }
+  function walkTo(id, p, travel) { return run({ cmd: 'walk', crew: id, to: { lat: p.lat, lon: p.lon, label: p.name }, travel: travel }); }
+  function destinations() { return [MI.base].concat(MI.stops); }
 
-  function moveNow() {
-    var id = $('heroCrew').value; if (!id || !W.crew[id]) return;
-    if (W.clockSpeed < 60) run({ cmd: 'setClockSpeed', n: 60 });
-    var path = Sim.demoPath(), first = path.shift();
-    run({ cmd: 'walk', crew: id, to: first, path: path, thenReturn: true });
+  function runMission() {
+    var id = $('heroCrew').value; if (!id || !W.crew[id]) { logLine('Run mission: no crew member selected (add one first).'); return; }
+    if (W.clockSpeed < 60) run({ cmd: 'setClockSpeed', n: 600 });
+    run({ cmd: 'runMission', crew: id });
+  }
+  /* simulated seconds as h/min, plus the real time it takes at the current clock multiplier */
+  function dur(s) {
+    if (!(s >= 0)) return '-';
+    var m = Math.round(s / 60);
+    return m >= 60 ? Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min' : m < 1 ? '< 1 min' : m + ' min';
+  }
+  function etaText(s) {
+    if (s === null || s === undefined) return '-';
+    var real = s / (W.clockSpeed || 1);
+    return dur(s) + ' (' + (real < 90 ? Math.round(real) + ' s' : Math.round(real / 60) + ' min') + ' real)';
+  }
+  function stopLabel(c) {
+    if (c.stopId) {
+      var st = MI.stops.filter(function (x) { return x.id === c.stopId; })[0], t = MI.tasks.filter(function (x) { return x.id === c.taskId; })[0];
+      return 'Stop ' + (st ? st.n + ', ' + st.name : c.stopId) + (t ? ' / ' + t.title : '');
+    }
+    return c.target && c.target.label ? 'En route to ' + c.target.label : '-';
   }
 
   function sendSos(id) {
@@ -1354,12 +1743,17 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     });
     $('evSolar').addEventListener('change', function () { run({ cmd: 'event', solar: this.checked }); });
     $('evDust').addEventListener('change', function () { run({ cmd: 'event', dust: this.checked }); });
-    $('resetBtn').addEventListener('click', function () { if (window.confirm('Reset the simulation (positions, vitals, dose, clock)?')) run({ cmd: 'reset' }); });
-    $('moveNow').addEventListener('click', moveNow);
+    $('resetBtn').addEventListener('click', function () { var b = this; confirmStep(b, 'Reset the simulation (positions, vitals, dose, clock)? A running mission stops.', 'Yes, reset', function () { run({ cmd: 'reset' }); }); });
+    $('runMission').addEventListener('click', runMission);
     $('addForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var name = $('addName').value.replace(/\s+/g, ' ').trim();
       if (!name) { $('addName').focus(); return; }
+      name = name.slice(0, 24);
+      var low = name.toLowerCase();
+      if (Object.keys(W.crew).some(function (k) { return String(W.crew[k].name).toLowerCase() === low; })) {   // two cards with the same name cannot be told apart
+        logLine('Add crew failed (a crew member named ' + name + ' already exists)'); $('addName').focus(); return;
+      }
       var r = sim.addCrew({ name: name });
       logLine(r.ok ? 'Operator: added crew ' + name : 'Add crew failed (' + r.error + ')');
       $('addName').value = ''; W = sim.world(); publish(); render();
@@ -1386,37 +1780,53 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   function buildCard(id) {
     var el = {}, hrAuto;
     var vit = h('dl', { class: 'vit' });
-    ['o2', 'bat', 'hr', 'suit', 'amb', 'rad', 'dose', 'speed', 'pos'].forEach(function (k) {
+    ['o2', 'bat', 'hr', 'suit', 'amb', 'rad', 'dose', 'speed', 'pos', 'travel', 'where', 'dist', 'eta'].forEach(function (k) {
       el[k] = h('dd', { text: '-' });
-      vit.appendChild(h('div', {}, [h('dt', { text: { o2: 'Oxygen', bat: 'Battery', hr: 'Heart rate', suit: 'Suit temp', amb: 'Ambient', rad: 'Radiation', dose: 'Dose', speed: 'Speed', pos: 'Map x,y' }[k] }), el[k]]));
+      vit.appendChild(h('div', {}, [h('dt', { text: { o2: 'Oxygen', bat: 'Battery', hr: 'Heart rate', suit: 'Suit temp', amb: 'Ambient', rad: 'Radiation', dose: 'Dose', speed: 'Speed', pos: 'Map x,y', travel: 'Travel', where: 'Stop / task', dist: 'Distance left', eta: 'ETA' }[k] }), el[k]]));
     });
     el.mode = h('span', { class: 'mode', text: 'idle' });
     el.name = h('span', { text: id });
     var dest = h('select', { 'aria-label': 'Destination for ' + id });
-    var keys = ['three', 'hawks', 'fan', 'neretva', 'whh', 'seitah', 'landing'];
-    keys.forEach(function (k) { dest.appendChild(h('option', { value: k, text: Sim.PLACES[k].label })); });
+    destinations().forEach(function (p, i) { dest.appendChild(h('option', { value: i, text: (p.n ? p.n + '. ' : '') + p.name })); });
     var head = h('input', { type: 'number', min: 0, max: 359, step: 1, value: 90, 'aria-label': 'Heading in degrees from north', style: 'width:5.5em' });
-    var spd = slider('Walking speed', 0.1, 10, 0.1, function (v) { run({ cmd: 'setSpeed', crew: id, mps: v }); }, ' m/s');
+    var spd = slider('Speed (rover ' + SPD.rover + ', foot ' + SPD.foot + ' m/s)', 0.1, 10, 0.1, function (v) { run({ cmd: 'setSpeed', crew: id, mps: v }); }, ' m/s');
     var o2 = slider('Oxygen', 0, 100, 1, function (v) { run({ cmd: 'set', crew: id, field: 'o2Pct', value: v }); }, ' %');
     var bat = slider('Battery', 0, 100, 1, function (v) { run({ cmd: 'set', crew: id, field: 'batPct', value: v }); }, ' %');
     var hr = slider('Heart rate', 40, 200, 1, function (v) { run({ cmd: 'set', crew: id, field: 'hr', value: v }); hr.row._auto.checked = false; }, ' bpm',
       function () { run({ cmd: 'set', crew: id, field: 'hr', value: null }); });
     hrAuto = hr.row._auto; hrAuto.checked = true;
     el.sliders = { speed: spd, o2: o2, bat: bat, hr: hr };
+    el.prog = h('progress', { max: Math.max(1, MI.tasks.length), value: 0, 'aria-label': 'Tasks done' });
+    el.progText = h('span', { class: 'progtext', text: '0 of ' + MI.tasks.length + ' tasks' });
+    el.travelBtns = {};
+    var tsw = h('div', { class: 'seg', role: 'group', 'aria-label': 'Travel mode for ' + id }, [['rover', 'Rover'], ['foot', 'On foot']].map(function (m) {
+      var b = h('button', { type: 'button', class: 'btn', 'aria-pressed': 'false', text: m[1], onclick: function () { run({ cmd: 'setTravel', crew: id, mode: m[0] }); } });
+      el.travelBtns[m[0]] = b; return b;
+    }));
     var card = h('article', { class: 'card', 'aria-label': id }, [
       h('h3', {}, [el.name, el.mode]),
       vit,
+      h('div', { class: 'progrow' }, [el.prog, el.progText]),
+      h('div', { class: 'btnrow' }, [h('span', { class: 'lbl', text: 'Travel' }), tsw,
+        h('button', { type: 'button', class: 'btn', text: 'Run mission', onclick: function () { run({ cmd: 'runMission', crew: id }); } })]),
       h('div', { class: 'btnrow' }, [
-        h('button', { type: 'button', class: 'btn primary', text: 'Walk', onclick: function () { walkTo(id, Sim.PLACES[dest.value]); } }),
+        h('button', { type: 'button', class: 'btn primary', text: 'Walk', onclick: function () { walkTo(id, destinations()[Number(dest.value)]); } }),
         h('button', { type: 'button', class: 'btn', text: 'Stop', onclick: function () { run({ cmd: 'stop', crew: id }); } }),
         h('button', { type: 'button', class: 'btn', text: 'Return', onclick: function () { run({ cmd: 'return', crew: id }); } }),
         h('button', { type: 'button', class: 'btn danger', text: 'SOS', onclick: function () { sendSos(id); } })
       ]),
       h('div', { class: 'btnrow' }, [h('label', { class: 'field inline' }, ['To ', dest]),
         h('label', { class: 'field inline' }, ['Heading ', head]),
-        h('button', { type: 'button', class: 'btn', text: 'Walk on heading', onclick: function () { run({ cmd: 'walk', crew: id, heading: Number(head.value) || 0 }); } })]),
+        h('button', { type: 'button', class: 'btn', text: 'Walk on heading', onclick: function () {
+          var hv = String(head.value).trim(), hn = Number(hv);
+          if (hv === '' || !isFinite(hn)) { logLine('Walk on heading needs a number of degrees from north (0 to 359).'); head.focus(); return; }
+          run({ cmd: 'walk', crew: id, heading: ((hn % 360) + 360) % 360 });
+        } })]),
       spd.row, o2.row, bat.row, hr.row,
-      h('div', { class: 'btnrow' }, [h('button', { type: 'button', class: 'btn', text: 'Remove', onclick: function () { if (window.confirm('Remove ' + nameOf(id) + '?')) { sim.removeCrew(id); W = sim.world(); publish(); render(); } } })])
+      h('div', { class: 'btnrow' }, [h('button', { type: 'button', class: 'btn', text: 'Remove', onclick: function (ev) {
+        if (Object.keys(W.crew).length <= 1) { logLine('Remove failed (at least one crew member must stay; Reset does not bring removed crew back)'); return; }
+        confirmStep(ev.currentTarget, 'Remove ' + nameOf(id) + ' from the simulation?', 'Yes, remove', function () { sim.removeCrew(id); W = sim.world(); publish(); render(); });
+      } })])
     ]);
     el.card = card;
     return el;
@@ -1452,13 +1862,22 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       e.hr.textContent = c.hr + ' bpm'; e.suit.textContent = fmt(c.suitTempC, 1) + ' C'; e.amb.textContent = fmt(c.ambientTempC, 0) + ' C';
       e.rad.textContent = fmt(c.radUsvH, 1) + ' uSv/h'; e.dose.textContent = fmt(c.doseMsv, 3) + ' mSv';
       e.speed.textContent = fmt(c.speedMps, 1) + ' m/s'; e.pos.textContent = fmt(c.x, 0) + ', ' + fmt(c.y, 0);
+      var trv = c.travel === 'rover' ? 'rover' : 'foot';
+      e.travel.textContent = trv === 'rover' ? 'Rover (cabin air)' : 'On foot (suit)';
+      e.where.textContent = stopLabel(c);
+      e.dist.textContent = c.distM === null || c.distM === undefined ? '-' : c.distM >= 1000 ? fmt(c.distM / 1000, 2) + ' km' : fmt(c.distM, 0) + ' m';
+      e.eta.textContent = etaText(c.etaS);
+      var pr = c.progress || { done: 0, total: MI.tasks.length };
+      e.prog.max = Math.max(1, pr.total); e.prog.value = pr.done; e.progText.textContent = pr.done + ' of ' + pr.total + ' tasks';
+      Object.keys(e.travelBtns).forEach(function (k) { e.travelBtns[k].setAttribute('aria-pressed', k === trv ? 'true' : 'false'); });
+      setSlider(e.sliders.speed, c.speedMps > 0 ? c.speedMps : SPD[trv]);
       setSlider(e.sliders.o2, Math.round(c.o2Pct)); setSlider(e.sliders.bat, Math.round(c.batPct));
       if (e.sliders.hr.row._auto.checked) setSlider(e.sliders.hr, c.hr);
     });
     // table
     ids.forEach(function (id) {
       var c = W.crew[id], r = rows[id]; if (!r) return;
-      var v = [c.name, c.mode, fmt(c.lat, 5), fmt(c.lon, 5), fmt(c.x, 0) + ', ' + fmt(c.y, 0), fmt(c.speedMps, 1), fmt(c.headingDeg, 0), fmt(c.o2Pct, 1), fmt(c.batPct, 1), c.hr, fmt(c.suitTempC, 1), fmt(c.ambientTempC, 1), fmt(c.radUsvH, 1), fmt(c.doseMsv, 3)];
+      var v = [c.name, c.mode, c.travel === 'rover' ? 'rover' : 'foot', c.stopId ? c.stopId + (c.taskId ? ' / ' + c.taskId : '') : '-', (c.progress ? c.progress.done + '/' + c.progress.total : '-'), fmt(c.lat, 5), fmt(c.lon, 5), fmt(c.x, 0) + ', ' + fmt(c.y, 0), fmt(c.speedMps, 1), fmt(c.headingDeg, 0), fmt(c.o2Pct, 1), fmt(c.batPct, 1), c.hr, fmt(c.suitTempC, 1), fmt(c.ambientTempC, 1), fmt(c.radUsvH, 1), fmt(c.doseMsv, 3)];
       v.forEach(function (t, i) { if (r[i].textContent !== String(t)) r[i].textContent = t; });
     });
     // header, clock, events
@@ -1477,7 +1896,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     rows = {};
     ids.forEach(function (id) {
       var tr = h('tr'), cells = [];
-      for (var i = 0; i < 14; i++) { var td = h(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row' } : {}); cells.push(td); tr.appendChild(td); }
+      for (var i = 0; i < 17; i++) { var td = h(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row' } : {}); cells.push(td); tr.appendChild(td); }
       rows[id] = cells; tb.appendChild(tr);
     });
   }
@@ -1544,6 +1963,17 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       setRole('blocked', 'Another control page took over this room. This page has stopped publishing.');
     }
   }
+  /* A reloaded (or re-opened) control page continues from the room's last published world (a closed control page leaves one, marked stale)
+     instead of rewinding every crew member to the start. Only worlds published within the last 30 minutes are used. */
+  var resumed = false;
+  function resumeRoomWorld() {
+    if (resumed) return; resumed = true;
+    var L = window.JdaLink, st = null;
+    try { st = L && L.getState ? L.getState('world') : null; } catch (e) { st = null; }
+    var v = st && st.value;
+    if (!v || typeof v !== 'object' || !v.crew || v.authorId === authorId || !(Date.now() - Number(v.hb) < 30 * 60000)) return;
+    if (sim.load(v)) { W = sim.world(); lastIds = ''; logLine('Resumed from the last world of this room (' + String(v.t).slice(11, 19) + ' mission time). Use Reset simulation to start over.'); }
+  }
   function takeOver() {
     if (lastOther && Date.now() - lastOther.ms < 15000) sim.load(lastOther.w);   // continue from its world, no jump back
     epoch = Math.max(Date.now(), (lastOther && Number(lastOther.w.epoch) || 0) + 1);
@@ -1564,7 +1994,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
       var offMsg = L.on(onMessage), offSt = typeof L.onState === 'function' ? L.onState('world', onWorldState) : null;
       offLink = function () { try { offMsg(); } catch (e) { /* ignore */ } if (offSt) { try { offSt(); } catch (e) { /* ignore */ } } };
       logLine('Joined room ' + code);
-      otherEvents = 0; lastOther = null; observeUntil = Date.now() + 3000; setRole('observing');
+      otherEvents = 0; lastOther = null; resumed = false; observeUntil = Date.now() + 3000; setRole('observing');
     }
     if (!code) setRole('authority');
     buildLinks();
@@ -1573,7 +2003,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
     if (!m || typeof m !== 'object') return;
     if (m.type === 'cmd' && role !== 'blocked' && REMOTE_CMDS.indexOf(m.cmd) >= 0) {
       var who = m.from && m.from.name ? m.from.name : 'Remote';
-      run({ cmd: m.cmd, crew: m.crew, to: m.to, heading: m.heading, path: m.path, mps: m.mps, n: m.n, field: m.field, value: m.value, solar: m.solar, dust: m.dust, speed: m.speed }, who);
+      run({ cmd: m.cmd, crew: m.crew, to: m.to, heading: m.heading, path: m.path, mps: m.mps, n: m.n, field: m.field, value: m.value, solar: m.solar, dust: m.dust, speed: m.speed, travel: m.travel, mode: m.mode, thenReturn: m.thenReturn }, who);
     } else if (m.type === 'sos') {
       logLine('SOS received from ' + String(m.from && m.from.name || m.from || 'unknown').slice(0, 30), 'sos');
     }
@@ -1587,7 +2017,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   function pump() {
     var now = Date.now(), dt = Math.min(now - lastTick, 600000); lastTick = now;
     while (dt > 0) { var d = Math.min(dt, 5000); sim.tick(d); dt -= d; }
-    if (role === 'observing' && now >= observeUntil) setRole('authority', 'No other control page found; this page is the simulation authority.');
+    if (role === 'observing' && now >= observeUntil) { resumeRoomWorld(); setRole('authority', 'No other control page found; this page is the simulation authority.'); }
     if (role === 'blocked' && lastOther && now - lastOther.ms > 8000) { takeOver(); logLine('The other control page stopped sending updates, so this page took over.'); }
     W = role === 'blocked' && lastOther ? lastOther.w : sim.world();
     if (++pubCount >= 10) { pubCount = 0; publish(); }
@@ -1603,7 +2033,7 @@ window.JEZERO_SCIENCE = {"meta":{"cell_m":38.8,"h":199,"note":"SIMULATED / DERIV
   setInterval(render, 250);
   setInterval(watchRoom, 500);
   render(); watchRoom();
-  logLine('Simulation ready. Press Move now to send a crew member on a walk.');
+  logLine('Simulation ready. Press Run mission to send a crew member from base camp through all stops and back.');
   window.JdaControl = { sim: sim, run: run, world: function () { return W; } };   // for tests and the console
 })();
 

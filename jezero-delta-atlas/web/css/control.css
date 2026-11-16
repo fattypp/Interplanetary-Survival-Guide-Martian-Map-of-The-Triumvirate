@@ -68,3 +68,15 @@ thead th{background:var(--chip);position:sticky;top:0;font-weight:600}
 main{grid-template-columns:minmax(0,1fr)}main>*{min-width:0}
 .ch{padding-right:max(16px,env(safe-area-inset-right))}
 @media (max-width:900px){.ch{padding-top:52px}}
+
+/* mission progress and travel */
+.progrow{display:flex;align-items:center;gap:10px}
+.progrow progress{flex:1 1 auto;height:10px;accent-color:var(--acc)}
+.progtext{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.btnrow .lbl{align-self:center;flex:0 0 auto;min-width:0;font-size:11px;text-transform:uppercase;color:var(--mute)}
+.vit dd{overflow-wrap:anywhere}
+
+.cf-back{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.6)}
+.cf-dlg{width:min(420px,100%);padding:18px;border:2px solid var(--bad);border-radius:12px;background:var(--panel);color:inherit}
+.cf-dlg p{margin:0 0 14px;font-weight:600}
+.cf-dlg .btnrow{justify-content:flex-end}
